@@ -1,0 +1,37 @@
+# Netlify configuration.
+#
+# IMPORTANT: this alone is not enough to run the app. The database is a SQLite
+# file on disk and Netlify's functions have a read-only filesystem, so every
+# write is lost. Read the deployment section of HANDOVER.md and pick a hosted
+# database (Turso is the smallest change) before deploying for real.
+
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "SAMEORIGIN"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "geolocation=(), microphone=(), camera=()"
+
+# The admin and the checkout must never be indexed or cached by a CDN.
+[[headers]]
+  for = "/admin/*"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow"
+    Cache-Control = "no-store"
+
+[[headers]]
+  for = "/checkout-simulator"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow"
+    Cache-Control = "no-store"

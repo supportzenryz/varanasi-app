@@ -1,0 +1,178 @@
+@import "tailwindcss";
+@import "./fonts.css";
+
+/* Varanasi brand tokens — taken from the captured theme CSS of the live site */
+@theme {
+  --color-gold: #E9BA20;
+  --color-gold-deep: #B69112;
+  --color-gold-ink: #7A5C04;
+  --color-ink: #0F0F0F;
+  --color-ink-2: #1F1F1F;
+  --color-ink-3: #4A4C42;
+  --color-pale: #F5F9E9;
+  --color-pale-2: #ECF4D5;
+  --color-pale-3: #E3EEC1;
+  --color-leaf: #458F4A;
+  --color-clay: #D15F3C;
+  --color-brick: #882D25;
+
+  --font-display: "Fraunces", Georgia, "Times New Roman", serif;
+  --font-accent: "Tenor Sans", Optima, Georgia, serif;
+  --font-body: "Manrope", ui-sans-serif, system-ui, -apple-system, sans-serif;
+}
+
+/* The public site is dark and gold, the way the printed menus and the original
+   site are. The cream palette reads as a different restaurant entirely, so the
+   page tokens below are the dark ones and `--line` is a low gold rather than a
+   sage green. The admin keeps the light surfaces — it's a working tool, and
+   staff read it in daylight. */
+:root {
+  --surface: var(--color-ink-2);
+  --page: var(--color-ink);
+  --text: var(--color-pale);
+  --muted: rgba(245, 249, 233, 0.58);
+  --line: rgba(233, 186, 32, 0.22);
+  --line-soft: rgba(245, 249, 233, 0.10);
+}
+
+/* Admin runs on the light palette; scoping it here keeps every shared
+   component working in both without a second set of classes. */
+.dash {
+  --surface: #FFFFFF;
+  --page: var(--color-pale);
+  --text: var(--color-ink);
+  --muted: var(--color-ink-3);
+  --line: #D7DFBF;
+  --line-soft: #E4EACF;
+}
+
+@layer base {
+/* Base type size. Every size in the app is expressed in rem, so this one
+   number is the whole site's type scale. The captured theme ran at the 16px
+   browser default, which read small on a wide dark page — the client asked for
+   larger type throughout, so the scale is lifted here rather than by editing
+   several hundred utility classes. */
+html {
+  -webkit-text-size-adjust: 100%;
+  scroll-behavior: smooth;
+  color-scheme: dark;
+  font-size: 18px;
+}
+@media (max-width: 480px) { html { font-size: 17px; } }
+body {
+  background: var(--page);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-synthesis-weight: none;
+  -webkit-font-smoothing: antialiased;
+}
+.dash body, .dash { color-scheme: light; }
+
+/* Form controls on the dark site: the browser default is a white box, which
+   punches a hole in the page. */
+.on-dark input, .on-dark select, .on-dark textarea {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--color-pale);
+  border-color: var(--line);
+}
+.on-dark input::placeholder, .on-dark textarea::placeholder { color: rgba(245, 249, 233, 0.35); }
+.on-dark input:focus, .on-dark select:focus, .on-dark textarea:focus { border-color: var(--color-gold); }
+.on-dark option { background: var(--color-ink-2); color: var(--color-pale); }
+/* the native date/time pickers ship a black glyph — invert it on dark */
+.on-dark input[type="date"]::-webkit-calendar-picker-indicator,
+.on-dark input[type="time"]::-webkit-calendar-picker-indicator { filter: invert(1) opacity(.55); }
+.on-dark input[type="checkbox"] { accent-color: var(--color-gold); }
+
+/* The printed menus set headings in Fraunces with generous tracking; match it. */
+h1, h2, h3, .display {
+  font-family: var(--font-display);
+  font-weight: 400;
+  text-wrap: balance;
+  letter-spacing: -0.005em;
+}
+h1 { line-height: 1.04; }
+}
+
+@layer components {
+/* Small gold caps — the live site's section label, and the PDF's category rule */
+.accent {
+  font-family: var(--font-accent);
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  display: inline-block;
+  /* The captured theme set some of these gold caps as low as 0.52rem, which is
+     under 10px and effectively unreadable. `1em` is whatever the utility class
+     asked for, so this is a floor rather than an override: anything already
+     larger is left alone. */
+  font-size: max(1em, 0.72rem);
+}
+.tnum { font-variant-numeric: tabular-nums; }
+
+/* leader dots between a dish and its price, as the printed menu does */
+.leader { display: flex; align-items: baseline; gap: .5rem; }
+/* Dotted rule from dish to price. It has to follow the palette — as ink on the
+   dark site it was invisible, which lost the printed-menu look entirely. */
+.leader > .fill {
+  flex: 1 1 auto;
+  border-bottom: 1px dotted color-mix(in srgb, var(--color-gold) 34%, transparent);
+  transform: translateY(-.25rem);
+  min-width: 1.5rem;
+}
+.dash .leader > .fill { border-bottom-color: color-mix(in srgb, var(--color-ink) 26%, transparent); }
+
+/* A thin gold rule with a diamond at its centre — the menu's section divider */
+.rule {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  color: var(--color-gold-deep);
+}
+.rule::before, .rule::after {
+  content: "";
+  height: 1px;
+  flex: 1 1 auto;
+  background: linear-gradient(to right, transparent, currentColor 35%, currentColor 65%, transparent);
+  opacity: .5;
+}
+.rule.on-dark { color: var(--color-gold); }
+
+/* Buttons: the live site's square gold fill and its outlined counterpart */
+.btn {
+  display: inline-block;
+  padding: .9rem 1.8rem;
+  font-size: .8rem;
+  font-weight: 700;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  transition: background-color .25s, color .25s, border-color .25s;
+}
+.btn-gold { background: var(--color-gold); color: var(--color-ink); }
+.btn-gold:hover { background: var(--color-gold-deep); }
+.btn-outline { border: 1px solid rgba(245, 249, 233, .45); color: var(--color-pale); }
+.btn-outline:hover { border-color: var(--color-gold); color: var(--color-gold); }
+/* the quiet button: an outlined gold on the dark site, solid ink in the admin */
+.btn-ink { border: 1px solid var(--color-gold); color: var(--color-gold); background: transparent; }
+.btn-ink:hover { background: var(--color-gold); color: var(--color-ink); }
+.dash .btn-ink { background: var(--color-ink); color: var(--color-pale); border-color: var(--color-ink); }
+.dash .btn-ink:hover { background: var(--color-ink-2); }
+
+/* A card on the dark site: a hair of light lifted off the page, gold-edged. */
+.card {
+  background: linear-gradient(180deg, rgba(255,255,255,.045), rgba(255,255,255,.02));
+  border: 1px solid var(--line);
+}
+.dash .card { background: #FFFFFF; border-color: var(--line); }
+
+/* Photographs sit behind a soft ink wash so gold type stays legible on them */
+.wash-ink { background: linear-gradient(to right, rgba(15,15,15,.92) 0%, rgba(15,15,15,.72) 45%, rgba(15,15,15,.35) 100%); }
+.wash-ink-y { background: linear-gradient(to top, rgba(15,15,15,.85) 0%, rgba(15,15,15,.15) 55%, rgba(15,15,15,.35) 100%); }
+
+.hover-zoom img { transition: transform .7s cubic-bezier(.2,.7,.3,1); }
+.hover-zoom:hover img { transform: scale(1.05); }
+}
+
+:focus-visible { outline: 2px solid var(--color-gold); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}

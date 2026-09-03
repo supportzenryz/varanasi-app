@@ -1,0 +1,199 @@
+{
+  "_source": "Transcribed from the captured varanasi.uk private-dining pages, Sept 2026. Capacities, deposits and hire charges are the client's own published figures.",
+  "birmingham": [
+    {
+      "name": "Main Dining Hall",
+      "capacityMax": 150,
+      "exclusivityNote": "Charges apply",
+      "setMenuNote": "Shahi or Dawat Set Menu (tasting menu)",
+      "headline": "A Grand, Immersive Dining Experience",
+      "description": "The Main Dining Hall at Varanasi offers a breathtaking setting designed to impress. With its striking décor, ambient lighting and vibrant atmosphere, this expansive space provides the perfect backdrop for large-scale celebrations and unforgettable dining experiences. Available for exclusive hire, the hall can be transformed to suit a variety of occasions — offering complete privacy, personalised service, and a commanding space that elevates any event.",
+      "tagline": "A breathtaking setting for large-scale celebrations, available for exclusive hire.",
+      "idealFor": [
+        "Grand Celebrations",
+        "Corporate Events & Galas",
+        "Wedding Receptions",
+        "Large Family Gatherings",
+        "Award Ceremonies",
+        "Festive Parties",
+        "Charity Dinners"
+      ],
+      "image": "/media/lib/birmingham/2025/12/main_dining_hall.jpg",
+      "imageBlurred": "/media/lib/birmingham/2025/12/main_dining_hall_blurred_v3.jpg"
+    },
+    {
+      "name": "Nirvana Cocktail Lounge",
+      "capacityMax": 50,
+      "hireChargePence": 25000,
+      "headline": "A Beautiful & Tranquil Event Setting",
+      "description": "The Nirvana Cocktail Lounge welcomes guests into a serene, atmospheric space enhanced by a stunning 20ft waterfall and calming energy. Perfect for vibrant, informal gatherings, this spacious and visually captivating area is ideal for parties, drinks receptions, or pre-dinner cocktails before seating in the main restaurant.",
+      "tagline": "Enjoy casual drinking and nibbles underneath the 20ft waterfall.",
+      "idealFor": [
+        "Any Type of Celebration",
+        "Milestone Birthdays",
+        "Wedding Parties",
+        "Business Events",
+        "Christmas Parties",
+        "New Year's Eve Celebrations"
+      ],
+      "image": "/media/lib/birmingham/2024/07/nirvana_cocktail_lounge.jpg",
+      "imageBlurred": "/media/lib/birmingham/2024/07/nirvana_cocktail_lounge_blurred.webp"
+    },
+    {
+      "name": "Siddhartha Dining Room",
+      "capacityMax": 20,
+      "depositPerPersonPence": 1000,
+      "hireChargePence": 10000,
+      "setMenuNote": "Dawat Set Menu at £65.00 per person (tasting menu)",
+      "headline": "A Formal, Private Business Environment",
+      "description": "Ideal for corporate functions and professional gatherings, the Siddhartha room provides an exclusive, private setting for up to 20 guests. Equipped with a wall-mounted 42\" screen, this room is designed to support meetings, presentations and corporate dining in comfort and style.",
+      "tagline": "An exclusive, formal space for corporate events and larger groups.",
+      "idealFor": [
+        "Client Meetings",
+        "Board Meetings",
+        "Seminars",
+        "Presentations",
+        "Conference Calls",
+        "Parties & Corporate Functions",
+        "Christmas Meals"
+      ],
+      "image": "/media/lib/birmingham/2024/07/siddhartha_dining_room.jpg",
+      "imageBlurred": "/media/lib/birmingham/2024/07/siddhartha_dining_room_blurred.webp"
+    },
+    {
+      "name": "Large Family Room",
+      "capacityMax": 50,
+      "depositPerPersonPence": 1000,
+      "setMenuNote": "Shahi or Dawat Set Menu (tasting menu)",
+      "headline": "A Spacious & Elegant Setting for Grand Celebrations",
+      "description": "The Large Family Room is the ideal space for hosting sizable gatherings while still enjoying the exclusivity and sophistication of private dining at Varanasi. With its refined décor and welcoming atmosphere, it lends itself perfectly to a wide range of events — from milestone celebrations to family reunions and festive occasions.",
+      "tagline": "Dine comfortably inside this large, unique, personal space for families.",
+      "idealFor": [
+        "Large Family Gatherings",
+        "Milestone Birthdays",
+        "Wedding-Related Celebrations",
+        "Anniversaries",
+        "Corporate Social Events",
+        "Festive Parties",
+        "Graduation Celebrations"
+      ],
+      "image": "/media/lib/birmingham/2024/07/large_family_room.jpg",
+      "imageBlurred": "/media/lib/birmingham/2024/07/large_family_room_blurred.webp"
+    },
+    {
+      "name": "Samsara Room",
+      "capacityMax": 12,
+      "depositPerPersonPence": 1000,
+      "hireChargePence": 7000,
+      "setMenuNote": "Dawat Set Menu at £65.00 per person (tasting menu)",
+      "headline": "A Warm & Relaxed Setting",
+      "description": "The Samsara room is an intimate space ideal for medium-sized gatherings. Designed with comfort in mind, it offers a cosy environment where guests can enjoy a relaxed dining experience while still embracing the vibrant atmosphere of Varanasi.",
+      "tagline": "A cosy room for family and friends.",
+      "idealFor": [
+        "Family & Friends",
+        "Milestone Birthdays",
+        "Celebratory Dinners",
+        "Anniversaries",
+        "Graduations",
+        "Engagements"
+      ],
+      "image": "/media/lib/birmingham/2024/07/samsara_sanctuary.webp",
+      "imageBlurred": "/media/lib/birmingham/2024/07/samsara_sanctuary_blurred.webp"
+    },
+    {
+      "name": "Small Family Room",
+      "capacityMax": 30,
+      "depositPerPersonPence": 1000,
+      "setMenuNote": "Shahi or Dawat Set Menu (tasting menu)",
+      "headline": "An Intimate Group Dining Space",
+      "description": "Created with families and close-knit groups in mind, the Small Family Room is perfect for intimate celebrations. Its warm and private setting accommodates up to 30 guests, offering a sophisticated fine dining experience for special occasions.",
+      "tagline": "A warm, private setting for close-knit groups.",
+      "idealFor": [
+        "Family & Friends",
+        "Milestone Birthdays",
+        "Celebratory Meals",
+        "Anniversaries",
+        "Graduations",
+        "Engagements"
+      ],
+      "image": "/media/lib/birmingham/2024/07/small_family_room.webp"
+    },
+    {
+      "name": "Maharaja Room",
+      "capacityMax": 8,
+      "depositPerPersonPence": 1000,
+      "hireChargePence": 5000,
+      "setMenuNote": "Dawat Set Menu at £65.00 per person (tasting menu)",
+      "headline": "A Cosy, Relaxed Dining Experience",
+      "description": "This beautifully appointed private room accommodates up to 8 guests and combines intimacy with comfort. Tucked away from the main dining area, the Maharaja room offers a warm, inviting ambience with lounge-style seating, perfect for relaxed, informal celebrations.",
+      "tagline": "Lounge-style seating for relaxed, informal celebrations.",
+      "idealFor": [
+        "Family Gatherings",
+        "Celebratory Meals",
+        "Milestone Birthdays",
+        "Anniversaries",
+        "Graduations",
+        "Engagements"
+      ],
+      "image": "/media/lib/birmingham/2024/07/mahajara-booth.jpeg",
+      "imageBlurred": "/media/lib/birmingham/2024/07/mahajara_booth_blurred.webp"
+    },
+    {
+      "name": "Raja Rani",
+      "capacityMax": 2,
+      "depositPerPersonPence": 1000,
+      "hireChargePence": 3000,
+      "setMenuNote": "Dawat Set Menu at £65.00 per person (tasting menu)",
+      "headline": "Luxurious, Intimate & Memorable",
+      "description": "The Raja–Rani room offers a truly exclusive setting designed for intimate occasions and refined dining experiences. Perfect for couples seeking a luxurious, private space, this room provides an elegant atmosphere and personalised service away from the main restaurant.",
+      "tagline": "An exclusive table for two, away from the main restaurant.",
+      "idealFor": [
+        "Proposals",
+        "Anniversaries",
+        "Date Nights",
+        "Intimate Celebrations"
+      ],
+      "image": "/media/lib/birmingham/2024/07/raja-rani.jpeg",
+      "imageBlurred": "/media/lib/birmingham/2024/07/raja_rani_blurred.webp"
+    }
+  ],
+  "leicester": [
+    {
+      "name": "Private Room 01",
+      "capacityMax": 8,
+      "depositPerPersonPence": 1000,
+      "hireChargePence": 8000,
+      "setMenuNote": "Dawat Set Menu at £65.00 per person (tasting menu)",
+      "headline": "A Cosy, Relaxed Dining Experience",
+      "description": "This beautifully appointed private room accommodates up to 8 guests and blends intimacy with comfort. Tucked away from the main dining area, Private Room 1 exudes a warm, inviting ambience with lounge-style seating perfect for relaxed, informal celebrations.",
+      "tagline": "An intimate, elegant space for up to eight guests.",
+      "idealFor": [
+        "Family Gatherings",
+        "Celebratory Meals",
+        "Milestone Birthdays",
+        "Anniversaries",
+        "Graduations"
+      ],
+      "image": "/media/lib/leicester/2025/12/room1_new.jpg",
+      "imageBlurred": "/media/lib/leicester/2025/12/room1_new_blurred.jpg"
+    },
+    {
+      "name": "Private Room 02",
+      "capacityMax": 8,
+      "depositPerPersonPence": 1000,
+      "hireChargePence": 8000,
+      "setMenuNote": "Dawat Set Menu at £65.00 per person (tasting menu)",
+      "headline": "Stylish and Versatile",
+      "description": "A chic, flexible space designed for private dining or small business gatherings. With sleek décor and comfortable seating for up to 8 guests, the Contemporary Suite provides a sophisticated yet relaxed atmosphere for any occasion.",
+      "tagline": "Exquisite cuisine and impeccable service for up to eight guests.",
+      "idealFor": [
+        "Private Dinners",
+        "Business Meetings",
+        "Intimate Celebrations",
+        "Special Occasions"
+      ],
+      "image": "/media/lib/leicester/2025/12/room2_new.jpg",
+      "imageBlurred": "/media/lib/leicester/2025/12/room2_new_blurred.jpg"
+    }
+  ]
+}

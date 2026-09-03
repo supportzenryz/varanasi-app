@@ -1,0 +1,150 @@
+{
+  "_source": "Branch copy, hero media, venue stats and gallery, transcribed from the captured varanasi.uk pages.",
+  "brand": {
+    "logo": "/media/lib/birmingham/2024/07/logo.png",
+    "logoDark": "/media/lib/birmingham/2024/07/logo_dark.png",
+    "logoIcon": "/media/lib/birmingham/2024/07/logo_icon.svg",
+    "wordmark": "/media/lib/birmingham/2026/01/varanasi_logo_text.png",
+    "favicon": "/media/lib/birmingham/2024/08/favicon-varanasi.svg",
+    "appleTouchIcon": "/media/lib/birmingham/2024/08/apple-touch-icon-varanasi.png",
+    "socialImage": "/media/lib/birmingham/2024/09/Varanasi_Social_Image.jpg",
+    "award": "/media/lib/birmingham/2026/01/travellers_choice_2025_v2.png",
+    "awardAlt": "Tripadvisor Travellers' Choice 2025",
+    "giftVoucherImage": "/media/lib/birmingham/2024/08/Gift_Vouchers2.webp",
+    "divider": "/media/lib/birmingham/2024/07/frame_divider.svg"
+  },
+  "branches": {
+    "birmingham": {
+      "heroKicker": "Artistry in Every Bite",
+      "heroHeading": "Indian Fine Dining Restaurant in Birmingham",
+      "heroVideo": "/media/lib/birmingham/2024/08/62062d2fec5a15da7cc2c22d_varanasi_intro-720p-2.mp4",
+      "heroImage": "/media/lib/birmingham/2024/08/hero_bg.webp",
+      "aboutHeading": "Varanasi's Modern Twist on Tradition",
+      "aboutSubheading": "A dynamic menu that celebrates heritage with a twist",
+      "aboutBody": "Varanasi brings contemporary Indian fine dining to Broad Street: a kitchen built around the tandoor and the sigri, eight private spaces, and three cocktail bars beneath a 20ft waterfall.",
+      "openingNote": "(Last orders 10pm)",
+      "bookingEmail": "reservations@varanasi.uk",
+      "pressEmail": "info@varanasi.uk",
+      "drinksPdf": "/media/lib/birmingham/2026/01/Varanasi-Drinks-and-Cocktail-Menu.pdf",
+      "stats": [
+        {
+          "value": "1",
+          "label": "Unique Venue",
+          "image": "/media/lib/birmingham/2024/08/home-about.webp"
+        },
+        {
+          "value": "3",
+          "label": "Cocktail Bars",
+          "image": "/media/lib/birmingham/2024/08/home-about-2.webp"
+        },
+        {
+          "value": "8",
+          "label": "Private Rooms",
+          "image": "/media/lib/birmingham/2024/08/home-about-3.webp",
+          "href": "/birmingham/private-dining-experiences"
+        }
+      ],
+      "collage": [
+        "/media/lib/birmingham/2024/08/drinks_varanasi.webp",
+        "/media/lib/birmingham/2024/08/main_room.webp",
+        "/media/lib/birmingham/2024/07/private_dining_room.jpg",
+        "/media/lib/birmingham/2024/08/varanasi_gallery_main.webp",
+        "/media/lib/birmingham/2024/07/buddha_varanasi.jpg",
+        "/media/lib/birmingham/2024/07/food_small_varanasi.jpg"
+      ],
+      "gallery": [
+        "/media/lib/birmingham/2024/10/gallery1.jpg",
+        "/media/lib/birmingham/2024/10/gallery2.jpg",
+        "/media/lib/birmingham/2024/10/gallery3.jpg",
+        "/media/lib/birmingham/2024/10/gallery4.jpg",
+        "/media/lib/birmingham/2024/10/gallery5.jpg",
+        "/media/lib/birmingham/2024/10/gallery6.jpg",
+        "/media/lib/birmingham/2024/10/gallery7.jpg",
+        "/media/lib/birmingham/2024/10/gallery8.jpg",
+        "/media/lib/birmingham/2024/10/gallery9.jpg",
+        "/media/lib/birmingham/2024/10/gallery10.jpg",
+        "/media/lib/birmingham/2024/10/gallery12.jpg",
+        "/media/lib/birmingham/2024/08/gallery-instagram-02.webp",
+        "/media/lib/birmingham/2024/08/gallery-instagram-03.webp",
+        "/media/lib/birmingham/2024/08/gallery-instagram-04.webp",
+        "/media/lib/birmingham/2024/08/gallery-instagram-05.webp",
+        "/media/lib/birmingham/2024/08/gallery-instagram-06.webp"
+      ],
+      "menuHero": "/media/lib/birmingham/2024/07/footer_food_bg.webp",
+      "privateDiningHero": "/media/lib/birmingham/2024/07/private_dining_hero.webp",
+      "menuBanners": [
+        "/media/lib/birmingham/2024/08/dishes-category-dinner-images.webp",
+        "/media/lib/birmingham/2024/08/dishes-category-dinner-images2.webp",
+        "/media/lib/birmingham/2024/08/dishes-category-dinner-images3.webp",
+        "/media/lib/birmingham/2024/08/dishes-category-dinner-image4.webp",
+        "/media/lib/birmingham/2024/08/dishes-category-dinner-images5.webp",
+        "/media/lib/birmingham/2024/08/dishes-category-dinner-images6.webp"
+      ],
+      "drinksHero": "/media/lib/birmingham/2024/08/varanasi_bottles.webp"
+    },
+    "leicester": {
+      "heroKicker": "Artistry in Every Bite",
+      "heroHeading": "Indian Fine Dining Restaurant in Leicester",
+      "heroImage": "/media/lib/leicester/2025/03/Varanasi-Leicester-Home-Hero.webp",
+      "heroVideo": null,
+      "aboutHeading": "Varanasi's Modern Twist on Tradition",
+      "aboutSubheading": "A dynamic menu that celebrates heritage with a twist",
+      "aboutBody": "The same kitchen, on Leicester's High Street: a single elegant dining room, a cocktail bar, and two private rooms for celebrations, corporate evenings and family gatherings.",
+      "openingNote": "(Last orders 10pm)",
+      "bookingEmail": "leicester@varanasi.uk",
+      "pressEmail": "info@varanasi.uk",
+      "drinksPdf": "/media/lib/leicester/2026/01/Varanasi-Drinks-and-Cocktail-Menu.pdf",
+      "stats": [
+        {
+          "value": "1",
+          "label": "Unique Venue",
+          "image": "/media/lib/leicester/2025/03/Varanasi-Leicester-Home-Dining.jpg"
+        },
+        {
+          "value": "1",
+          "label": "Cocktail Bar",
+          "image": "/media/lib/leicester/2025/03/Varanasi-Leicester-CocktailBar.jpg"
+        },
+        {
+          "value": "2",
+          "label": "Private Rooms",
+          "image": "/media/lib/leicester/2025/03/Varanasi-Leicester-Home-Private.jpg",
+          "href": "/leicester/private-dining-experiences"
+        }
+      ],
+      "collage": [
+        "/media/lib/leicester/2025/03/Varanasi-Leicester-Drinks.jpg",
+        "/media/lib/leicester/2025/03/Varanasi-Leicester-TableSetting.jpg",
+        "/media/lib/leicester/2025/03/Varanasi-Leicester-Gallery-Main.jpg",
+        "/media/lib/leicester/2025/03/Varanasi-Leicester-Lantern.jpg",
+        "/media/lib/leicester/2025/03/Varanasi-Leicester-Food-Small.jpg",
+        "/media/lib/leicester/2025/03/Varanasi-Leicester-Elephant.jpg"
+      ],
+      "gallery": [
+        "/media/lib/leicester/2025/03/Varanasi-Leicester-Gallery-Main.jpg",
+        "/media/lib/leicester/2025/03/Varanasi-Leicester-Gallery-Entrance.jpg",
+        "/media/lib/leicester/2025/03/Varanasi-Leicester-Gallery-01.jpg",
+        "/media/lib/leicester/2025/03/Varanasi-Leicester-Gallery-02.jpg",
+        "/media/lib/leicester/2025/03/Varanasi-Leicester-Gallery-03.jpg",
+        "/media/lib/leicester/2025/03/Varanasi-Leicester-CocktailBar.jpg",
+        "/media/lib/leicester/2025/03/Varanasi-Leicester-Drinks.jpg",
+        "/media/lib/leicester/2025/03/Varanasi-Leicester-TableSetting.jpg",
+        "/media/lib/leicester/2025/03/Varanasi-Leicester-Lantern.jpg",
+        "/media/lib/leicester/2025/03/Varanasi-Leicester-Lighting.jpg",
+        "/media/lib/leicester/2025/03/Varanasi-Leicester-Elephant.jpg",
+        "/media/lib/leicester/2025/03/Varanasi-Leicester-Food-Small.jpg"
+      ],
+      "menuHero": "/media/lib/leicester/2024/07/footer_food_bg.webp",
+      "privateDiningHero": "/media/lib/leicester/2025/03/Varanasi-Leicester-Private-Dining-Hero.jpg",
+      "menuBanners": [
+        "/media/lib/leicester/2024/08/dishes-category-dinner-images.webp",
+        "/media/lib/leicester/2024/08/dishes-category-dinner-images2.webp",
+        "/media/lib/leicester/2024/08/dishes-category-dinner-images3.webp",
+        "/media/lib/leicester/2024/08/dishes-category-dinner-image4.webp",
+        "/media/lib/leicester/2024/08/dishes-category-dinner-images5.webp",
+        "/media/lib/leicester/2024/08/dishes-category-dinner-images6.webp"
+      ],
+      "drinksHero": "/media/lib/leicester/2025/03/Varanasi-Leicester-Drinks.jpg"
+    }
+  }
+}

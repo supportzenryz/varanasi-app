@@ -1,0 +1,353 @@
+[
+ {
+  "slug": "",
+  "file": "home.html",
+  "title": "Welcome | Varanasi",
+  "description": "Please choose a location below: Birmingham Leicester",
+  "bodyClass": "home page-template-default page page-id-1 ",
+  "branch": "birmingham",
+  "bytes": 26473
+ },
+ {
+  "slug": "birmingham",
+  "file": "birmingham.html",
+  "title": "Varanasi | Indian Fine Dining Restaurant in Birmingham",
+  "description": "Discover exquisite fine dining at Varanasi located in Birmingham. Create memories with our private rooms and discover unique tastes with our menu.",
+  "bodyClass": "home page-template-default page page-id-2976 ",
+  "branch": "birmingham",
+  "bytes": 68068
+ },
+ {
+  "slug": "birmingham/birmingham",
+  "file": "birmingham__birmingham.html",
+  "title": "Varanasi | Indian Fine Dining Restaurant in Birmingham",
+  "description": "Discover exquisite fine dining at Varanasi located in Birmingham. Create memories with our private rooms and discover unique tastes with our menu.",
+  "bodyClass": "home page-template-default page page-id-2976 ",
+  "branch": "birmingham",
+  "bytes": 68068
+ },
+ {
+  "slug": "birmingham/book-a-private-room",
+  "file": "birmingham__book-a-private-room.html",
+  "title": "Book A Private Room - Varanasi",
+  "description": "Enjoy a fine dining experience in a private secluded area at Varanasi Birmingham. Select from several luxurious rooms. Book A Private Room Today",
+  "bodyClass": "page-template-default page page-id-3404 ",
+  "branch": "birmingham",
+  "bytes": 44531
+ },
+ {
+  "slug": "birmingham/book-online",
+  "file": "birmingham__book-online.html",
+  "title": "Book Online - Varanasi",
+  "description": "Enjoy a fine dining experience at Varanasi Birmingham and enjoy our incredible authentic Indian cuisine. Book Online Today.",
+  "bodyClass": "page-template-default page page-id-3564 ",
+  "branch": "birmingham",
+  "bytes": 51248
+ },
+ {
+  "slug": "birmingham/book-online",
+  "file": "birmingham__book-online.html",
+  "title": "Book Online - Varanasi",
+  "description": "Enjoy a fine dining experience at Varanasi Birmingham and enjoy our incredible authentic Indian cuisine. Book Online Today.",
+  "bodyClass": "page-template-default page page-id-3564 ",
+  "branch": "birmingham",
+  "bytes": 51250
+ },
+ {
+  "slug": "birmingham/contact",
+  "file": "birmingham__contact.html",
+  "title": "Contact - Varanasi Birmingham",
+  "description": "Contact Varanasi Birmingham to book a table, enquire for catering and corporate events. Varanasi Birmingham is located at 184 Broad Street, Birmingham, B15 1DA",
+  "bodyClass": "page-template-default page page-id-22 ",
+  "branch": "birmingham",
+  "bytes": 46971
+ },
+ {
+  "slug": "birmingham/corporate-dining-events",
+  "file": "birmingham__corporate-dining-events.html",
+  "title": "Book Corporate Dining Events - Varanasi Birmingham",
+  "description": "As Birmingham’s most prominent restaurant at 20,000 sq ft, Varanasi can create unique dining experiences for private, corporate dining events. Enquire online.",
+  "bodyClass": "page-template-default page page-id-2408 ",
+  "branch": "birmingham",
+  "bytes": 59887
+ },
+ {
+  "slug": "birmingham/franchise-opportunities",
+  "file": "birmingham__franchise-opportunities.html",
+  "title": "Franchise Opportunities - Varanasi",
+  "description": "Discover franchise opportunities at Varanasi. If you think you fit the bill and that we could work together, we’d love you to contact us.",
+  "bodyClass": "page-template-default page page-id-2416 ",
+  "branch": "birmingham",
+  "bytes": 46052
+ },
+ {
+  "slug": "birmingham/gallery",
+  "file": "birmingham__gallery.html",
+  "title": "Gallery - Varanasi",
+  "description": "Experience the atmosphere of Varanasi through our gallery. Find more images on our social medias. Make a reservation online.",
+  "bodyClass": "page-template-default page page-id-2412 ",
+  "branch": "birmingham",
+  "bytes": 67449
+ },
+ {
+  "slug": "birmingham/gift-vouchers",
+  "file": "birmingham__gift-vouchers.html",
+  "title": "Purchase Gift Vouchers - Varanasi",
+  "description": "Purchase gift vouchers at Varanasi and treat your family, friends or colleagues to a dining experience at Varanasi. Enquire on our website today.",
+  "bodyClass": "page-template-default page page-id-2414 ",
+  "branch": "birmingham",
+  "bytes": 42506
+ },
+ {
+  "slug": "birmingham/menu",
+  "file": "birmingham__menu.html",
+  "title": "Our Menu - Varanasi",
+  "description": "The Varanasi menu is a continually evolving repertoire; some classics, some reworking of old favourites plus new dishes for each season. Make a reservation.",
+  "bodyClass": "page-template-default page page-id-2404 ",
+  "branch": "birmingham",
+  "bytes": 100499
+ },
+ {
+  "slug": "birmingham/privacy",
+  "file": "birmingham__privacy.html",
+  "title": "Privacy Policy &amp; GDPR - Varanasi",
+  "description": "Your privacy is important to Varanasi Restaurant. Therefore, we have designed and implemented a privacy policy into our already service driven structure,",
+  "bodyClass": "page-template-default page page-id-3520 ",
+  "branch": "birmingham",
+  "bytes": 47727
+ },
+ {
+  "slug": "birmingham/private-dining-experiences",
+  "file": "birmingham__private-dining-experiences.html",
+  "title": "Private Dining Experiences - Varanasi",
+  "description": "Discover private dining experiences at Varanasi Birmingham. Make a reservation online and book a private room to get the full Varanasi experience.",
+  "bodyClass": "page-template-default page page-id-2406 ",
+  "branch": "birmingham",
+  "bytes": 90761
+ },
+ {
+  "slug": "birmingham/terms",
+  "file": "birmingham__terms.html",
+  "title": "Terms &amp; Conditions - Varanasi",
+  "description": "If you have any dietary requirements, please inform us when making your reservation.",
+  "bodyClass": "page-template-default page page-id-3522 ",
+  "branch": "birmingham",
+  "bytes": 38922
+ },
+ {
+  "slug": "blog/dish",
+  "file": "blog__dish.html",
+  "title": "Dishes | Varanasi",
+  "description": "Dishes Archive | Varanasi",
+  "bodyClass": "archive post-type-archive post-type-archive-dish ",
+  "branch": "birmingham",
+  "bytes": 40892
+ },
+ {
+  "slug": "book-online",
+  "file": "book-online.html",
+  "title": "Page Not Found | Varanasi",
+  "description": "",
+  "bodyClass": "error404 ",
+  "branch": "birmingham",
+  "bytes": 24677
+ },
+ {
+  "slug": "catering",
+  "file": "catering.html",
+  "title": "Book Corporate Dining Events - Varanasi Birmingham",
+  "description": "As Birmingham’s most prominent restaurant at 20,000 sq ft, Varanasi can create unique dining experiences for private, corporate dining events. Enquire online.",
+  "bodyClass": "page-template-default page page-id-2408 ",
+  "branch": "birmingham",
+  "bytes": 59887
+ },
+ {
+  "slug": "contact",
+  "file": "contact.html",
+  "title": "Contact - Varanasi Birmingham",
+  "description": "Contact Varanasi Birmingham to book a table, enquire for catering and corporate events. Varanasi Birmingham is located at 184 Broad Street, Birmingham, B15 1DA",
+  "bodyClass": "page-template-default page page-id-22 ",
+  "branch": "birmingham",
+  "bytes": 46971
+ },
+ {
+  "slug": "corporate-dining-events",
+  "file": "corporate-dining-events.html",
+  "title": "Book Corporate Dining Events - Varanasi Birmingham",
+  "description": "As Birmingham’s most prominent restaurant at 20,000 sq ft, Varanasi can create unique dining experiences for private, corporate dining events. Enquire online.",
+  "bodyClass": "page-template-default page page-id-2408 ",
+  "branch": "birmingham",
+  "bytes": 59887
+ },
+ {
+  "slug": "franchise-opportunities",
+  "file": "franchise-opportunities.html",
+  "title": "Franchise Opportunities - Varanasi",
+  "description": "Discover franchise opportunities at Varanasi. If you think you fit the bill and that we could work together, we’d love you to contact us.",
+  "bodyClass": "page-template-default page page-id-2416 ",
+  "branch": "birmingham",
+  "bytes": 46052
+ },
+ {
+  "slug": "gallery",
+  "file": "gallery.html",
+  "title": "Gallery - Varanasi",
+  "description": "Experience the atmosphere of Varanasi through our gallery. Find more images on our social medias. Make a reservation online.",
+  "bodyClass": "page-template-default page page-id-2412 ",
+  "branch": "birmingham",
+  "bytes": 67449
+ },
+ {
+  "slug": "gift-vouchers",
+  "file": "gift-vouchers.html",
+  "title": "Purchase Gift Vouchers - Varanasi",
+  "description": "Purchase gift vouchers at Varanasi and treat your family, friends or colleagues to a dining experience at Varanasi. Enquire on our website today.",
+  "bodyClass": "page-template-default page page-id-2414 ",
+  "branch": "birmingham",
+  "bytes": 42504
+ },
+ {
+  "slug": "leicester",
+  "file": "leicester.html",
+  "title": "Varanasi | Indian Fine Dining Restaurant in Leicester",
+  "description": "Discover exquisite fine dining at Varanasi located in Leicester. Create memories with our private rooms and discover unique tastes with our menu.",
+  "bodyClass": "home page-template-default page page-id-2976 ",
+  "branch": "leicester",
+  "bytes": 68794
+ },
+ {
+  "slug": "leicester",
+  "file": "leicester.html",
+  "title": "Varanasi | Indian Fine Dining Restaurant in Leicester",
+  "description": "Discover exquisite fine dining at Varanasi located in Leicester. Create memories with our private rooms and discover unique tastes with our menu.",
+  "bodyClass": "home page-template-default page page-id-2976 ",
+  "branch": "leicester",
+  "bytes": 68794
+ },
+ {
+  "slug": "leicester/book-a-private-room",
+  "file": "leicester__book-a-private-room.html",
+  "title": "Book A Private Room - Varanasi",
+  "description": "Enjoy a fine dining experience in a private secluded area at Varanasi Leicester. Select from several luxurious rooms. Book A Private Room Today.",
+  "bodyClass": "page-template-default page page-id-3404 ",
+  "branch": "leicester",
+  "bytes": 44454
+ },
+ {
+  "slug": "leicester/book-online",
+  "file": "leicester__book-online.html",
+  "title": "Book Online - Varanasi",
+  "description": "Enjoy a fine dining experience at Varanasi Leicester and enjoy our incredible authentic Indian cuisine. Book Online Today.",
+  "bodyClass": "page-template-default page page-id-3564 ",
+  "branch": "leicester",
+  "bytes": 51171
+ },
+ {
+  "slug": "leicester/book-online",
+  "file": "leicester__book-online.html",
+  "title": "Book Online - Varanasi",
+  "description": "Enjoy a fine dining experience at Varanasi Leicester and enjoy our incredible authentic Indian cuisine. Book Online Today.",
+  "bodyClass": "page-template-default page page-id-3564 ",
+  "branch": "leicester",
+  "bytes": 51171
+ },
+ {
+  "slug": "leicester/contact",
+  "file": "leicester__contact.html",
+  "title": "Contact - Varanasi Leicester",
+  "description": "Contact Varanasi Leicester to book a table, enquire for catering and corporate events. Varanasi Leicester is located at 87–89 High Street, Leicester, LE1 4JB",
+  "bodyClass": "page-template-default page page-id-22 ",
+  "branch": "leicester",
+  "bytes": 46479
+ },
+ {
+  "slug": "leicester/corporate-dining-events",
+  "file": "leicester__corporate-dining-events.html",
+  "title": "Book Corporate Dining Events - Varanasi Leicester",
+  "description": "As Leicester&#039;s most prominent restaurant, Varanasi can create unique dining experiences for private, corporate dining events. Enquire online.",
+  "bodyClass": "page-template-default page page-id-2408 ",
+  "branch": "leicester",
+  "bytes": 59739
+ },
+ {
+  "slug": "leicester/franchise-opportunities",
+  "file": "leicester__franchise-opportunities.html",
+  "title": "Franchise Opportunities - Varanasi",
+  "description": "Discover franchise opportunities at Varanasi. If you think you fit the bill and that we could work together, we’d love you to contact us.",
+  "bodyClass": "page-template-default page page-id-2416 ",
+  "branch": "leicester",
+  "bytes": 45392
+ },
+ {
+  "slug": "leicester/gallery",
+  "file": "leicester__gallery.html",
+  "title": "Gallery - Varanasi",
+  "description": "Experience the atmosphere of Varanasi through our gallery. Find more images on our social medias. Make a reservation online.",
+  "bodyClass": "page-template-default page page-id-2412 ",
+  "branch": "leicester",
+  "bytes": 68516
+ },
+ {
+  "slug": "leicester/gift-vouchers",
+  "file": "leicester__gift-vouchers.html",
+  "title": "Purchase Gift Vouchers - Varanasi",
+  "description": "Purchase gift vouchers at Varanasi and treat your family, friends or colleagues to a dining experience at Varanasi. Enquire on our website today.",
+  "bodyClass": "page-template-default page page-id-2414 ",
+  "branch": "leicester",
+  "bytes": 42397
+ },
+ {
+  "slug": "leicester/menu",
+  "file": "leicester__menu.html",
+  "title": "Our Menu - Varanasi",
+  "description": "The Varanasi menu is a continually evolving repertoire; some classics, some reworking of old favourites plus new dishes for each season. Make a reservation.",
+  "bodyClass": "page-template-default page page-id-2404 ",
+  "branch": "leicester",
+  "bytes": 100126
+ },
+ {
+  "slug": "leicester/privacy",
+  "file": "leicester__privacy.html",
+  "title": "Privacy Policy &amp; GDPR - Varanasi",
+  "description": "Your privacy is important to Varanasi Restaurant. Therefore, we have designed and implemented a privacy policy into our already service driven structure,",
+  "bodyClass": "page-template-default page page-id-3520 ",
+  "branch": "leicester",
+  "bytes": 47619
+ },
+ {
+  "slug": "leicester/private-dining-experiences",
+  "file": "leicester__private-dining-experiences.html",
+  "title": "Private Dining Experiences - Varanasi",
+  "description": "Discover private dining experiences at Varanasi Leicester. Make a reservation online and book a private room to get the full Varanasi experience.",
+  "bodyClass": "page-template-default page page-id-2406 ",
+  "branch": "leicester",
+  "bytes": 60208
+ },
+ {
+  "slug": "leicester/terms",
+  "file": "leicester__terms.html",
+  "title": "Terms &amp; Conditions - Varanasi",
+  "description": "If you have any dietary requirements, please inform us when making your reservation.",
+  "bodyClass": "page-template-default page page-id-3522 ",
+  "branch": "leicester",
+  "bytes": 38850
+ },
+ {
+  "slug": "menu",
+  "file": "menu.html",
+  "title": "Our Menu - Varanasi",
+  "description": "The Varanasi menu is a continually evolving repertoire; some classics, some reworking of old favourites plus new dishes for each season. Make a reservation.",
+  "bodyClass": "page-template-default page page-id-2404 ",
+  "branch": "birmingham",
+  "bytes": 100499
+ },
+ {
+  "slug": "private-dining-experiences",
+  "file": "private-dining-experiences.html",
+  "title": "Private Dining Experiences - Varanasi",
+  "description": "Discover private dining experiences at Varanasi Birmingham. Make a reservation online and book a private room to get the full Varanasi experience.",
+  "bodyClass": "page-template-default page page-id-2406 ",
+  "branch": "birmingham",
+  "bytes": 90761
+ }
+]

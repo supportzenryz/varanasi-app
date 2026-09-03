@@ -1,0 +1,274 @@
+{
+  "_source": "Varanasi-Drinks-and-Cocktail-Menu.pdf (Jan 2026), transcribed verbatim. Prices in pence.",
+  "_key": {
+    "sweetness": "Note: sweetness varies on scale 1-6, meaning from sweetest to least sweet",
+    "body": "M = Medium, LM = Light Medium, MH = Medium Heavy, H = Heavy, VG = Vegan"
+  },
+  "categories": [
+    {
+      "name": "Signature Cocktails",
+      "items": [
+        { "name": "Indian Spiced Mai Tai", "meta": "Nuts", "description": "Old J Spiced Rum, Cointreau, Pineapple Juice, Orange Juice, Lime Almond Syrup, Chilli flakes", "price": 1400 },
+        { "name": "The Orient Express", "description": "Gin, St Germaine, Kwai Feh, Apple Juice, Raspberry Puree and Lime", "price": 1400 },
+        { "name": "Mango Pleaser", "description": "Vodka, Mango Juice, Lime Juice, Grenadine Syrup, Sugar Syrup, Fresh chili for Garnish", "price": 1400 },
+        { "name": "Banana in a Storm", "description": "Banana Liquor, Kraken Rum, Ginger Beer, Angostura Bitters, Fresh lime", "price": 1400 },
+        { "name": "Varanasi Colada", "meta": "Dairy, Nuts", "description": "Vodka, Koko Kanu, Pineapple juice, Single Cream, Coconut Syrup, Almond Syrup, Lime", "price": 1400 },
+        { "name": "Caramel Fashioned", "description": "Woodford Reserve, Caramel Syrup, Angostura Bitters, Orange peel and Smoked Cinnamon", "price": 1400 },
+        { "name": "Cucumber Cooler", "description": "Kwai Feh Lychee Liquor, Gin, Lavender Syrup, Lychee Juice, Fresh Cucumber, Lime", "price": 1400 }
+      ]
+    },
+    {
+      "name": "Classics Cocktails",
+      "items": [
+        { "name": "Margarita", "description": "Tequila, Cointreau, lime, Sugar Syrup, Lime wheel and salted Rim", "price": 1400 },
+        { "name": "Long Island Iced Tea", "description": "Vodka, Gin, Tequila, Rum, Cointreau, lemon Juice, Sugar Syrup Topped up With Coke", "price": 1500 },
+        { "name": "Godfather", "description": "Jim bean, Disaronno, Orange Peel", "price": 1400 },
+        { "name": "Old Fashion", "description": "Choice Of Whiskey, Bourbon or Rum Sugar, Angostura Bitters and Orange peel", "price": 1400 },
+        { "name": "Dark & Stormy", "description": "Gosling Black Rum, Kraken Spiced rum, Ginger Beer, Lime Juice, Angostura Bitters, Sugar Syrup", "price": 1400 }
+      ]
+    },
+    {
+      "name": "Classic Martini's",
+      "items": [
+        { "name": "Lavender Garden Martini", "description": "Vodka, Lychee Juice, Cranberry Juice, Lime, Lavender Syrup, Sugar syrup, Garnished with lavender", "price": 1500 },
+        { "name": "Classic Martini", "description": "A choice of: Gin or Vodka Orange or Lemon", "price": 1400 },
+        { "name": "Expresso Martini", "description": "Vodka, Kahlua, Expresso, Vanilla syrup", "price": 1500 },
+        { "name": "Rose Petal Martini", "description": "Vodka, Kwai Feh Lychee Liquor, Lychee Juice, Lime Juice, Rose Syrup, Lavender Syrup, Garnished with dried rose petals", "price": 1500 },
+        { "name": "Porn Star Martini", "description": "Vodka, Passoa, Pineapple Juice, Passionfruit Juice, Vanilla Syrup, accompanied by a side of Bubbles", "price": 1500 }
+      ]
+    },
+    {
+      "name": "Mojitos",
+      "note": "Alcoholic",
+      "items": [
+        { "name": "Classic Mojito", "description": "Havana Club Rum, Fresh Mint, Limes, Sugar Syrup, Soda", "price": 1400 },
+        { "name": "Pink Mojito", "description": "Gin, Havana Club Rum, Fresh Mint, Limes, Grenadine, Cranberry Juice", "price": 1500 },
+        { "name": "Mojito Royale", "description": "Old J Spiced Rum, Fresh Mint, Limes, Vanilla Syrup, Topped up with Prosecco and edible gold dust", "price": 1600 }
+      ]
+    },
+    {
+      "name": "Mocktails",
+      "note": "Non alcoholic",
+      "items": [
+        { "name": "Paragon Mule", "meta": "Fresh · Spiced · Vibrant", "description": "Zesty lemongrass and lime juice blended with paragon rue berry and blue curaçao notes, finished with fiery ginger beer.", "price": 1000 },
+        { "name": "White Chocolate Passionfruit Martini", "meta": "Rich · Exotic · Indulgent", "description": "Smooth white chocolate meets tropical passion fruit and pineapple, balanced with fresh lemon.", "price": 1000 },
+        { "name": "Rhubarb Fizz", "meta": "Bold · Tangy · Refreshing", "description": "Sharp rhubarb and orange layered with bitter rhubarb, paragon timur berry and ginger beer.", "price": 1000 },
+        { "name": "Bergamot & Elderflower Spritz", "meta": "Citrus · Floral · Sophisticated", "description": "Bergamot and floral elderflower with lemon rantcho and soda for a crisp finish.", "price": 1000 },
+        { "name": "Yuzu Margarita", "meta": "Sharp · Clean · Uplifting", "description": "Zesty yuzu fruit with agave sweetness and fresh lime for a bold citrus kick.", "price": 1000 },
+        { "name": "Secret Garden", "meta": "Herbal · Fresh · Balanced", "description": "Cooling cucumber and basil with paragon timur berry, lime, and cloudy apple.", "price": 1000 },
+        { "name": "Pink Panther", "meta": "Sweet · Light · Crowd-pleasing", "description": "Juicy lychee and red berries topped with lemonade for a fruity, refreshing serve.", "price": 1000 },
+        { "name": "Green Oasis", "meta": "Green · Fresh · Modern", "description": "Fresh kiwi and basil muddled with timur berry, lime, and cloudy apple.", "price": 1000 },
+        { "name": "Royal Rhubarb Bloom", "meta": "Floral · Tart · Elegant", "description": "Rhubarb and hibiscus softened with paragon rue berry and soda.", "price": 1000 },
+        { "name": "Sunset Cove Elixir", "meta": "Sweet · Tropical · Fun", "description": "Caribbean flavours with toasted marshmallow syrup, guava, and lime.", "price": 1000 },
+        { "name": "Pineapple Chai Margarita", "meta": "Warm · Exotic · Unique", "description": "Spiced chai meets pineapple and agave with a citrus twist.", "price": 1000 }
+      ]
+    },
+    {
+      "name": "Champagne",
+      "items": [
+        { "name": "NV Moet et Chandon Imperial Brut", "meta": "France | 12%", "description": "A well balanced assemblage of three vine varieties. This clean Champagne is elegant, harmonious, fresh and supple.", "measure": "75cl", "price": 10000 },
+        { "name": "NV Yellow Label Brut Veuve Clicquot", "meta": "France | 12%", "description": "Intense, floral and fruity aromas with a musky tinge and lingering apple and pear notes.", "measure": "75cl", "price": 11000 },
+        { "name": "2006 Cuvee Dom Perignon Moet et Chandon", "meta": "France | 12.5%", "description": "Aromas of acacia honey and fresh almonds, dried apricots and toasted brioche finishing long and elegant.", "measure": "75cl", "price": 42000 },
+        { "name": "2006 Cristal Champagne Louis Roederer", "meta": "France | 12%", "description": "Cristal bursts from the glass with fresh hazelnut and apple scents. Elegant, deep and silky-textured, this medium to full-bodied beauty is immensely concentrated, pure, packed with apple flavours, and astoundingly long in the finish.", "measure": "75cl", "price": 39500 },
+        { "name": "Ace of Spades Gold Brut NV Armand de Brignac", "meta": "France | 12.5%", "description": "On the palate, Armand de Brignac has a sumptuous, racy fruit character that is perfectly integrated with the wines subtle brioche accents. The Champagnes texture is deliciously creamy, with great depth paired with a long, silky finish.", "measure": "75cl", "price": 60000 }
+      ]
+    },
+    {
+      "name": "Champagne Rose",
+      "items": [
+        { "name": "NV Moet et Chandon Rose", "meta": "France | 12%", "description": "Pink with amber highlights. A lively, intense bouquet of red fruits (wild strawberry, raspberry, cherry) floral nuances of rose a slight hint of pepper. Juicy, persistent intensity flavours of berries (strawberry, raspberry, redcurrant), fleshy and firm with peach and a subtle note of menthol.", "measure": "75cl", "price": 11000 },
+        { "name": "NV Veuve Clicquot Rose", "meta": "France | 12.5%", "description": "This medium bodied rosé is reminiscent of the power and finesse of the nonvintage label, with a soft red-fruit core.", "measure": "75cl", "price": 14000 },
+        { "name": "NV Cuvee Rose Laurent Perrier", "meta": "France | 12%", "description": "Elegant with soft, consistent bubbles, ripe red fruits such as raspberries and strawberries and a creamy textured, soft finish.", "measure": "75cl", "price": 15000 },
+        { "name": "NV Ace of Spades Rose Armand de Brignac", "meta": "France | 12.5%", "description": "The different red berry notes are clean and inviting. All this is combined with an accentuated dash of green herbs and spices. A great alternative not only for that extra special aperitif moment.", "measure": "75cl", "price": 65000 },
+        { "name": "Dom Perignon Rose 1998/2000", "meta": "France | 12%", "description": "Produced only in exceptional years, Dom Perignon Rosé represents one of the finest Rosé wines in Champagne. A hedonistic cornucopia of seductive red berries, luxurious spices and redolent florals. A wine to be seduced by and savoured.", "measure": "75cl", "price": 75000 }
+      ]
+    },
+    {
+      "name": "Sparkling Wine",
+      "items": [
+        { "name": "Brilla Prosecco", "meta": "Italy ( 2 / LM )", "description": "Straw yellow in colour, this Prosecco has a delicate bouquet with fruity notes of pear, green apple, and acacia flowers; it is fresh, soft and with balanced and balanced acidity and flavour. Excellent for enhancing dishes of Italian and European cuisine in general; from aperitif to dessert, this sparkling wine is the right choice", "measure": "175ml", "price": 950, "measure2": "75cl", "price2": 3800 },
+        { "name": "Brilla Prosecco Rose", "meta": "Italy ( 3 / M )", "description": "Brilliant and refined pelage; a very elegant rosé with fruity notes of green apple and yellow pulp fruit; teases the palate, fresh and mineral. Ideal to sip as an aperitif and perfect with fish-based soups and grilled dishes or vegetarian dishes.", "measure": "75cl", "price": 4000 }
+      ]
+    },
+    {
+      "name": "White Wine",
+      "items": [
+        { "name": "Silverwater Sauvignon Blanc", "meta": "South Africa ( 5 / LM )", "description": "Silverwater Sauvignon Blanc is a fresh, crisp and dry Sauvignon. As you would expect from a Sauvignon Blanc from this longitude the flavours are a combination of gooseberry and passion fruit notes with a truly New Zealand style. This Sauvignon Blanc is the perfect wine to serve as an aperitif or with seafood dishes. Just as it should be — fresh clean vibrant and uncomplicated.", "measure": "175ml", "price": 800, "measure2": "75cl", "price2": 2900 },
+        { "name": "Alain Mecon Chardonnay", "meta": "France ( 4 / L )", "description": "Alain Mecon Chardonnay is a straw coloured wine which has a lovely balance between juicy, buttery tropical fruit and crisp refreshment. The perfect accompaniment to fish, white meat dishes or on its own.", "measure": "175ml", "price": 800, "measure2": "75cl", "price2": 2900 },
+        { "name": "Corte Fresca Pinot Grigio", "meta": "Italy ( VG / 5 / LM )", "description": "Fresh and fruity, with light notes of wild flowers and fresh fruit Fresh, light balanced and persistent. Good fruity notes and slight aromatic return An elegant, soft and dry white wine with excellent flinty minerality. Enjoy this wine with pasta dishes, white meats or fish.", "measure": "175ml", "price": 800, "measure2": "75cl", "price2": 2900 },
+        { "name": "Aoetoroa Sauvignon Blanc", "meta": "New Zealand ( 5 / LM )", "description": "With a plethora of fresh tropical fruit and gooseberry aromas as well as nuances of elderflower and nettle, it is well-balanced, elegant and has a long finish to savour.", "measure": "175ml", "price": 1050, "measure2": "75cl", "price2": 3900 },
+        { "name": "Pioneera Albarino", "meta": "Spain ( 2 / LM )", "description": "This wine has citrus, green apple and pear with a light spritz and a fresh mineral finish. Aromas of apple, fresh hay, pineapple, and natural vanilla draw you in, while the palate is lively and fresh, with citrus, pineapple, and pithy lemon flavours. Juicy, clean, and zesty on the finish, and chiselled in terms of structure and acidity.", "measure": "75cl", "price": 3900 },
+        { "name": "Aulico Gavi di Gavi Bianco", "meta": "Italy ( VG / 3 / L )", "description": "Straw-yellow with greenish sparkles. Soft and elegant palate, rich in fruit nuances. Rich, settled and harmonious with a long lasting finish. Best enjoyed with all kinds of fish and shellfish dishes, fragrant; summer salads and antipasti, Gavi wines are best enjoyed young.", "measure": "75cl", "price": 4800 },
+        { "name": "Sancerre Le", "meta": "France ( 3 / M )", "description": "To the eye, Sancerre Blanc is a light yellow color with green reflections. It is a wine full of verve, finesse and vigor. It is highly appreciated for its slight acidity and its typical \"flint\" taste. White Sancerre goes remarkably well with charcuterie, shellfish, fish in white butter and goat's cheese.", "measure": "75cl", "price": 6500 },
+        { "name": "Domain Chablis", "meta": "France ( VG / 2 / L )", "description": "Petit Chablis is a fresh and very aromatic wine. Its fruity nose carries a suggestion of apple and citrus notes. In the mouth, a nice gustatory attack is combined with a round and fine palate.", "measure": "75cl", "price": 6500 }
+      ]
+    },
+    {
+      "name": "Rose Wine",
+      "items": [
+        { "name": "Hilmar Springs Zinfandel Blush", "meta": "California ( VG / 4 / H )", "description": "Bright salmon pink in colour, this wine has a fresh nose of strawberry and raspberry fruits. On the palate it is juicy and refreshing: a delicious strawberry finish completes this perfect summertime wine. Pairs well with", "measure": "175ml", "price": 800, "measure2": "75cl", "price2": 2900 },
+        { "name": "Corte Rfresca Pinot Grigio Blush", "meta": "Italy ( VG / 3 / L )", "description": "A delicate blend of soft summer fruits and light acidity combine to produce a gentle dry blush. Enjoy this wine on its own or with spicy foods, salads or pasta dishes.", "measure": "175ml", "price": 800, "measure2": "75cl", "price2": 2900 },
+        { "name": "Whispering Angel", "meta": "France ( VG / 3 / M ) · Provence Rose", "description": "Bright yet pale, Whispering Angel is aromatic with a fine floral and fruity character of lavender, raspberry and cherry. On the palate it is medium bodied, delightfully fresh with tart berries and cream and a delicate spicy minerality.", "measure": "175ml", "price": 1400, "measure2": "75cl", "price2": 4400 }
+      ]
+    },
+    {
+      "name": "Red Wine",
+      "items": [
+        { "name": "Soldier Block Shiraz", "meta": "Australia ( VG / 3 / M )", "description": "Delicate red fruit and herbal aromas open up to a palate of ripe mulberry and plum fruit. Bright, aromatic and juicy on the nose with just a touch of naughty bacon fat. True to the varietal, the tiny proportion of Malbec in this blend gives a flowery perfume. Paired well with leaner red meat dishes; mushrooms or items that display a nice char characteristic.", "measure": "175ml", "price": 800, "measure2": "75cl", "price2": 2900 },
+        { "name": "Roos Estate Merlot", "meta": "South Africa ( 2 / LM )", "description": "Blackcurrant and dark cherry fruit purity supported by a fine, graphite tannin structure showing depth and length. Paired well with lean meats and spiced heavier meats.", "measure": "175ml", "price": 800, "measure2": "75cl", "price2": 2900 },
+        { "name": "Para Dos Malbec", "meta": "Argentina ( 3 / M )", "description": "Para Dos Malbec is a fruity wine, think black cherries and blackberries. These combine with sweet Vanilla spice and nutty aromas to provide a complex nose. A crowd pleasing Malbec, it has good body, structure and volume. This wine pairs with rich cheeses, dark meats and spiced dishes.", "measure": "175ml", "price": 800, "measure2": "75cl", "price2": 2900 },
+        { "name": "Rocca Chainti", "meta": "Italy ( VG / 4 / MH )", "description": "An off ruby red colour with garnet highlights. Vinous character, its nose gains wideness over time developing an elegant aroma of red fruit's jam and menthol notes. Full, harmonious, and balanced taste. This is a versatile wine, ideal with game, poultry, and grilled meats or those with a rich sauce.", "measure": "75cl", "price": 3600 },
+        { "name": "Aoetotora Pinot Nior", "meta": "New Zealand ( VG / 2 / LM )", "description": "Rich and inviting, ripe berry and plum notes together with hints of mocha. Generous and flavoursome with bright fruit and supple oak tannins running the length of the palate leaving a long lasting impression. This wine is at the peak of ripeness with cherry, floral, violet, raspberry and spicy oak flavours. Pairs well with softer cheeses, truffles or game meats.", "measure": "75cl", "price": 4400 },
+        { "name": "Finca Monica Crianza Rioja", "meta": "Spain ( VG / 5 / H )", "description": "A pure, fruity style as made exclusively with old vines of at least 30 years of age. This lovely Rioja, perfect for every day drinking has aromas of dark fruit, earthy and smoky notes and a hint of vanilla are followed by rich flavours of blackberry and plum. Freshly fruity and richly textured with a long finish. Pairs well with spiced dishes.", "measure": "75cl", "price": 4400 }
+      ]
+    },
+    {
+      "name": "Beers",
+      "items": [
+        { "name": "Cobra", "measure": "330ml", "price": 550 },
+        { "name": "Peroni", "measure": "330ml", "price": 550 },
+        { "name": "Lucky Buddah", "measure": "330ml", "price": 650 },
+        { "name": "Corona", "measure": "330ml", "price": 550 }
+      ]
+    },
+    {
+      "name": "Spirits — Vodka",
+      "items": [
+        { "name": "Belvedere Pure", "measure": "50ml", "price": 1350, "measure2": "Bottle", "price2": 13000 },
+        { "name": "Cîroc", "measure": "50ml", "price": 1300, "measure2": "Bottle", "price2": 13000 },
+        { "name": "Cîroc Pineapple", "measure": "50ml", "price": 1350, "measure2": "Bottle", "price2": 14000 },
+        { "name": "Cîroc Apple", "measure": "50ml", "price": 1350, "measure2": "Bottle", "price2": 14000 },
+        { "name": "Cîroc Mango", "measure": "50ml", "price": 1350, "measure2": "Bottle", "price2": 14000 },
+        { "name": "Cîroc Redberry", "measure": "50ml", "price": 1350, "measure2": "Bottle", "price2": 14000 },
+        { "name": "Ciroc Coconut", "measure": "50ml", "price": 1350, "measure2": "Bottle", "price2": 14000 },
+        { "name": "Finlandia", "measure": "50ml", "price": 1200 },
+        { "name": "Grey Goose", "measure": "50ml", "price": 1350, "measure2": "Bottle", "price2": 14500 },
+        { "name": "Au Gold", "measure": "50ml", "price": 1600, "measure2": "Bottle", "price2": 16000 }
+      ]
+    },
+    {
+      "name": "Gin",
+      "items": [
+        { "name": "Londons No1", "measure": "50ml", "price": 1300 },
+        { "name": "Bombay Saphire", "measure": "50ml", "price": 1300, "measure2": "Bottle", "price2": 12000 },
+        { "name": "Hendrick's", "measure": "50ml", "price": 1300, "measure2": "Bottle", "price2": 12500 },
+        { "name": "Tanqueray No 10", "measure": "50ml", "price": 1400, "measure2": "Bottle", "price2": 14500 },
+        { "name": "Monkey 47", "measure": "50ml", "price": 1500 },
+        { "name": "Pink Gin 50 ML", "measure": "50ml", "price": 1300 },
+        { "name": "Whitney Neils 50ml", "description": "Rhubarb & Ginger / Raspberry / Blood Orange", "measure": "50ml", "price": 1300 }
+      ]
+    },
+    {
+      "name": "Bourbon",
+      "items": [
+        { "name": "Jack Daniels", "measure": "50ml", "price": 1300, "measure2": "Bottle", "price2": 12500 },
+        { "name": "Woodford Reserve", "measure": "50ml", "price": 1300 },
+        { "name": "Makers Mark", "measure": "50ml", "price": 1400 }
+      ]
+    },
+    {
+      "name": "Whisky",
+      "items": [
+        { "name": "Jameson", "measure": "50ml", "price": 1300, "measure2": "Bottle", "price2": 12000 },
+        { "name": "Chivas Regal", "measure": "50ml", "price": 1300, "measure2": "Bottle", "price2": 12500 },
+        { "name": "Johny Walker Black", "measure": "50ml", "price": 1300, "measure2": "Bottle", "price2": 12500 },
+        { "name": "Johny Walker Red Label", "measure": "50ml", "price": 1300 },
+        { "name": "Glenfiddich", "measure": "50ml", "price": 1400 },
+        { "name": "Macallan Whiskey 12 Year Old", "measure": "50ml", "price": 3600 },
+        { "name": "Macallan Whiskey 18 Year Old", "measure": "50ml", "price": 4700 },
+        { "name": "Blue Label Whisky", "measure": "50ml", "price": 4700 },
+        { "name": "Glenmorangie Original", "measure": "50ml", "price": 1300 },
+        { "name": "Glenmorangie Signet", "measure": "50ml", "price": 3700 },
+        { "name": "Ardbeg 10", "measure": "50ml", "price": 1500 },
+        { "name": "Laphroaig 10", "measure": "50ml", "price": 1500 }
+      ]
+    },
+    {
+      "name": "Japanese Whisky",
+      "items": [
+        { "name": "Hibiki Harmony", "measure": "50ml", "price": 2000 },
+        { "name": "Nikka From The Barrel", "measure": "50ml", "price": 1600 }
+      ]
+    },
+    {
+      "name": "Cognac",
+      "items": [
+        { "name": "Courvoisier VSOP", "measure": "50ml", "price": 1350, "measure2": "Bottle", "price2": 13000 },
+        { "name": "Courvoisier XO", "measure": "50ml", "price": 3100 },
+        { "name": "Hennessy VSOP", "measure": "50ml", "price": 1350, "measure2": "Bottle", "price2": 13000 },
+        { "name": "Hennessy XO", "measure": "50ml", "price": 3600 },
+        { "name": "Remy Martin VSOP", "measure": "50ml", "price": 1350 }
+      ]
+    },
+    {
+      "name": "Rum",
+      "items": [
+        { "name": "Old J Spiced Rum", "measure": "50ml", "price": 1300 },
+        { "name": "Old J Tiki Fire", "measure": "50ml", "price": 1300 },
+        { "name": "Koko Kanu", "measure": "50ml", "price": 1300 },
+        { "name": "Kraken Rum", "measure": "50ml", "price": 1300 },
+        { "name": "Havana Club 3", "measure": "50ml", "price": 1300 },
+        { "name": "Bacardi 8yr Old", "measure": "50ml", "price": 1500 }
+      ]
+    },
+    {
+      "name": "Tequila",
+      "items": [
+        { "name": "Casamigos Blanco", "measure": "50ml", "price": 1300 },
+        { "name": "Patron Silver", "measure": "50ml", "price": 1600 },
+        { "name": "Don Julio Blanco", "measure": "50ml", "price": 1300 }
+      ]
+    },
+    {
+      "name": "Liqueurs & Other",
+      "items": [
+        { "name": "Disaronno Amaretto", "measure": "50ml", "price": 1300 },
+        { "name": "Jägermeister", "measure": "50ml", "price": 1200 },
+        { "name": "Baileys", "measure": "50ml", "price": 1200 },
+        { "name": "Chambord", "measure": "50ml", "price": 1200 },
+        { "name": "Grand Mariner", "measure": "50ml", "price": 1200 },
+        { "name": "Tia Maria", "measure": "50ml", "price": 1200 },
+        { "name": "Kwai Feh Lychee", "measure": "50ml", "price": 1200 },
+        { "name": "Luxardo Limoncello", "measure": "50ml", "price": 1200 },
+        { "name": "Sambuca", "measure": "50ml", "price": 1200 },
+        { "name": "Kahlua", "measure": "50ml", "price": 1200 },
+        { "name": "Cointreau", "measure": "50ml", "price": 1200 },
+        { "name": "Dry Martini", "measure": "50ml", "price": 1200 }
+      ]
+    },
+    {
+      "name": "Schweppes",
+      "items": [
+        { "name": "Coca Cola", "measure": "200ml", "price": 450 },
+        { "name": "Golden Ginger Ale", "measure": "200ml", "price": 450 },
+        { "name": "Tonic Water", "measure": "200ml", "price": 450 },
+        { "name": "Light Tonic Water", "measure": "200ml", "price": 450 },
+        { "name": "Coke Zero", "measure": "200ml", "price": 450 },
+        { "name": "Lemonade", "measure": "200ml", "price": 450 },
+        { "name": "Appletiser", "price": 495 }
+      ]
+    },
+    {
+      "name": "Juices",
+      "items": [
+        { "name": "Apple", "price": 450 },
+        { "name": "Orange", "price": 450 },
+        { "name": "Pineapple", "price": 450 },
+        { "name": "Cranberry", "price": 450 },
+        { "name": "Mango", "price": 450 },
+        { "name": "Lychee", "price": 450 },
+        { "name": "Passionfruit", "price": 450 },
+        { "name": "Guava", "price": 450 }
+      ]
+    },
+    {
+      "name": "Water",
+      "items": [
+        { "name": "Voss Sparkling Water", "measure": "800ml", "price": 595 },
+        { "name": "Voss Sparkling Water", "measure": "300ml", "price": 450 },
+        { "name": "Voss Still Water", "measure": "800ml", "price": 595 },
+        { "name": "Voss Still Water", "measure": "300ml", "price": 450 }
+      ]
+    }
+  ]
+}

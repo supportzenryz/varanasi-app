@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="68.365" height="20.122" viewBox="0 0 68.365 20.122">
+  <g id="right-icon" transform="translate(0 0.707)">
+    <ellipse id="Ellipse_14" data-name="Ellipse 14" cx="2.43" cy="2.43" rx="2.43" ry="2.43" transform="translate(55.665 6.714)" fill="none" stroke="#e9ba20" stroke-width="2"/>
+    <line id="Line_36" data-name="Line 36" x1="3.349" y1="3.349" transform="translate(49.658 0)" fill="none" stroke="#e9ba20" stroke-width="2"/>
+    <line id="Line_37" data-name="Line 37" x2="4.736" transform="translate(53.007 15.358) rotate(135)" fill="none" stroke="#e9ba20" stroke-width="2"/>
+    <line id="Line_38" data-name="Line 38" x1="3.349" y1="3.349" transform="translate(64.309 14.651)" fill="none" stroke="#e9ba20" stroke-width="2"/>
+    <line id="Line_39" data-name="Line 39" x2="4.736" transform="translate(67.658 0.707) rotate(135)" fill="none" stroke="#e9ba20" stroke-width="2"/>
+    <line id="Line_40" data-name="Line 40" x1="39.131" transform="translate(0 8.462)" fill="none" stroke="#e9ba20" stroke-width="2"/>
+  </g>
+</svg>

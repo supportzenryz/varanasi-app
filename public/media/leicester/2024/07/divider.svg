@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="18.707" height="19.414" viewBox="0 0 18.707 19.414">
+  <g id="divider" transform="translate(0.354 0.354)">
+    <circle id="Ellipse_9" data-name="Ellipse 9" cx="2.43" cy="2.43" r="2.43" transform="translate(7.133 7.133)" fill="none" stroke="#e9ba20" stroke-width="1"/>
+    <line id="Line_23" data-name="Line 23" x2="4.736" transform="translate(14.651 15.358) rotate(45)" fill="none" stroke="#e9ba20" stroke-width="1"/>
+    <line id="Line_24" data-name="Line 24" y1="3.349" x2="3.349" transform="translate(14.651)" fill="none" stroke="#e9ba20" stroke-width="1"/>
+    <line id="Line_25" data-name="Line 25" x2="4.736" transform="translate(0 0.707) rotate(45)" fill="none" stroke="#e9ba20" stroke-width="1"/>
+    <line id="Line_26" data-name="Line 26" y1="3.349" x2="3.349" transform="translate(0 14.651)" fill="none" stroke="#e9ba20" stroke-width="1"/>
+  </g>
+</svg>

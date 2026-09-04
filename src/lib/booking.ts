@@ -319,18 +319,75 @@ If you'd rather book over the phone, call us on ${branch?.phone ?? ""} and we'll
 
 Varanasi ${branch?.city ?? ""}`,
   });
+
+  // The restaurant is told too. A failed payment is a guest who wanted a
+  // table and didn't get one — which is a booking that can often be rescued
+  // with a phone call, but only if somebody knows it happened. Previously
+  // this went to the guest alone and the attempt vanished.
+  if (rules.notifications.to.length) {
+    await sendMail({
+      to: rules.notifications.to,
+      subject: `Payment failed — ${branch?.city ?? ""} — ${dateLabel(b.date)} ${prettyTime(b.time)} — ${b.partySize} guests`,
+      fromName: rules.notifications.fromName,
+      fromEmail: rules.notifications.fromEmail,
+      replyTo: b.email ?? undefined,
+      text:
+`A guest tried to book and their deposit payment did not go through, so no
+table is being held. They may appreciate a call.
+
+${summary(b, branch)}
+
+Nothing was charged. Reply to this email to reach them directly.
+
+See it in the admin: ${site}/admin/bookings?branch=${branch?.slug ?? ""}`,
+    });
+  }
 }
 
 async function notifyCancelled(b: Booking): Promise<void> {
   const rules = bookingRules();
   const branch = branchFor(b);
-  if (!rules.notifications.to.length) return;
+  const site = process.env.SITE_URL ?? "https://varanasi.uk";
+
+  if (rules.notifications.to.length) {
+    await sendMail({
+      to: rules.notifications.to,
+      subject: `Booking cancelled — ${branch?.city ?? ""} — ${dateLabel(b.date)} ${prettyTime(b.time)} — ${b.reference}`,
+      fromName: rules.notifications.fromName,
+      fromEmail: rules.notifications.fromEmail,
+      text: `A guest cancelled their booking online.\n\n${summary(b, branch)}`,
+    });
+  }
+
+  // And a receipt for the guest. Cancelling online used to be silent from
+  // their side, which leaves someone wondering whether it worked — so they
+  // ring to check, which is the phone call the online cancellation existed to
+  // avoid. It also puts the reference in writing if there is ever a dispute
+  // about a deposit.
+  if (!b.email) return;
   await sendMail({
-    to: rules.notifications.to,
-    subject: `Booking cancelled — ${branch?.city ?? ""} — ${dateLabel(b.date)} ${prettyTime(b.time)} — ${b.reference}`,
+    to: [b.email],
+    subject: `Your Varanasi booking has been cancelled — ${b.reference}`,
+    replyTo: rules.notifications.replyTo,
     fromName: rules.notifications.fromName,
     fromEmail: rules.notifications.fromEmail,
-    text: `A guest cancelled their booking online.\n\n${summary(b, branch)}`,
+    text:
+`Dear ${b.guestName},
+
+Your booking has been cancelled, as you asked. Nothing further is reserved
+and we won't be expecting you.
+
+The booking that was cancelled:
+${summary(b, branch)}
+
+If any deposit is due back to you, we'll deal with that separately and be in
+touch — there is nothing more for you to do.
+
+We hope to see you another time. To book again:
+${site}/${branch?.slug ?? ""}/book-online
+
+Varanasi ${branch?.city ?? ""}
+${branch?.phone ?? ""}`,
   });
 }
 

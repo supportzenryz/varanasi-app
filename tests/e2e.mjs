@@ -204,6 +204,95 @@ t('gmial.com is refused, not silently accepted',
 t('  · and the guest is told what to fix',
   /did you mean/i.test(await page.locator('main').innerText()));
 
+console.log('\n── 3c. Both sides are emailed, on every outcome ──');
+
+/* The outbox is where mail lands when no provider key is set, so it is also
+   the cheapest way to assert who was written to. Each check counts only files
+   created after a marker time, so an earlier run cannot make it pass. */
+const outbox = 'data/outbox';
+const mailSince = (t0) => {
+  if (!fs.existsSync(outbox)) return [];
+  return fs.readdirSync(outbox)
+    .filter(f => f.endsWith('.txt'))
+    .map(f => `${outbox}/${f}`)
+    .filter(p => fs.statSync(p).mtimeMs >= t0)
+    .map(p => fs.readFileSync(p, 'utf8'));
+};
+const restaurantInbox = q(`select value from settings where key='booking_rules'`)
+  .map(r => { try { return JSON.parse(r.value)?.notifications?.to ?? []; } catch { return []; } })
+  .flat();
+
+/* Booking is a three-step flow driven by the URL: party size and date, then
+   the slot picker, then details. Step 2 is loaded and a real slot clicked
+   rather than a time guessed — availability is re-checked on submit, so a
+   guessed time would fail for the wrong reason. */
+const bookOnce = async (email) => {
+  const when = new Date(Date.now() + 6 * 864e5).toISOString().slice(0, 10);
+  await page.goto(`${BASE}/birmingham/book-online?guests=2&date=${when}`, { waitUntil: 'networkidle' });
+  const slot = page.locator('a[href*="time="]').first();
+  if (!(await slot.count())) return null;
+  await slot.click();
+  await page.waitForLoadState('networkidle');
+  await page.fill('input[name="name"]', 'E2E Booking Guest');
+  await page.fill('input[name="email"]', email);
+  await page.fill('input[name="phone"]', '07700 900123');
+  /* Tick every required box rather than naming them: the deposit step asks for
+     three separate confirmations and a missed one is silent — the browser just
+     blocks submit and the page says "please confirm", which reads like a
+     server refusal but is not one. */
+  for (const box of await page.locator('form input[type="checkbox"][required]').all()) {
+    await box.check();
+  }
+  await page.click('form button.btn-gold');
+  await page.waitForURL(/checkout-simulator|confirmed|book-online/, { timeout: 20000 }).catch(() => {});
+  const rows = q(`select reference, cancel_token from bookings where email = '${email}'`);
+  return rows[0] ?? null;
+};
+
+// ---- a failed payment ----
+const failEmail = `e2e.payfail.${stamp}@zenryz-test.com`;
+const failBk = await bookOnce(failEmail);
+t('Booking created through the real three-step form', Boolean(failBk));
+
+if (failBk) {
+  const t0 = Date.now();
+  await page.goto(`${BASE}/birmingham/book-online/unconfirmed?ref=${failBk.reference}`, { waitUntil: 'networkidle' });
+  await page.waitForTimeout(1500);
+  const mail = mailSince(t0);
+  t('payment failed → the guest is told', mail.some(m => m.includes(failEmail)));
+  t('payment failed → the restaurant is told too, so the booking can be rescued',
+    mail.some(m => restaurantInbox.some(a => m.includes(a)) && /payment failed/i.test(m)),
+    `${mail.length} message(s) to ${restaurantInbox.join(',')}`);
+}
+
+// ---- a guest cancelling ----
+// A fresh booking: cancelByToken only accepts a live one, so the booking used
+// above is deliberately not reused.
+const cxlEmail = `e2e.cancel.${stamp}@zenryz-test.com`;
+const cxlBk = await bookOnce(cxlEmail);
+t('Second booking created, still live, for the cancellation path', Boolean(cxlBk));
+
+if (cxlBk) {
+  const t0 = Date.now();
+  await page.goto(`${BASE}/birmingham/booking/${cxlBk.reference}?t=${cxlBk.cancel_token}`,
+    { waitUntil: 'networkidle' });
+  const btn = page.locator('form button:has-text("Cancel"), button:has-text("Cancel booking")').first();
+  t('Manage page offers the guest a way to cancel', await btn.count() > 0);
+  if (await btn.count()) {
+    await btn.click();
+    await page.waitForTimeout(2200);
+    const mail = mailSince(t0);
+    t('guest cancels → the restaurant is told',
+      mail.some(m => restaurantInbox.some(a => m.includes(a)) && /cancel/i.test(m)));
+    t('guest cancels → the guest gets it in writing, so they need not ring to check',
+      mail.some(m => m.includes(cxlEmail) && /cancel/i.test(m)),
+      `${mail.length} message(s)`);
+    t('  · and the booking is actually cancelled',
+      q(`select status from bookings where reference='${cxlBk.reference}'`)[0]?.status === 'cancelled',
+      q(`select status from bookings where reference='${cxlBk.reference}'`)[0]?.status);
+  }
+}
+
 console.log('\n── 4. Admin: sign in ──');
 
 await page.goto(`${BASE}/admin/login`, { waitUntil: 'networkidle' });

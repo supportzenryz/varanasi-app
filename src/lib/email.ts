@@ -55,7 +55,18 @@ export async function sendMail(mail: Mail): Promise<MailResult> {
         }),
         cache: "no-store",
       });
-      if (!res.ok) return { ok: false, via: "resend", detail: `HTTP ${res.status}: ${await res.text()}` };
+      if (!res.ok) {
+        // Logged, not just returned. Every caller awaits sendMail and ignores
+        // the result — deliberately, because a booking must not fail when an
+        // email does — which meant a provider rejection produced no email and
+        // no trace of why. The most common cause is a `from` address on a
+        // domain the provider has not verified, and that is invisible from
+        // the website: the booking succeeds, the guest hears nothing.
+        const body = await res.text();
+        console.error(`[email:resend] REJECTED "${mail.subject}" -> ${mail.to.join(", ")}: HTTP ${res.status} ${body}`);
+        return { ok: false, via: "resend", detail: `HTTP ${res.status}: ${body}` };
+      }
+      console.log(`[email:resend] sent "${mail.subject}" -> ${mail.to.join(", ")}`);
       return { ok: true, via: "resend" };
     }
 
@@ -66,7 +77,11 @@ export async function sendMail(mail: Mail): Promise<MailResult> {
         body: JSON.stringify({ from, ...mail }),
         cache: "no-store",
       });
-      if (!res.ok) return { ok: false, via: "webhook", detail: `HTTP ${res.status}` };
+      if (!res.ok) {
+        console.error(`[email:webhook] REJECTED "${mail.subject}": HTTP ${res.status}`);
+        return { ok: false, via: "webhook", detail: `HTTP ${res.status}` };
+      }
+      console.log(`[email:webhook] sent "${mail.subject}" -> ${mail.to.join(", ")}`);
       return { ok: true, via: "webhook" };
     }
 

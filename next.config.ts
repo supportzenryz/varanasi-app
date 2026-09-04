@@ -13,12 +13,16 @@ const nextConfig: NextConfig = {
   // the landing-page logo are served above the default deliberately.
   images: {
     qualities: [75, 88, 90, 95],
-    // Every <Image> resolves through src/lib/image-loader.js, which sends the
-    // media library to Cloudinary and leaves everything in public/ alone. Doing
-    // it in a loader rather than at each call site means the admin's own image
-    // previews are covered too, and no page can be forgotten.
-    loader: "custom",
-    loaderFile: "./src/lib/image-loader.js",
+    // No custom loader. One was added to route the media library to a CDN,
+    // but the photography turned out to be small enough to live in the repo
+    // (21MB is what the site actually references), so there is nothing for a
+    // CDN to solve — and a custom loader replaces Next's optimizer wholesale,
+    // which meant local images were being served at full resolution. Next
+    // warns about exactly this: a custom loader that ignores `width`.
+    //
+    // remotePatterns stays: if a CDN is ever wanted, putting absolute
+    // Cloudinary URLs in the database is the simpler route and Next will
+    // optimise them properly.
     remotePatterns: [
       { protocol: "https", hostname: "res.cloudinary.com", pathname: "/**" },
     ],

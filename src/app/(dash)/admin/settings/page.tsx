@@ -180,6 +180,38 @@ export default async function SettingsAdmin() {
               </span>
             </div>
           </div>
+
+          {/* The sending identity. This lived only in the seed file, which
+              meant it could not be changed after launch without editing the
+              database — and it has to be changeable, because the address must
+              be on a domain the email provider has verified. Sending from an
+              unverified domain is rejected per-message, with nothing visible
+              on the website to explain why confirmations stopped arriving. */}
+          <div className="mt-6 grid gap-4 sm:grid-cols-3">
+            <div>
+              <label className={label} htmlFor="fromName">Emails appear from</label>
+              <input id="fromName" name="fromName" defaultValue={rules.notifications.fromName}
+                className={field} />
+              <span className="block text-xs text-ink-3 mt-1">The name guests see.</span>
+            </div>
+            <div>
+              <label className={label} htmlFor="fromEmail">Sending address</label>
+              <input id="fromEmail" name="fromEmail" type="email"
+                defaultValue={rules.notifications.fromEmail} className={field} />
+              <span className="block text-xs text-ink-3 mt-1">
+                Must be on a domain verified with your email provider, or nothing sends.
+                Use onboarding@resend.dev while testing.
+              </span>
+            </div>
+            <div>
+              <label className={label} htmlFor="replyTo">Replies go to</label>
+              <input id="replyTo" name="replyTo" type="email"
+                defaultValue={rules.notifications.replyTo} className={field} />
+              <span className="block text-xs text-ink-3 mt-1">
+                Where a guest's reply lands. Can be a normal mailbox.
+              </span>
+            </div>
+          </div>
         </section>
 
         <button className="bg-ink text-pale px-6 py-3 text-sm font-semibold justify-self-start">

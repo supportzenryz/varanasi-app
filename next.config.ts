@@ -13,6 +13,15 @@ const nextConfig: NextConfig = {
   // the landing-page logo are served above the default deliberately.
   images: {
     qualities: [75, 88, 90, 95],
+    // Every <Image> resolves through src/lib/image-loader.js, which sends the
+    // media library to Cloudinary and leaves everything in public/ alone. Doing
+    // it in a loader rather than at each call site means the admin's own image
+    // previews are covered too, and no page can be forgotten.
+    loader: "custom",
+    loaderFile: "./src/lib/image-loader.js",
+    remotePatterns: [
+      { protocol: "https", hostname: "res.cloudinary.com", pathname: "/**" },
+    ],
   },
   turbopack: {
     // There is a stray package-lock.json in C:\Users\sathi, and without this

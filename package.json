@@ -5,14 +5,15 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
+    "start": "node scripts/ensure-db.mjs && next start",
     "lint": "eslint",
     "db:migrate": "node scripts/migrate.mjs",
     "db:seed": "node scripts/seed.mjs",
     "db:generate": "drizzle-kit generate",
     "media:import": "node scripts/import-media.mjs",
     "exact:build": "node scripts/build-exact.mjs",
-    "test:e2e": "node tests/e2e.mjs"
+    "test:e2e": "node tests/e2e.mjs",
+    "db:ensure": "node scripts/ensure-db.mjs"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

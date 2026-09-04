@@ -25,7 +25,11 @@ import { DatabaseSync } from "node:sqlite";
 import fs from "node:fs";
 import path from "node:path";
 
-const file = process.env.DATABASE_URL ?? "./data/varanasi.db";
+/** Hosts hand DATABASE_URL over as `file:/data/x.db`; SQLite wants a path. */
+const rawUrl = (process.env.DATABASE_URL ?? "").trim();
+const file = rawUrl
+  ? (rawUrl.startsWith("file:") ? rawUrl.slice(5) || "./data/varanasi.db" : rawUrl)
+  : "./data/varanasi.db";
 const dir = "./drizzle";
 fs.mkdirSync(path.dirname(file), { recursive: true });
 

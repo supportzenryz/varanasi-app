@@ -2,7 +2,14 @@ import { DatabaseSync } from "node:sqlite";
 import bcrypt from "bcryptjs";
 import fs from "node:fs";
 
-const db = new DatabaseSync(process.env.DATABASE_URL ?? "./data/varanasi.db");
+/** Hosts hand DATABASE_URL over as `file:/data/x.db`; SQLite wants a path. */
+const rawUrl = (process.env.DATABASE_URL ?? "").trim();
+const dbFile = rawUrl
+  ? (rawUrl.startsWith("file:") ? rawUrl.slice(5) || "./data/varanasi.db" : rawUrl)
+  : "./data/varanasi.db";
+
+const db = new DatabaseSync(dbFile);
+db.exec("PRAGMA busy_timeout = 15000");
 db.exec("PRAGMA foreign_keys = ON");
 
 const readJson = (f) => JSON.parse(fs.readFileSync(f, "utf8"));

@@ -1,91 +1,91 @@
 {
   "_source": "Branch copy, hero media, venue stats and gallery, transcribed from the captured varanasi.uk pages.",
   "brand": {
-    "logo": "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/birmingham/2024/07/logo.png",
-    "logoDark": "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/birmingham/2024/07/logo_dark.png",
-    "logoIcon": "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/birmingham/2024/07/logo_icon.svg",
-    "wordmark": "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/birmingham/2026/01/varanasi_logo_text.png",
-    "favicon": "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/birmingham/2024/08/favicon-varanasi.svg",
-    "appleTouchIcon": "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/birmingham/2024/08/apple-touch-icon-varanasi.png",
-    "socialImage": "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/birmingham/2024/09/Varanasi_Social_Image.jpg",
-    "award": "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/birmingham/2026/01/travellers_choice_2025_v2.png",
+    "logo": "/media/lib/birmingham/2024/07/logo.png",
+    "logoDark": "/media/lib/birmingham/2024/07/logo_dark.png",
+    "logoIcon": "/media/lib/birmingham/2024/07/logo_icon.svg",
+    "wordmark": "/media/lib/birmingham/2026/01/varanasi_logo_text.png",
+    "favicon": "/media/lib/birmingham/2024/08/favicon-varanasi.svg",
+    "appleTouchIcon": "/media/lib/birmingham/2024/08/apple-touch-icon-varanasi.png",
+    "socialImage": "/media/lib/birmingham/2024/09/Varanasi_Social_Image.jpg",
+    "award": "/media/lib/birmingham/2026/01/travellers_choice_2025_v2.png",
     "awardAlt": "Tripadvisor Travellers' Choice 2025",
-    "giftVoucherImage": "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/birmingham/2024/08/Gift_Vouchers2.webp",
-    "divider": "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/birmingham/2024/07/frame_divider.svg"
+    "giftVoucherImage": "/media/lib/birmingham/2024/08/Gift_Vouchers2.webp",
+    "divider": "/media/lib/birmingham/2024/07/frame_divider.svg"
   },
   "branches": {
     "birmingham": {
       "heroKicker": "Artistry in Every Bite",
       "heroHeading": "Indian Fine Dining Restaurant in Birmingham",
-      "heroVideo": "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/birmingham/2024/08/62062d2fec5a15da7cc2c22d_varanasi_intro-720p-2.mp4",
-      "heroImage": "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/birmingham/2024/08/hero_bg.webp",
+      "heroVideo": "/media/lib/birmingham/2024/08/62062d2fec5a15da7cc2c22d_varanasi_intro-720p-2.mp4",
+      "heroImage": "/media/lib/birmingham/2024/08/hero_bg.webp",
       "aboutHeading": "Varanasi's Modern Twist on Tradition",
       "aboutSubheading": "A dynamic menu that celebrates heritage with a twist",
       "aboutBody": "Varanasi brings contemporary Indian fine dining to Broad Street: a kitchen built around the tandoor and the sigri, eight private spaces, and three cocktail bars beneath a 20ft waterfall.",
       "openingNote": "(Last orders 10pm)",
       "bookingEmail": "reservations@varanasi.uk",
       "pressEmail": "info@varanasi.uk",
-      "drinksPdf": "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/birmingham/2026/01/Varanasi-Drinks-and-Cocktail-Menu.pdf",
+      "drinksPdf": "/media/lib/birmingham/2026/01/Varanasi-Drinks-and-Cocktail-Menu.pdf",
       "stats": [
         {
           "value": "1",
           "label": "Unique Venue",
-          "image": "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/birmingham/2024/08/home-about.webp"
+          "image": "/media/lib/birmingham/2024/08/home-about.webp"
         },
         {
           "value": "3",
           "label": "Cocktail Bars",
-          "image": "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/birmingham/2024/08/home-about-2.webp"
+          "image": "/media/lib/birmingham/2024/08/home-about-2.webp"
         },
         {
           "value": "8",
           "label": "Private Rooms",
-          "image": "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/birmingham/2024/08/home-about-3.webp",
+          "image": "/media/lib/birmingham/2024/08/home-about-3.webp",
           "href": "/birmingham/private-dining-experiences"
         }
       ],
       "collage": [
-        "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/birmingham/2024/08/drinks_varanasi.webp",
-        "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/birmingham/2024/08/main_room.webp",
-        "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/birmingham/2024/07/private_dining_room.jpg",
-        "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/birmingham/2024/08/varanasi_gallery_main.webp",
-        "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/birmingham/2024/07/buddha_varanasi.jpg",
-        "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/birmingham/2024/07/food_small_varanasi.jpg"
+        "/media/lib/birmingham/2024/08/drinks_varanasi.webp",
+        "/media/lib/birmingham/2024/08/main_room.webp",
+        "/media/lib/birmingham/2024/07/private_dining_room.jpg",
+        "/media/lib/birmingham/2024/08/varanasi_gallery_main.webp",
+        "/media/lib/birmingham/2024/07/buddha_varanasi.jpg",
+        "/media/lib/birmingham/2024/07/food_small_varanasi.jpg"
       ],
       "gallery": [
-        "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/birmingham/2024/10/gallery1.jpg",
-        "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/birmingham/2024/10/gallery2.jpg",
-        "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/birmingham/2024/10/gallery3.jpg",
-        "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/birmingham/2024/10/gallery4.jpg",
-        "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/birmingham/2024/10/gallery5.jpg",
-        "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/birmingham/2024/10/gallery6.jpg",
-        "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/birmingham/2024/10/gallery7.jpg",
-        "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/birmingham/2024/10/gallery8.jpg",
-        "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/birmingham/2024/10/gallery9.jpg",
-        "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/birmingham/2024/10/gallery10.jpg",
-        "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/birmingham/2024/10/gallery12.jpg",
-        "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/birmingham/2024/08/gallery-instagram-02.webp",
-        "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/birmingham/2024/08/gallery-instagram-03.webp",
-        "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/birmingham/2024/08/gallery-instagram-04.webp",
-        "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/birmingham/2024/08/gallery-instagram-05.webp",
-        "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/birmingham/2024/08/gallery-instagram-06.webp"
+        "/media/lib/birmingham/2024/10/gallery1.jpg",
+        "/media/lib/birmingham/2024/10/gallery2.jpg",
+        "/media/lib/birmingham/2024/10/gallery3.jpg",
+        "/media/lib/birmingham/2024/10/gallery4.jpg",
+        "/media/lib/birmingham/2024/10/gallery5.jpg",
+        "/media/lib/birmingham/2024/10/gallery6.jpg",
+        "/media/lib/birmingham/2024/10/gallery7.jpg",
+        "/media/lib/birmingham/2024/10/gallery8.jpg",
+        "/media/lib/birmingham/2024/10/gallery9.jpg",
+        "/media/lib/birmingham/2024/10/gallery10.jpg",
+        "/media/lib/birmingham/2024/10/gallery12.jpg",
+        "/media/lib/birmingham/2024/08/gallery-instagram-02.webp",
+        "/media/lib/birmingham/2024/08/gallery-instagram-03.webp",
+        "/media/lib/birmingham/2024/08/gallery-instagram-04.webp",
+        "/media/lib/birmingham/2024/08/gallery-instagram-05.webp",
+        "/media/lib/birmingham/2024/08/gallery-instagram-06.webp"
       ],
-      "menuHero": "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/birmingham/2024/07/footer_food_bg.webp",
-      "privateDiningHero": "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/birmingham/2024/07/private_dining_hero.webp",
+      "menuHero": "/media/lib/birmingham/2024/07/footer_food_bg.webp",
+      "privateDiningHero": "/media/lib/birmingham/2024/07/private_dining_hero.webp",
       "menuBanners": [
-        "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/birmingham/2024/08/dishes-category-dinner-images.webp",
-        "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/birmingham/2024/08/dishes-category-dinner-images2.webp",
-        "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/birmingham/2024/08/dishes-category-dinner-images3.webp",
-        "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/birmingham/2024/08/dishes-category-dinner-image4.webp",
-        "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/birmingham/2024/08/dishes-category-dinner-images5.webp",
-        "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/birmingham/2024/08/dishes-category-dinner-images6.webp"
+        "/media/lib/birmingham/2024/08/dishes-category-dinner-images.webp",
+        "/media/lib/birmingham/2024/08/dishes-category-dinner-images2.webp",
+        "/media/lib/birmingham/2024/08/dishes-category-dinner-images3.webp",
+        "/media/lib/birmingham/2024/08/dishes-category-dinner-image4.webp",
+        "/media/lib/birmingham/2024/08/dishes-category-dinner-images5.webp",
+        "/media/lib/birmingham/2024/08/dishes-category-dinner-images6.webp"
       ],
-      "drinksHero": "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/birmingham/2024/08/varanasi_bottles.webp"
+      "drinksHero": "/media/lib/birmingham/2024/08/varanasi_bottles.webp"
     },
     "leicester": {
       "heroKicker": "Artistry in Every Bite",
       "heroHeading": "Indian Fine Dining Restaurant in Leicester",
-      "heroImage": "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/leicester/2025/03/Varanasi-Leicester-Home-Hero.webp",
+      "heroImage": "/media/lib/leicester/2025/03/Varanasi-Leicester-Home-Hero.webp",
       "heroVideo": null,
       "aboutHeading": "Varanasi's Modern Twist on Tradition",
       "aboutSubheading": "A dynamic menu that celebrates heritage with a twist",
@@ -93,58 +93,58 @@
       "openingNote": "(Last orders 10pm)",
       "bookingEmail": "leicester@varanasi.uk",
       "pressEmail": "info@varanasi.uk",
-      "drinksPdf": "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/leicester/2026/01/Varanasi-Drinks-and-Cocktail-Menu.pdf",
+      "drinksPdf": "/media/lib/leicester/2026/01/Varanasi-Drinks-and-Cocktail-Menu.pdf",
       "stats": [
         {
           "value": "1",
           "label": "Unique Venue",
-          "image": "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/leicester/2025/03/Varanasi-Leicester-Home-Dining.jpg"
+          "image": "/media/lib/leicester/2025/03/Varanasi-Leicester-Home-Dining.jpg"
         },
         {
           "value": "1",
           "label": "Cocktail Bar",
-          "image": "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/leicester/2025/03/Varanasi-Leicester-CocktailBar.jpg"
+          "image": "/media/lib/leicester/2025/03/Varanasi-Leicester-CocktailBar.jpg"
         },
         {
           "value": "2",
           "label": "Private Rooms",
-          "image": "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/leicester/2025/03/Varanasi-Leicester-Home-Private.jpg",
+          "image": "/media/lib/leicester/2025/03/Varanasi-Leicester-Home-Private.jpg",
           "href": "/leicester/private-dining-experiences"
         }
       ],
       "collage": [
-        "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/leicester/2025/03/Varanasi-Leicester-Drinks.jpg",
-        "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/leicester/2025/03/Varanasi-Leicester-TableSetting.jpg",
-        "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/leicester/2025/03/Varanasi-Leicester-Gallery-Main.jpg",
-        "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/leicester/2025/03/Varanasi-Leicester-Lantern.jpg",
-        "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/leicester/2025/03/Varanasi-Leicester-Food-Small.jpg",
-        "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/leicester/2025/03/Varanasi-Leicester-Elephant.jpg"
+        "/media/lib/leicester/2025/03/Varanasi-Leicester-Drinks.jpg",
+        "/media/lib/leicester/2025/03/Varanasi-Leicester-TableSetting.jpg",
+        "/media/lib/leicester/2025/03/Varanasi-Leicester-Gallery-Main.jpg",
+        "/media/lib/leicester/2025/03/Varanasi-Leicester-Lantern.jpg",
+        "/media/lib/leicester/2025/03/Varanasi-Leicester-Food-Small.jpg",
+        "/media/lib/leicester/2025/03/Varanasi-Leicester-Elephant.jpg"
       ],
       "gallery": [
-        "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/leicester/2025/03/Varanasi-Leicester-Gallery-Main.jpg",
-        "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/leicester/2025/03/Varanasi-Leicester-Gallery-Entrance.jpg",
-        "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/leicester/2025/03/Varanasi-Leicester-Gallery-01.jpg",
-        "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/leicester/2025/03/Varanasi-Leicester-Gallery-02.jpg",
-        "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/leicester/2025/03/Varanasi-Leicester-Gallery-03.jpg",
-        "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/leicester/2025/03/Varanasi-Leicester-CocktailBar.jpg",
-        "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/leicester/2025/03/Varanasi-Leicester-Drinks.jpg",
-        "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/leicester/2025/03/Varanasi-Leicester-TableSetting.jpg",
-        "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/leicester/2025/03/Varanasi-Leicester-Lantern.jpg",
-        "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/leicester/2025/03/Varanasi-Leicester-Lighting.jpg",
-        "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/leicester/2025/03/Varanasi-Leicester-Elephant.jpg",
-        "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/leicester/2025/03/Varanasi-Leicester-Food-Small.jpg"
+        "/media/lib/leicester/2025/03/Varanasi-Leicester-Gallery-Main.jpg",
+        "/media/lib/leicester/2025/03/Varanasi-Leicester-Gallery-Entrance.jpg",
+        "/media/lib/leicester/2025/03/Varanasi-Leicester-Gallery-01.jpg",
+        "/media/lib/leicester/2025/03/Varanasi-Leicester-Gallery-02.jpg",
+        "/media/lib/leicester/2025/03/Varanasi-Leicester-Gallery-03.jpg",
+        "/media/lib/leicester/2025/03/Varanasi-Leicester-CocktailBar.jpg",
+        "/media/lib/leicester/2025/03/Varanasi-Leicester-Drinks.jpg",
+        "/media/lib/leicester/2025/03/Varanasi-Leicester-TableSetting.jpg",
+        "/media/lib/leicester/2025/03/Varanasi-Leicester-Lantern.jpg",
+        "/media/lib/leicester/2025/03/Varanasi-Leicester-Lighting.jpg",
+        "/media/lib/leicester/2025/03/Varanasi-Leicester-Elephant.jpg",
+        "/media/lib/leicester/2025/03/Varanasi-Leicester-Food-Small.jpg"
       ],
-      "menuHero": "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/leicester/2024/07/footer_food_bg.webp",
-      "privateDiningHero": "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/leicester/2025/03/Varanasi-Leicester-Private-Dining-Hero.jpg",
+      "menuHero": "/media/lib/leicester/2024/07/footer_food_bg.webp",
+      "privateDiningHero": "/media/lib/leicester/2025/03/Varanasi-Leicester-Private-Dining-Hero.jpg",
       "menuBanners": [
-        "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/leicester/2024/08/dishes-category-dinner-images.webp",
-        "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/leicester/2024/08/dishes-category-dinner-images2.webp",
-        "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/leicester/2024/08/dishes-category-dinner-images3.webp",
-        "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/leicester/2024/08/dishes-category-dinner-image4.webp",
-        "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/leicester/2024/08/dishes-category-dinner-images5.webp",
-        "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/leicester/2024/08/dishes-category-dinner-images6.webp"
+        "/media/lib/leicester/2024/08/dishes-category-dinner-images.webp",
+        "/media/lib/leicester/2024/08/dishes-category-dinner-images2.webp",
+        "/media/lib/leicester/2024/08/dishes-category-dinner-images3.webp",
+        "/media/lib/leicester/2024/08/dishes-category-dinner-image4.webp",
+        "/media/lib/leicester/2024/08/dishes-category-dinner-images5.webp",
+        "/media/lib/leicester/2024/08/dishes-category-dinner-images6.webp"
       ],
-      "drinksHero": "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/leicester/2025/03/Varanasi-Leicester-Drinks.jpg"
+      "drinksHero": "/media/lib/leicester/2025/03/Varanasi-Leicester-Drinks.jpg"
     }
   }
 }

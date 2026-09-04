@@ -2,7 +2,12 @@ import { chromium } from 'playwright';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 
-const BASE = 'http://localhost:3000';
+/* Point this at a deployment to smoke-test it:
+ *   BASE_URL=https://your-app.up.railway.app npm run test:e2e
+ * The browser-driven checks all work remotely. The few that read data/varanasi.db
+ * directly are asserting against the *local* file, so treat a remote run as a
+ * check of the pages and journeys rather than of the database. */
+const BASE = (process.env.BASE_URL || 'http://localhost:3000').replace(/\/+$/, '');
 const results = [];
 const t = (name, ok, detail = '') => {
   results.push({ name, ok, detail });

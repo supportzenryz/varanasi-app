@@ -39,12 +39,30 @@ export class Sqlite {
   private readonly db: DatabaseSync;
   constructor(file: string) {
     this.db = new DatabaseSync(file);
-    this.db.exec("PRAGMA journal_mode = WAL");
+
+    // ORDER MATTERS. busy_timeout has to be the first statement on the
+    // connection, because it is what every *later* statement relies on to wait
+    // rather than fail. Setting it last — as this did — leaves the statements
+    // above it running with SQLite's default timeout of zero, so under
+    // contention they fail on contact. `next build` fans out to ~31 workers
+    // that all open this database within the same few milliseconds, which is
+    // exactly that contention, and it is why raising the timeout value had no
+    // effect: the statement that was failing ran before the timeout was set.
+    this.db.exec("PRAGMA busy_timeout = 15000");
+
+    // journal_mode is a persistent property of the database *file*, not of the
+    // connection: once the migration has set WAL, every later connection
+    // inherits it and re-issuing this is a no-op. Switching modes needs a brief
+    // exclusive lock though, so when many processes start together one of them
+    // can still lose the race. Since the value is already correct in that case,
+    // a failure here is not worth taking the process down for.
+    try {
+      this.db.exec("PRAGMA journal_mode = WAL");
+    } catch {
+      // Another process set it first, which is the outcome we wanted anyway.
+    }
+
     this.db.exec("PRAGMA foreign_keys = ON");
-    // Without this, a write that meets a concurrent write fails immediately
-    // with SQLITE_BUSY rather than waiting its turn. Two guests booking in the
-    // same second is exactly when we least want an error page.
-    this.db.exec("PRAGMA busy_timeout = 60000");
     // Durable enough for a restaurant, and far faster than FULL under WAL.
     this.db.exec("PRAGMA synchronous = NORMAL");
   }

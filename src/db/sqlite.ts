@@ -44,7 +44,7 @@ export class Sqlite {
     // Without this, a write that meets a concurrent write fails immediately
     // with SQLITE_BUSY rather than waiting its turn. Two guests booking in the
     // same second is exactly when we least want an error page.
-    this.db.exec("PRAGMA busy_timeout = 3000");
+    this.db.exec("PRAGMA busy_timeout = 30000");
     // Durable enough for a restaurant, and far faster than FULL under WAL.
     this.db.exec("PRAGMA synchronous = NORMAL");
   }

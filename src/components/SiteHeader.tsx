@@ -56,7 +56,7 @@ export function SiteHeader({
               restaurant they're on, so it's the natural place to change it too. */}
           <Link
             href="/"
-            className="accent text-[0.58rem] text-gold/90 hidden sm:flex items-center gap-1.5 hover:text-gold shrink-0 -ml-3"
+            className="accent text-[0.58rem] text-gold/90 hidden 2xl:flex items-center gap-1.5 hover:text-gold shrink-0 -ml-3"
             aria-label={`Varanasi ${city} — switch location`}
           >
             {city}
@@ -65,7 +65,7 @@ export function SiteHeader({
             </svg>
           </Link>
 
-          <nav aria-label="Main" className="hidden lg:flex items-center gap-x-4 xl:gap-x-6 text-[0.84rem] text-pale/85">
+          <nav aria-label="Main" className="hidden xl:flex items-center gap-x-3.5 2xl:gap-x-5 text-[0.78rem] text-pale/85">
             {links.map((l) => (
               <Link key={l.href + l.label} href={l.href} className="whitespace-nowrap hover:text-gold transition-colors">
                 {l.label}
@@ -81,7 +81,7 @@ export function SiteHeader({
               onClick={() => setOpen((v) => !v)}
               aria-expanded={open}
               aria-label="Menu"
-              className="lg:hidden text-pale p-2 -mr-2"
+              className="xl:hidden text-pale p-2 -mr-2"
             >
               <span className="block w-6 h-px bg-current" />
               <span className="block w-6 h-px bg-current mt-1.5" />
@@ -92,7 +92,7 @@ export function SiteHeader({
       </div>
 
       {open && (
-        <div className="lg:hidden bg-ink border-t border-white/10">
+        <div className="xl:hidden bg-ink border-t border-white/10">
           <nav aria-label="Main, mobile" className="mx-auto max-w-[84rem] px-5 py-4 grid gap-1">
             {(allLinks ?? links).map((l) => (
               <Link key={l.href + l.label} href={l.href} onClick={() => setOpen(false)}

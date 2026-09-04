@@ -11,6 +11,7 @@ import { pageHref } from "@/lib/nav";
 import { branchMedia } from "@/lib/brand";
 import { PageHero } from "@/components/PageHero";
 import { GiftVoucherBand } from "@/components/GiftVoucherBand";
+import { OrnamentDivider } from "@/components/Ornament";
 
 export async function generateMetadata({ params }: { params: Promise<{ branch: string }> }): Promise<Metadata> {
   const { branch: slug } = await params;
@@ -117,7 +118,7 @@ export default async function PrivateDiningPage({ params }: { params: Promise<{ 
             <h2 className="text-3xl sm:text-4xl mt-4">
               {rooms.length} {rooms.length === 1 ? "space" : "spaces"}, each with its own character
             </h2>
-            <div className="rule mt-6" aria-hidden="true">◆</div>
+            <OrnamentDivider className="mt-6" />
           </header>
 
           <div className="mt-16 grid gap-16 sm:gap-20">

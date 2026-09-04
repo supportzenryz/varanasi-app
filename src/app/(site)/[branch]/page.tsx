@@ -11,6 +11,7 @@ import { pageHref } from "@/lib/nav";
 import { brand, branchMedia } from "@/lib/brand";
 import { PageHero } from "@/components/PageHero";
 import { GiftVoucherBand } from "@/components/GiftVoucherBand";
+import { OrnamentDivider, JaliBand } from "@/components/Ornament";
 
 export async function generateMetadata({ params }: { params: Promise<{ branch: string }> }): Promise<Metadata> {
   const { branch: slug } = await params;
@@ -68,7 +69,7 @@ export default async function BranchHome({ params }: { params: Promise<{ branch:
 
 
       {/* the about section — heading, copy, and the photo collage the live site runs */}
-      <section className="mx-auto max-w-[84rem] px-5 lg:px-10 py-20 sm:py-28">
+      <section className="reveal mx-auto max-w-[84rem] px-5 lg:px-10 py-20 sm:py-28">
         <div className="grid gap-14 lg:grid-cols-2 lg:gap-20 lg:items-center">
           <div>
             <p className="accent text-[0.62rem] text-gold">Our kitchen</p>
@@ -79,7 +80,7 @@ export default async function BranchHome({ params }: { params: Promise<{ branch:
             {branch.aboutBody && (
               <p className="mt-6 text-pale/70 leading-relaxed max-w-[52ch]">{branch.aboutBody}</p>
             )}
-            <div className="rule my-9" aria-hidden="true">◆</div>
+            <OrnamentDivider className="my-9" />
 
             {/* a taste of the menu, read live from the database */}
             <ul className="grid gap-4">
@@ -103,7 +104,7 @@ export default async function BranchHome({ params }: { params: Promise<{ branch:
           <div className="grid grid-cols-2 gap-3 sm:gap-4">
             {(collage.length >= 5 ? collage.map((c) => c.src) : media.collage).slice(0, 5).map((src, i) => (
               <div key={src + i}
-                className={`relative overflow-hidden hover-zoom ${i === 0 ? "col-span-2 h-64 sm:h-80" : "h-44 sm:h-56"}`}>
+                className={`relative overflow-hidden hover-zoom framed warm ${i === 0 ? "col-span-2 h-64 sm:h-80" : "h-44 sm:h-56"}`}>
                 <Image src={src} alt="" fill quality={90}
                   sizes="(min-width: 1024px) 40vw, 50vw" className="object-cover" />
               </div>
@@ -114,7 +115,10 @@ export default async function BranchHome({ params }: { params: Promise<{ branch:
 
       {/* private dining — only ever this branch's own rooms */}
       {rooms.length > 0 && (
-        <section className="bg-ink border-t border-white/5">
+        <section className="reveal bg-ink border-t border-white/5">
+          {/* A pierced screen where a plain border was: the section this
+              introduces is about rooms, so an architectural motif earns its place. */}
+          <JaliBand className="opacity-70" />
           <div className="mx-auto max-w-[84rem] px-5 lg:px-10 py-20 sm:py-28">
             <div className="flex flex-wrap items-end justify-between gap-6">
               <div>
@@ -134,7 +138,7 @@ export default async function BranchHome({ params }: { params: Promise<{ branch:
                   {/* The photograph is lazy-loaded, so give the box a faint
                       gradient rather than flat ink — a card caught mid-load
                       then reads as a card, not a broken image. */}
-                  <div className="relative h-56 sm:h-60 overflow-hidden hover-zoom
+                  <div className="relative h-56 sm:h-60 overflow-hidden hover-zoom warm
                                   bg-gradient-to-br from-white/[0.06] to-transparent">
                     {r.image ? (
                       <Image src={r.image} alt={r.name} fill quality={88}
@@ -162,7 +166,7 @@ export default async function BranchHome({ params }: { params: Promise<{ branch:
       )}
 
       {/* find us */}
-      <section className="mx-auto max-w-[84rem] px-5 lg:px-10 py-20 sm:py-24 grid gap-14 lg:grid-cols-2">
+      <section className="reveal mx-auto max-w-[84rem] px-5 lg:px-10 py-20 sm:py-24 grid gap-14 lg:grid-cols-2">
         <div>
           <p className="accent text-[0.62rem] text-gold">Find us</p>
           <h2 className="text-3xl mt-4">{branch.addressLine}</h2>

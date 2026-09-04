@@ -55,7 +55,7 @@ export function MenuSections({
         const items = itemsByCategory.get(cat.id) ?? [];
         if (!items.length) return null;
         return (
-          <details key={cat.id} id={cat.slug} className="menu-section scroll-mt-28 group">
+          <details key={cat.id} id={cat.slug} className="menu-section reveal scroll-mt-28 group">
             <summary className="menu-summary">
               <span className="min-w-0">
                 <span className="display block text-xl sm:text-2xl text-gold leading-tight">

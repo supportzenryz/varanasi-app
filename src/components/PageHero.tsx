@@ -52,7 +52,7 @@ export function PageHero({
           aria-hidden="true"
         />
       ) : image ? (
-        <Image src={image} alt="" fill priority sizes="100vw" className="object-cover -z-20" />
+        <Image src={image} alt="" fill priority sizes="100vw" className="object-cover -z-20 ken-burns" />
       ) : null}
 
       <div className={`absolute inset-0 -z-10 ${centred ? "wash-ink-y" : "wash-ink"}`} aria-hidden="true" />

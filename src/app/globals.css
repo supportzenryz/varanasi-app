@@ -172,6 +172,69 @@ h1 { line-height: 1.04; }
 .wash-ink { background: linear-gradient(to right, rgba(15,15,15,.92) 0%, rgba(15,15,15,.72) 45%, rgba(15,15,15,.35) 100%); }
 .wash-ink-y { background: linear-gradient(to top, rgba(15,15,15,.85) 0%, rgba(15,15,15,.15) 55%, rgba(15,15,15,.35) 100%); }
 
+/* ---- Reveal on scroll ----------------------------------------------------
+   Sections lift and fade as they come into view.
+
+   This is scroll-driven CSS, not JavaScript: no observer, no hydration, no
+   client bundle. The animation is declared *only* inside @supports, which
+   matters more than it looks — the failure mode of a reveal effect is content
+   stranded at opacity 0. Browsers without scroll-driven animations never see
+   the rule at all, so they render the page normally rather than blankly.
+
+   The reduced-motion block further down sets `animation: none !important`,
+   and because the resting state here is the visible one, that leaves
+   everything on screen rather than hidden. */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .reveal {
+      animation: reveal-in linear both;
+      animation-timeline: view();
+      /* Finish well before the element is centred, so reading is never
+         waiting on an animation. */
+      animation-range: entry 4% cover 26%;
+    }
+  }
+}
+@keyframes reveal-in {
+  from { opacity: 0; transform: translateY(1.4rem); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* A slow drift across a still photograph. Barely perceptible per second, but
+   it stops a full-bleed hero reading as a screenshot. */
+@media (prefers-reduced-motion: no-preference) {
+  .ken-burns img, .ken-burns > img, img.ken-burns {
+    animation: ken-burns 28s ease-in-out infinite alternate;
+    transform-origin: 55% 45%;
+    will-change: transform;
+  }
+}
+@keyframes ken-burns {
+  from { transform: scale(1); }
+  to   { transform: scale(1.07); }
+}
+
+/* ---- Photographs --------------------------------------------------------
+   A hairline of gold set inside the edge of an image, rather than a border
+   drawn around it. Inside, it reads as a mount; outside, it reads as a box. */
+.framed { position: relative; }
+.framed::after {
+  content: "";
+  position: absolute;
+  inset: .6rem;
+  border: 1px solid rgba(198,163,90,.34);
+  pointer-events: none;
+  transition: inset .5s cubic-bezier(.2,.7,.3,1), border-color .5s;
+}
+.framed:hover::after { inset: .85rem; border-color: rgba(198,163,90,.6); }
+
+/* A warm wash that pulls the photography toward the gold of the palette, so a
+   wall of images from different shoots reads as one set. Lifts on hover, which
+   makes the picture feel like it steps forward. */
+.warm img { transition: filter .6s ease, transform .7s cubic-bezier(.2,.7,.3,1); }
+.warm img { filter: saturate(.92) contrast(1.04) sepia(.06); }
+.warm:hover img { filter: saturate(1) contrast(1.02) sepia(0); }
+
 /* ---- Menu sections -------------------------------------------------------
    The menu opens as an index: each section is a closed <details>, and the
    reader opens the ones they want. The styling below is what makes a

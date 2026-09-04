@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { startPurchase, attachVoucherSession } from "@/lib/voucher";
 import { voucherRules } from "@/lib/booking-config";
 import { createVoucherCheckout, stripeSimulated } from "@/lib/stripe";
-import { parsePounds } from "@/lib/money";
+import { parsePounds, formatPence } from "@/lib/money";
 
 function siteUrl(): string {
   return (process.env.SITE_URL ?? "http://localhost:3000").replace(/\/$/, "");
@@ -24,15 +24,33 @@ export async function buyVoucher(formData: FormData) {
 
   // A preset button, or a custom amount
   const preset = String(formData.get("value") ?? "");
+  const typed = String(formData.get("customValue") ?? "").trim();
   const rules = voucherRules();
   let valuePence: number | null = null;
-  if (preset === "custom") {
-    valuePence = parsePounds(String(formData.get("customValue") ?? ""));
-    if (valuePence == null) redirect(back("Please enter the amount you'd like to give."));
-  } else {
+
+  /* Typing an amount means that amount. Previously the box was only read when
+   * the "Another amount" radio had also been clicked, so someone who filled in
+   * 500 and pressed continue was charged the £50 default — silently, with the
+   * only warning in 12px grey text. A guest intending a £500 gift found out
+   * afterwards, if at all. Typing now wins over any preset. */
+  if (preset === "custom" || typed) {
+    valuePence = parsePounds(typed);
+    if (valuePence == null) {
+      redirect(back(typed
+        ? "We couldn't read that amount — please write it as a number, like 120."
+        : "Please enter the amount you'd like to give."));
+    }
+  } else if (preset) {
     valuePence = Number(preset);
   }
-  if (!valuePence || !Number.isFinite(valuePence)) redirect(back("Please choose an amount."));
+
+  if (!valuePence || !Number.isFinite(valuePence)) {
+    redirect(back("Please choose an amount, or type your own."));
+  }
+  if (valuePence! < rules.minPence || valuePence! > rules.maxPence) {
+    redirect(back(
+      `Please choose an amount between ${formatPence(rules.minPence)} and ${formatPence(rules.maxPence)}.`));
+  }
 
   const started = startPurchase({
     branchSlug: validAt || null,

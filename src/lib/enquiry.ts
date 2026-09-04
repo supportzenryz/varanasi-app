@@ -64,6 +64,39 @@ export async function submitEnquiry(input: EnquiryInput): Promise<EnquiryResult>
     return { ok: false, error: "Please keep your message under 4,000 characters." };
   }
 
+  /* Party size, date and time were stored verbatim: 999999 guests, party
+   * sizes of 0 and -5, and requested dates of 2020-01-01 and 2099-12-31 all
+   * went in and came back a cheerful "your enquiry has reached us". The
+   * booking flow validates all of this properly in src/lib/availability.ts;
+   * the enquiry forms simply never did. `type=number min=1` and `type=date`
+   * are browser hints, and the browser is not where this gets decided. */
+  if (input.partySize != null) {
+    const n = Number(input.partySize);
+    if (!Number.isInteger(n) || n < 1) {
+      return { ok: false, error: "Please give the number of guests as a whole number." };
+    }
+    if (n > 500) {
+      return { ok: false, error: "For a party that size, please call us — we'll plan it with you properly." };
+    }
+  }
+  if (input.requestedDate) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(input.requestedDate)) {
+      return { ok: false, error: "Please give the date as a real date." };
+    }
+    const today = new Date().toISOString().slice(0, 10);
+    if (input.requestedDate < today) {
+      return { ok: false, error: "That date has already passed — please choose another." };
+    }
+    const horizon = new Date();
+    horizon.setFullYear(horizon.getFullYear() + 2);
+    if (input.requestedDate > horizon.toISOString().slice(0, 10)) {
+      return { ok: false, error: "Please choose a date within the next two years." };
+    }
+  }
+  if (input.requestedTime && !/^([01]\d|2[0-3]):[0-5]\d$/.test(input.requestedTime)) {
+    return { ok: false, error: "Please give the time as a real time, like 19:30." };
+  }
+
   const branch = input.branchSlug ? branchBySlug(input.branchSlug) : undefined;
   const now = Math.floor(Date.now() / 1000);
 

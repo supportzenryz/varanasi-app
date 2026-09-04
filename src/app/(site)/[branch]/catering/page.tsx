@@ -8,6 +8,7 @@ import { pageHref } from "@/lib/nav";
 import { PageHero } from "@/components/PageHero";
 import { EnquiryForm } from "@/components/EnquiryForm";
 import { Sent } from "@/components/Sent";
+import { recallSubmission } from "@/lib/form-recall";
 
 export async function generateMetadata({ params }: { params: Promise<{ branch: string }> }): Promise<Metadata> {
   const { branch: slug } = await params;
@@ -37,6 +38,9 @@ export default async function Catering({
   if (!branch) notFound();
   const media = branchMedia(branch.slug);
   const { sent, error } = await searchParams;
+  /* The rejected submission, if there was one: the message and everything
+     typed, from a short-lived cookie rather than the query string. */
+  const recalled = error ? await recallSubmission(`/${branch.slug}/catering`) : null;
   const rules = bookingRules();
 
   return (
@@ -64,8 +68,9 @@ export default async function Catering({
           </div>
 
           <div className="mt-12 border border-[--line] bg-ink-2 px-5 sm:px-8 py-8">
-            <Sent sent={sent === "1"} error={error} />
+            <Sent sent={sent === "1"} error={recalled?.message ?? (error ? "Something wasn't quite right — please check the form below." : undefined)} />
             <EnquiryForm
+              values={recalled?.values ?? {}}
               type="catering"
               branchSlug={branch.slug}
               returnTo={`/${branch.slug}/catering`}

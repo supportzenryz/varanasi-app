@@ -154,11 +154,21 @@ export default async function BookOnline({
                         }
                         return (
                           <Link key={s.time}
-                            href={`${here}?guests=${guests}&date=${availability.date}&time=${s.time}`}
+                            /* The fragment sends the guest to the form their click just
+                               revealed. Without it they land at the top of a ~3,500px page
+                               with "Your details" some 1,600px below — at every step, and
+                               again after every validation error. */
+                            href={`${here}?guests=${guests}&date=${availability.date}&time=${s.time}#your-details`}
                             aria-current={active ? "true" : undefined}
+                            /* The chosen time was ink on ink with an ink border, against a
+                               panel of the same ink — so choosing a slot REMOVED its outline
+                               and sank it into the background while every slot they had not
+                               chosen glowed. The affordance was inverted, in the one flow
+                               that takes money. Gold fill now means chosen, as it does on
+                               every other control on the site. */
                             className={`px-4 py-2.5 text-sm border transition-colors ${
                               active
-                                ? "bg-ink text-pale border-ink"
+                                ? "bg-gold text-ink border-gold font-semibold"
                                 : "bg-ink-2 border-[--line] hover:border-gold hover:text-gold"}`}>
                             {prettyTime(s.time)}
                           </Link>
@@ -179,7 +189,7 @@ export default async function BookOnline({
             {/* ---------- step 3: details, then payment ---------- */}
             {step === 3 && guests && date && chosenTime && (
               <div className="border-t border-[--line] px-5 sm:px-8 py-7">
-                <h2 className="text-2xl sm:text-3xl">Your details</h2>
+                <h2 id="your-details" className="text-2xl sm:text-3xl scroll-mt-28">Your details</h2>
                 <p className="mt-1.5 text-sm text-pale/70">
                   {dateLabel(date)} at {prettyTime(chosenTime)} · {guests} {guests === 1 ? "guest" : "guests"}
                 </p>
@@ -228,7 +238,7 @@ export default async function BookOnline({
 
                   <div>
                     <label className={label} htmlFor="notes">Anything else?</label>
-                    <textarea id="notes" name="notes" rows={3} className={field}
+                    <textarea id="notes" maxLength={2000} name="notes" rows={3} className={field}
                       placeholder="Seating preferences, a cake, a wheelchair space…" />
                   </div>
 

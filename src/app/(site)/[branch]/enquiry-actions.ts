@@ -1,6 +1,7 @@
 "use server";
 import { redirect } from "next/navigation";
 import { submitEnquiry, type EnquiryType } from "@/lib/enquiry";
+import { rememberSubmission } from "@/lib/form-recall";
 
 /**
  * One action behind every enquiry form on the site. Which page it came from is
@@ -49,6 +50,14 @@ export async function submitEnquiryAction(formData: FormData) {
     termsAccepted: formData.get("terms") === "on",
   });
 
-  if (!result.ok) redirect(`${page}?error=${encodeURIComponent(result.error)}`);
+  if (!result.ok) {
+    /* The message and everything typed go into a short-lived, server-set
+     * cookie rather than the query string. That returns the guest's work to
+     * them instead of blanking the form, and it takes the message out of a
+     * place anyone can write to: `?error=Your+card+was+declined…` used to
+     * render verbatim inside the site's own error box on the real domain. */
+    await rememberSubmission(result.error, formData, page);
+    redirect(`${page}?error=1`);
+  }
   redirect(`${page}?sent=1`);
 }

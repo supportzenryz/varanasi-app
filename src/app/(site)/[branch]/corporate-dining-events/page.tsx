@@ -11,6 +11,7 @@ import { pageHref } from "@/lib/nav";
 import { PageHero } from "@/components/PageHero";
 import { EnquiryForm } from "@/components/EnquiryForm";
 import { Sent } from "@/components/Sent";
+import { recallSubmission } from "@/lib/form-recall";
 
 export async function generateMetadata({ params }: { params: Promise<{ branch: string }> }): Promise<Metadata> {
   const { branch: slug } = await params;
@@ -40,6 +41,9 @@ export default async function Corporate({
   if (!branch) notFound();
   const media = branchMedia(branch.slug);
   const { sent, error } = await searchParams;
+  /* The rejected submission, if there was one: the message and everything
+     typed, from a short-lived cookie rather than the query string. */
+  const recalled = error ? await recallSubmission(`/${branch.slug}/corporate-dining-events`) : null;
   const rules = bookingRules();
 
   const rooms = db.select({ id: privateRooms.id, name: privateRooms.name })
@@ -118,8 +122,9 @@ export default async function Corporate({
       {/* enquiry */}
       <section className="bg-ink border-t border-[--line]">
         <div className="mx-auto max-w-[58rem] px-5 lg:px-10 py-14 sm:py-20">
-          <Sent sent={sent === "1"} error={error} />
+          <Sent sent={sent === "1"} error={recalled?.message ?? (error ? "Something wasn't quite right — please check the form below." : undefined)} />
           <EnquiryForm
+              values={recalled?.values ?? {}}
             type="corporate"
             branchSlug={branch.slug}
             returnTo={`/${branch.slug}/corporate-dining-events`}

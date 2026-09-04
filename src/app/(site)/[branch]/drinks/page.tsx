@@ -68,7 +68,7 @@ export default async function DrinksPage({ params }: { params: Promise<{ branch:
       </PageHero>
 
       <div className="mx-auto max-w-3xl px-5 lg:px-8 py-16 sm:py-20">
-        <MenuSections categories={withItems} itemsByCategory={byCat} />
+        <MenuSections noun="drink" categories={withItems} itemsByCategory={byCat} />
 
         <section className="mt-20 pt-14 border-t border-[--line]">
           <h2 className="accent text-[0.62rem] text-gold">Reading the wine list</h2>

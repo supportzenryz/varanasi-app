@@ -53,7 +53,11 @@ export async function startBooking(formData: FormData) {
 
   const rules = bookingRules();
   const successUrl = `${siteUrl()}/${branch.slug}/book-online/confirmed?ref=${booking.reference}&session_id={CHECKOUT_SESSION_ID}`;
-  const cancelUrl = `${siteUrl()}/${branch.slug}/book-online/unconfirmed?ref=${booking.reference}`;
+  /* The token goes on the cancel URL because that page releases the table.
+   * Without it the only thing needed to cancel someone's hold was their
+   * booking reference in a plain GET — so a link preview, an email scanner
+   * or a forwarded URL would quietly release it and send a failure notice. */
+  const cancelUrl = `${siteUrl()}/${branch.slug}/book-online/unconfirmed?ref=${booking.reference}&t=${booking.cancelToken ?? ""}`;
 
   // Without Stripe keys we hand off to the built-in simulator instead, so the
   // whole journey — including the failure path — can be demonstrated today.

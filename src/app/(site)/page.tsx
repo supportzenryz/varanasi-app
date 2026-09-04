@@ -5,7 +5,9 @@ import { allBranches } from "@/lib/branches";
 import { brand } from "@/lib/brand";
 
 export const metadata: Metadata = {
-  title: "Varanasi | Indian Fine Dining",
+  // absolute, or the root layout's "%s | Varanasi" template appends a
+  // second Varanasi and the tab reads "… | Varanasi | Varanasi".
+  title: { absolute: "Varanasi | Indian Fine Dining" },
   description:
     "Indian fine dining in Birmingham and Leicester. Choose your restaurant to see menus, book a table or buy a gift voucher.",
   alternates: { canonical: "/" },

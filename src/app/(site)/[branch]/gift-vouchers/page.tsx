@@ -72,6 +72,8 @@ export default async function GiftVouchers({
                       defaultChecked={preselected ? Number(preselected) === p : i === 1} />
                     <span className="block px-6 py-3.5 border border-[--line] text-lg tnum
                                      peer-checked:bg-gold peer-checked:text-ink peer-checked:border-gold
+                                     peer-focus-visible:outline peer-focus-visible:outline-2
+                                     peer-focus-visible:outline-offset-2 peer-focus-visible:outline-gold
                                      hover:border-gold transition-colors">
                       {formatPence(p)}
                     </span>
@@ -82,6 +84,8 @@ export default async function GiftVouchers({
                     <input type="radio" name="value" value="custom" className="peer sr-only" />
                     <span className="block px-6 py-3.5 border border-[--line] text-lg
                                      peer-checked:bg-gold peer-checked:text-ink peer-checked:border-gold
+                                     peer-focus-visible:outline peer-focus-visible:outline-2
+                                     peer-focus-visible:outline-offset-2 peer-focus-visible:outline-gold
                                      hover:border-gold transition-colors">
                       Another amount
                     </span>
@@ -96,7 +100,7 @@ export default async function GiftVouchers({
                   <input id="customValue" name="customValue" inputMode="decimal"
                     placeholder="e.g. 120" className={field} />
                   <span className="block text-xs text-pale/45 mt-1.5">
-                    Only used if you picked &ldquo;Another amount&rdquo;.
+                    Typing here chooses &ldquo;Another amount&rdquo; for you.
                   </span>
                 </div>
               )}

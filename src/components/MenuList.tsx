@@ -34,10 +34,12 @@ function Price({ measure, pence }: { measure: string | null; pence: number | nul
 }
 
 export function MenuSections({
-  categories, itemsByCategory,
+  categories, itemsByCategory, noun = "dish",
 }: {
   categories: MenuCategoryRow[];
   itemsByCategory: Map<number, MenuItemRow[]>;
+  /** What the items are. The drinks page read "Champagne — 5 DISHES". */
+  noun?: "dish" | "drink";
 }) {
   return (
     /* Every section is closed to begin with, so the page opens as an index of
@@ -72,7 +74,7 @@ export function MenuSections({
               </span>
 
               <span className="menu-count accent shrink-0">
-                {items.length} {items.length === 1 ? "dish" : "dishes"}
+                {items.length} {items.length === 1 ? noun : `${noun}es`.replace("drinkes", "drinks")}
                 <svg className="menu-chevron" viewBox="0 0 12 12" aria-hidden="true">
                   <path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor"
                         strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />

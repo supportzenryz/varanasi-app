@@ -267,7 +267,18 @@ if (failBk) {
      renders and the hero photograph is being optimised on a cold build, so
      waiting for the network to fall quiet times out on a first run. What
      matters here is that the render happened and the mail was written. */
+  /* First: without the token, nothing may happen. A plain GET on this URL used
+     to release the table, so a link preview or an email scanner could cancel a
+     guest's booking. */
   await page.goto(`${BASE}/birmingham/book-online/unconfirmed?ref=${failBk.reference}`,
+    { waitUntil: 'domcontentloaded' });
+  await page.waitForTimeout(1200);
+  t('A hold is NOT released without the booking token',
+    mailSince(t0).length === 0, `${mailSince(t0).length} message(s)`);
+
+  // Then with it, which is the URL Stripe actually sends the guest back to.
+  await page.goto(
+    `${BASE}/birmingham/book-online/unconfirmed?ref=${failBk.reference}&t=${failBk.cancel_token}`,
     { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(2500);
   const mail = mailSince(t0);
@@ -288,10 +299,18 @@ if (cxlBk) {
   const t0 = Date.now();
   await page.goto(`${BASE}/birmingham/booking/${cxlBk.reference}?t=${cxlBk.cancel_token}`,
     { waitUntil: 'networkidle' });
-  const btn = page.locator('form button:has-text("Cancel"), button:has-text("Cancel booking")').first();
-  t('Manage page offers the guest a way to cancel', await btn.count() > 0);
-  if (await btn.count()) {
-    await btn.click();
+  /* Cancelling is deliberately two steps now: one tap used to forfeit a paid
+     deposit with no confirmation and no undo. */
+  const step1 = page.locator('a:has-text("Cancel this booking")').first();
+  t('Manage page offers the guest a way to cancel', await step1.count() > 0);
+  if (await step1.count()) {
+    await step1.click();
+    await page.waitForLoadState('networkidle');
+    const warned = await page.locator('main').innerText();
+    t('  · and warns before doing it, naming the deposit', /cannot be undone/i.test(warned));
+    const step2 = page.locator('form button:has-text("Yes, cancel it")').first();
+    t('  · with an explicit confirm', await step2.count() > 0);
+    await step2.click();
     await page.waitForTimeout(2200);
     const mail = mailSince(t0);
     t('guest cancels → the restaurant is told',
@@ -445,6 +464,92 @@ if (await addTo.count() > 0) {
   t('It does NOT leak into the other branch', !leicester.includes(dishName));
 }
 
+console.log('\n── 5b. What a guest sees when something goes wrong ──');
+
+{
+  // ---- the 404 ----
+  expect404s = true;
+  const res = await page.goto(`${BASE}/birmingham/no-such-page`, { waitUntil: 'networkidle' });
+  const body = await page.locator('body').innerText();
+  t('A wrong address returns 404', res.status() === 404, String(res.status()));
+  t('  · and is the restaurant, not Next.js\'s white default page',
+    !/This page could not be found/i.test(body));
+  t('  · offering both restaurants and a phone number',
+    /Birmingham/.test(body) && /Leicester/.test(body) && /\d{4}\s?\d{3}\s?\d{4}/.test(body));
+
+  // ---- a rejected form keeps the guest's work ----
+  await page.goto(`${BASE}/birmingham/catering`, { waitUntil: 'networkidle' });
+  await page.fill('input[name="name"]', 'Lady Ashcombe');
+  await page.fill('input[name="email"]', 'guest@gmial.com');   // a typo the site catches
+  await page.fill('input[name="phone"]', '07700 900123');
+  await page.fill('textarea[name="message"]', 'Fifty for a private dinner in October.');
+  await page.check('input[name="terms"]');
+  await page.click('form button:has-text("Send enquiry")');
+  await page.waitForURL(/\?(sent|error)=/, { timeout: 15000 }).catch(() => {});
+
+  const kept = await page.evaluate(() => ({
+    name: document.querySelector('input[name="name"]')?.value ?? '',
+    phone: document.querySelector('input[name="phone"]')?.value ?? '',
+    message: document.querySelector('textarea[name="message"]')?.value ?? '',
+  }));
+  t('A rejected form gives the guest their answers back', kept.name === 'Lady Ashcombe', kept.name);
+  t('  · including the message they composed', /private dinner/.test(kept.message));
+  t('  · and shows the real reason',
+    /did you mean/i.test(await page.locator('[role=alert]').first().innerText().catch(() => '')));
+
+  // ---- the error text cannot be written by whoever sends the link ----
+  await page.goto(
+    `${BASE}/birmingham/contact?error=${encodeURIComponent('Your card was declined. Call 0800 555 1234.')}`,
+    { waitUntil: 'networkidle' });
+  const banner = await page.locator('[role=alert]').first().innerText().catch(() => '');
+  t('A crafted link cannot put its own words in the error banner',
+    !/0800 555 1234/.test(banner), banner.slice(0, 50));
+
+  // ---- on a phone, feedback is on screen ----
+  const phone = await ctx.newPage();
+  await phone.setViewportSize({ width: 375, height: 667 });
+  await phone.goto(`${BASE}/birmingham/catering`, { waitUntil: 'networkidle' });
+  await phone.fill('input[name="name"]', 'E2E Phone Guest');
+  await phone.fill('input[name="email"]', `e2e.phone.${stamp}@zenryz-test.com`);
+  await phone.fill('textarea[name="message"]', 'Checking the banner is visible.');
+  await phone.check('input[name="terms"]');
+  await phone.click('form button:has-text("Send enquiry")');
+  await phone.waitForURL(/\?(sent|error)=/, { timeout: 15000 }).catch(() => {});
+  await phone.waitForTimeout(1800);
+  const where = await phone.evaluate(() => {
+    const el = document.querySelector('[role=status],[role=alert]');
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    return { top: Math.round(r.top), onScreen: r.top >= -30 && r.top < window.innerHeight };
+  });
+  t('On a phone the confirmation is on screen, not ~800px below the fold',
+    where?.onScreen === true, JSON.stringify(where));
+  await phone.close();
+
+  // ---- the chosen time reads as chosen ----
+  const when5b = new Date(Date.now() + 8 * 864e5).toISOString().slice(0, 10);
+  await page.goto(`${BASE}/birmingham/book-online?guests=2&date=${when5b}`, { waitUntil: 'networkidle' });
+  const slotLink = page.locator('a[href*="time="]').first();
+  if (await slotLink.count()) {
+    await slotLink.click();
+    /* Wait for the thing the click is supposed to reveal. networkidle resolves
+       mid-navigation here, which shows a half-rendered page and made a working
+       change look like a regression. */
+    await page.waitForSelector('#your-details', { timeout: 15000 }).catch(() => {});
+    const look = await page.evaluate(() => {
+      const on = document.querySelector('a[aria-current="true"]');
+      if (!on) return null;
+      const c = getComputedStyle(on);
+      return { bg: c.backgroundColor, border: c.borderTopColor };
+    });
+    // gold fill, not ink-on-ink which made the chosen slot vanish into the panel
+    t('Choosing a time advances to the details step', await page.locator('#your-details').count() > 0);
+    t('  · and the chosen slot is gold, not sunk into the ink panel',
+      Boolean(look) && look.bg !== 'rgb(15, 15, 15)' && look.border !== 'rgb(15, 15, 15)',
+      JSON.stringify(look));
+  }
+}
+
 console.log('\n── 6a. Money and authority ──');
 
 /* Each of these was a real hole found in audit, and each is the sort that
@@ -512,7 +617,17 @@ db.commit()`]);
 
   // ---- money is parsed, not guessed, and a redemption cannot be replayed ----
   await page.goto(`${BASE}/admin/vouchers`, { waitUntil: 'networkidle' });
-  const v = q(`select code, balance_pence from vouchers where status='active' and balance_pence > 1000 limit 1`)[0];
+  execFileSync('python3', ['-c', `
+import sqlite3, time
+db = sqlite3.connect('data/varanasi.db')
+now = int(time.time())
+db.execute("delete from vouchers where code='VG-E2ET-ESTE-ST01'")
+db.execute('''insert into vouchers (code,value_pence,balance_pence,status,purchaser_name,purchaser_email,
+recipient_name,recipient_email,origin,issued_at,expires_at,created_at)
+values ('VG-E2ET-ESTE-ST01',5000,5000,'active','E2E Buyer','buyer@zenryz-test.com','E2E Recipient',
+'recip@zenryz-test.com','purchase',?,?,?)''', (now, now + 31536000, now))
+db.commit()`]);
+  const v = q(`select code, balance_pence from vouchers where code='VG-E2ET-ESTE-ST01'`)[0];
   if (!v) {
     t('A live voucher exists to test redemption against', false, 'none found');
   } else {

@@ -20,18 +20,26 @@ export default async function Unconfirmed({
   params, searchParams,
 }: {
   params: Promise<{ branch: string }>;
-  searchParams: Promise<{ ref?: string }>;
+  searchParams: Promise<{ ref?: string; t?: string }>;
 }) {
   const { branch: slug } = await params;
   const branch = branchBySlug(slug);
   if (!branch) notFound();
 
-  const { ref } = await searchParams;
+  const { ref, t: token } = await searchParams;
   const booking = ref ? bookingByReference(ref) : undefined;
 
-  // Only act if it really is unpaid — someone could land here after paying by
-  // hitting Back, and we must not cancel a paid booking.
-  if (booking && booking.branchId === branch.id && booking.depositStatus !== "captured") {
+  /* Releasing the table needs the booking's own token, not just its reference.
+   * This page acts on a plain GET, so with only `?ref=` anyone holding the
+   * reference — or any link preview, email scanner or prefetch that touched
+   * the URL — released the hold and triggered a payment-failed notice. Stripe's
+   * cancel_url now carries the token, so the real journey still works and a
+   * guessed or scraped reference does nothing.
+   *
+   * And only if it really is unpaid: a guest can reach this page by pressing
+   * Back after paying, and a paid booking must never be cancelled here. */
+  const authorised = Boolean(booking?.cancelToken) && token === booking?.cancelToken;
+  if (authorised && booking && booking.branchId === branch.id && booking.depositStatus !== "captured") {
     markPaymentFailed(booking.id);
     await notifyPaymentFailed(booking);
   }

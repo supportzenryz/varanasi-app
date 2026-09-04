@@ -18,8 +18,8 @@
         "Festive Parties",
         "Charity Dinners"
       ],
-      "image": "/media/lib/birmingham/2025/12/main_dining_hall.jpg",
-      "imageBlurred": "/media/lib/birmingham/2025/12/main_dining_hall_blurred_v3.jpg"
+      "image": "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/birmingham/2025/12/main_dining_hall.jpg",
+      "imageBlurred": "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/birmingham/2025/12/main_dining_hall_blurred_v3.jpg"
     },
     {
       "name": "Nirvana Cocktail Lounge",
@@ -36,8 +36,8 @@
         "Christmas Parties",
         "New Year's Eve Celebrations"
       ],
-      "image": "/media/lib/birmingham/2024/07/nirvana_cocktail_lounge.jpg",
-      "imageBlurred": "/media/lib/birmingham/2024/07/nirvana_cocktail_lounge_blurred.webp"
+      "image": "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/birmingham/2024/07/nirvana_cocktail_lounge.jpg",
+      "imageBlurred": "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/birmingham/2024/07/nirvana_cocktail_lounge_blurred.webp"
     },
     {
       "name": "Siddhartha Dining Room",
@@ -57,8 +57,8 @@
         "Parties & Corporate Functions",
         "Christmas Meals"
       ],
-      "image": "/media/lib/birmingham/2024/07/siddhartha_dining_room.jpg",
-      "imageBlurred": "/media/lib/birmingham/2024/07/siddhartha_dining_room_blurred.webp"
+      "image": "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/birmingham/2024/07/siddhartha_dining_room.jpg",
+      "imageBlurred": "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/birmingham/2024/07/siddhartha_dining_room_blurred.webp"
     },
     {
       "name": "Large Family Room",
@@ -77,8 +77,8 @@
         "Festive Parties",
         "Graduation Celebrations"
       ],
-      "image": "/media/lib/birmingham/2024/07/large_family_room.jpg",
-      "imageBlurred": "/media/lib/birmingham/2024/07/large_family_room_blurred.webp"
+      "image": "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/birmingham/2024/07/large_family_room.jpg",
+      "imageBlurred": "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/birmingham/2024/07/large_family_room_blurred.webp"
     },
     {
       "name": "Samsara Room",
@@ -97,8 +97,8 @@
         "Graduations",
         "Engagements"
       ],
-      "image": "/media/lib/birmingham/2024/07/samsara_sanctuary.webp",
-      "imageBlurred": "/media/lib/birmingham/2024/07/samsara_sanctuary_blurred.webp"
+      "image": "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/birmingham/2024/07/samsara_sanctuary.webp",
+      "imageBlurred": "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/birmingham/2024/07/samsara_sanctuary_blurred.webp"
     },
     {
       "name": "Small Family Room",
@@ -116,7 +116,7 @@
         "Graduations",
         "Engagements"
       ],
-      "image": "/media/lib/birmingham/2024/07/small_family_room.webp"
+      "image": "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/birmingham/2024/07/small_family_room.webp"
     },
     {
       "name": "Maharaja Room",
@@ -135,8 +135,8 @@
         "Graduations",
         "Engagements"
       ],
-      "image": "/media/lib/birmingham/2024/07/mahajara-booth.jpeg",
-      "imageBlurred": "/media/lib/birmingham/2024/07/mahajara_booth_blurred.webp"
+      "image": "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/birmingham/2024/07/mahajara-booth.jpeg",
+      "imageBlurred": "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/birmingham/2024/07/mahajara_booth_blurred.webp"
     },
     {
       "name": "Raja Rani",
@@ -153,8 +153,8 @@
         "Date Nights",
         "Intimate Celebrations"
       ],
-      "image": "/media/lib/birmingham/2024/07/raja-rani.jpeg",
-      "imageBlurred": "/media/lib/birmingham/2024/07/raja_rani_blurred.webp"
+      "image": "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/birmingham/2024/07/raja-rani.jpeg",
+      "imageBlurred": "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/birmingham/2024/07/raja_rani_blurred.webp"
     }
   ],
   "leicester": [
@@ -174,8 +174,8 @@
         "Anniversaries",
         "Graduations"
       ],
-      "image": "/media/lib/leicester/2025/12/room1_new.jpg",
-      "imageBlurred": "/media/lib/leicester/2025/12/room1_new_blurred.jpg"
+      "image": "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/leicester/2025/12/room1_new.jpg",
+      "imageBlurred": "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/leicester/2025/12/room1_new_blurred.jpg"
     },
     {
       "name": "Private Room 02",
@@ -192,8 +192,8 @@
         "Intimate Celebrations",
         "Special Occasions"
       ],
-      "image": "/media/lib/leicester/2025/12/room2_new.jpg",
-      "imageBlurred": "/media/lib/leicester/2025/12/room2_new_blurred.jpg"
+      "image": "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/leicester/2025/12/room2_new.jpg",
+      "imageBlurred": "https://res.cloudinary.com/qu72ymeo/image/upload/v1/media/lib/leicester/2025/12/room2_new_blurred.jpg"
     }
   ]
 }

@@ -7,6 +7,7 @@ import { voucherRules } from "@/lib/booking-config";
 import { formatPence } from "@/lib/money";
 import { PageHero } from "@/components/PageHero";
 import { buyVoucher } from "./actions";
+import { SubmitButton } from "@/components/SubmitButton";
 
 export async function generateMetadata({ params }: { params: Promise<{ branch: string }> }): Promise<Metadata> {
   const { branch: slug } = await params;
@@ -193,7 +194,7 @@ export default async function GiftVouchers({
             </label>
 
             <div className="flex flex-wrap items-center gap-4">
-              <button className="btn btn-gold">Continue to payment</button>
+              <SubmitButton pendingLabel="Taking you to payment…">Continue to payment</SubmitButton>
               <span className="text-xs text-pale/70">
                 You&rsquo;ll be taken to our secure payment page. The voucher is only issued once payment succeeds.
               </span>

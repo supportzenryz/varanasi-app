@@ -445,6 +445,101 @@ if (await addTo.count() > 0) {
   t('It does NOT leak into the other branch', !leicester.includes(dishName));
 }
 
+console.log('\n── 6a. Money and authority ──');
+
+/* Each of these was a real hole found in audit, and each is the sort that
+   regresses quietly because nothing visible breaks when it comes back. */
+{
+  // ---- a revoked account stops working immediately ----
+  const ctx2 = await browser.newContext();
+  const p2 = await ctx2.newPage();
+  execFileSync('python3', ['-c', `
+import sqlite3, bcrypt
+db = sqlite3.connect('data/varanasi.db')
+db.execute("update users set password_hash=?, must_change_password=0, is_active=1 where email='leicester@varanasi.uk'",
+           (bcrypt.hashpw(b'ChangeMe!2026', bcrypt.gensalt(10)).decode(),))
+db.commit()`]);
+  await p2.goto(`${BASE}/admin/login`, { waitUntil: 'networkidle' });
+  await p2.fill('input[name="email"]', 'leicester@varanasi.uk');
+  await p2.fill('input[name="password"]', 'ChangeMe!2026');
+  await p2.click('button[type="submit"]');
+  await p2.waitForURL(u => !u.pathname.startsWith('/admin/login'), { timeout: 15000 }).catch(() => {});
+  await p2.goto(`${BASE}/admin/vouchers`, { waitUntil: 'domcontentloaded' });
+  t('A signed-in manager can reach the vouchers screen', p2.url().includes('/admin/vouchers'));
+
+  // deactivate them while that session is still open
+  execFileSync('python3', ['-c', `
+import sqlite3
+db = sqlite3.connect('data/varanasi.db')
+db.execute("update users set is_active=0 where email='leicester@varanasi.uk'")
+db.commit()`]);
+  await p2.goto(`${BASE}/admin/vouchers`, { waitUntil: 'domcontentloaded' });
+  t('Deactivating an account ends its session at once, not in 7 days',
+    p2.url().includes('/admin/login'), new URL(p2.url()).pathname);
+
+  // and a password change does the same, which is what makes "reset" a remedy
+  execFileSync('python3', ['-c', `
+import sqlite3, bcrypt
+db = sqlite3.connect('data/varanasi.db')
+db.execute("update users set is_active=1, password_hash=? where email='leicester@varanasi.uk'",
+           (bcrypt.hashpw(b'Something-Else!2026', bcrypt.gensalt(10)).decode(),))
+db.commit()`]);
+  await p2.goto(`${BASE}/admin/vouchers`, { waitUntil: 'domcontentloaded' });
+  t('Changing the password ends existing sessions too',
+    p2.url().includes('/admin/login'), new URL(p2.url()).pathname);
+  await ctx2.close();
+  execFileSync('python3', ['-c', `
+import sqlite3, bcrypt
+db = sqlite3.connect('data/varanasi.db')
+db.execute("update users set password_hash=?, must_change_password=1, is_active=1, role='manager' where email='leicester@varanasi.uk'",
+           (bcrypt.hashpw(b'ChangeMe!2026', bcrypt.gensalt(10)).decode(),))
+db.commit()`]);
+
+  // ---- a resubmitted enquiry is one enquiry ----
+  const dupeEmail = `e2e.dupe.${stamp}@zenryz-test.com`;
+  for (let i = 0; i < 2; i++) {
+    await page.goto(`${BASE}/birmingham/contact`, { waitUntil: 'networkidle' });
+    await page.fill('input[name="name"]', 'E2E Duplicate');
+    await page.fill('input[name="email"]', dupeEmail);
+    await page.fill('textarea[name="message"]', 'Sent twice on purpose.');
+    await page.check('input[name="terms"]');
+    await page.click('form button:has-text("Send enquiry")');
+    await page.waitForURL(/\?(sent|error)=/, { timeout: 15000 }).catch(() => {});
+  }
+  t('The same enquiry sent twice is stored once',
+    q(`select id from enquiries where email = '${dupeEmail}'`).length === 1,
+    `${q(`select id from enquiries where email = '${dupeEmail}'`).length} row(s)`);
+
+  // ---- money is parsed, not guessed, and a redemption cannot be replayed ----
+  await page.goto(`${BASE}/admin/vouchers`, { waitUntil: 'networkidle' });
+  const v = q(`select code, balance_pence from vouchers where status='active' and balance_pence > 1000 limit 1`)[0];
+  if (!v) {
+    t('A live voucher exists to test redemption against', false, 'none found');
+  } else {
+    const redeem = async (amount, expected) => page.evaluate(async ([code, amt, bal]) => {
+      const body = new URLSearchParams({ code, amount: amt, note: '', expectedBalance: String(bal) });
+      const r = await fetch('/admin/vouchers', {
+        method: 'POST', body,
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        redirect: 'follow',
+      });
+      return r.url;
+    }, [v.code, amount, expected]);
+
+    // A negative amount used to be read as positive and take the money again.
+    await redeem('-10', v.balance_pence);
+    const afterNeg = q(`select balance_pence from vouchers where code='${v.code}'`)[0].balance_pence;
+    t('Redeeming "-10" takes nothing (it used to take £10)',
+      afterNeg === v.balance_pence, `${v.balance_pence} -> ${afterNeg}`);
+
+    // "14 / 18" style input must refuse rather than become £1,418.
+    await redeem('14 / 18', v.balance_pence);
+    const afterJunk = q(`select balance_pence from vouchers where code='${v.code}'`)[0].balance_pence;
+    t('Redeeming "14 / 18" takes nothing', afterJunk === v.balance_pence,
+      `${v.balance_pence} -> ${afterJunk}`);
+  }
+}
+
 console.log('\n── 6b. Backups, and who may take the customer list ──');
 
 /* Backups did not exist. The restaurant sells gift vouchers, which are money

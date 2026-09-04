@@ -1,4 +1,5 @@
 import "server-only";
+import crypto from "node:crypto";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { SignJWT, jwtVerify } from "jose";
@@ -14,6 +15,8 @@ export type Role = "owner" | "manager" | "staff";
 export type Session = {
   userId: number; name: string; email: string; role: Role;
   branchId: number | null; mustChangePassword: boolean;
+  /** digest of the password hash — see fingerprint() */
+  fp?: string;
 };
 
 /** What each role is allowed to do. Checked server-side on every action. */
@@ -49,6 +52,22 @@ export function assertBranchAccess(session: Session, branchId: number): void {
   if (session.branchId !== branchId) throw new Error("Not permitted for this branch");
 }
 
+/**
+ * A short fingerprint of the stored password hash.
+ *
+ * Carried in the session and re-checked on every request, so changing a
+ * password — whether the owner resets it or the user changes their own —
+ * invalidates every session that account already had. Without it, "Reset
+ * password" is not a remedy for a compromised account at all: the intruder
+ * keeps working for the remaining life of their cookie.
+ *
+ * The hash itself never leaves the server; this is a truncated digest of it,
+ * which is enough to notice that it changed and useless for anything else.
+ */
+function fingerprint(passwordHash: string): string {
+  return crypto.createHash("sha256").update(passwordHash).digest("hex").slice(0, 16);
+}
+
 export async function createSession(s: Session): Promise<void> {
   const token = await new SignJWT({ ...s })
     .setProtectedHeader({ alg: "HS256" })
@@ -62,16 +81,45 @@ export async function createSession(s: Session): Promise<void> {
   });
 }
 
+/**
+ * The session, re-checked against the database on every request.
+ *
+ * It used to return the token's contents verbatim. Role, branch, active state
+ * and the password gate were therefore whatever they had been at sign-in,
+ * frozen for the seven days the cookie lived — so deactivating an account,
+ * demoting someone, moving them to another branch or resetting their password
+ * changed nothing until the cookie expired. A deactivated account was observed
+ * taking £5 off a customer's gift voucher.
+ *
+ * The cost is one primary-key lookup per request, which on a local SQLite file
+ * is not a cost worth trading a week of stale authority for.
+ */
 export async function getSession(): Promise<Session | null> {
   const jar = await cookies();
   const token = jar.get(COOKIE)?.value;
   if (!token) return null;
+
+  let claim: Session & { fp?: string };
   try {
     const { payload } = await jwtVerify(token, secret);
-    return payload as unknown as Session;
+    claim = payload as unknown as Session & { fp?: string };
   } catch {
     return null;
   }
+
+  const row = db.select().from(users).where(eq(users.id, claim.userId)).get();
+  if (!row || !row.isActive) return null;                       // gone or switched off
+  if (claim.fp !== fingerprint(row.passwordHash)) return null;  // password changed since
+
+  // The row wins over the token for everything that can be revoked.
+  return {
+    userId: row.id,
+    name: row.name,
+    email: row.email,
+    role: row.role as Role,
+    branchId: row.branchId ?? null,
+    mustChangePassword: row.mustChangePassword,
+  };
 }
 
 export async function requireSession(): Promise<Session> {
@@ -111,5 +159,19 @@ export async function verifyLogin(email: string, password: string): Promise<Sess
   return {
     userId: row.id, name: row.name, email: row.email, role: row.role as Role,
     branchId: row.branchId ?? null, mustChangePassword: row.mustChangePassword,
+    fp: fingerprint(row.passwordHash),
   };
+}
+
+/** Re-issues the cookie for a user whose password has just changed, so that
+ *  changing your own password does not sign you out of the tab you did it in
+ *  while still ending every other session that account had. */
+export async function refreshSessionAfterPasswordChange(userId: number): Promise<void> {
+  const row = db.select().from(users).where(eq(users.id, userId)).get();
+  if (!row) return;
+  await createSession({
+    userId: row.id, name: row.name, email: row.email, role: row.role as Role,
+    branchId: row.branchId ?? null, mustChangePassword: row.mustChangePassword,
+    fp: fingerprint(row.passwordHash),
+  });
 }

@@ -5,7 +5,7 @@ import bcrypt from "bcryptjs";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { users, auditLog } from "@/db/schema";
-import { destroySession, requireSession, createSession } from "@/lib/auth";
+import { destroySession, requireSession, refreshSessionAfterPasswordChange } from "@/lib/auth";
 
 export async function logoutAction() {
   await destroySession();
@@ -33,7 +33,11 @@ export async function changePasswordAction(_prev: { error?: string; ok?: boolean
     userId: session.userId, action: "password.change", entity: "user", entityId: String(session.userId),
   }).run();
 
-  await createSession({ ...session, mustChangePassword: false });
+  // Re-issue from the row, not from the old session: the cookie is bound to a
+  // fingerprint of the password hash, so reusing the previous session object
+  // would hand back a cookie carrying the fingerprint that just stopped being
+  // valid — and sign the user out of the tab they are standing in.
+  await refreshSessionAfterPasswordChange(session.userId);
   revalidatePath("/admin");
   return { ok: true };
 }

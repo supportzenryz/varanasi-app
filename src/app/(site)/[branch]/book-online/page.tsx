@@ -9,6 +9,7 @@ import { expireStaleHolds, dateLabel } from "@/lib/booking";
 import { formatPence } from "@/lib/money";
 import { PageHero } from "@/components/PageHero";
 import { startBooking } from "./actions";
+import { SubmitButton } from "@/components/SubmitButton";
 
 export async function generateMetadata({ params }: { params: Promise<{ branch: string }> }): Promise<Metadata> {
   const { branch: slug } = await params;
@@ -272,9 +273,9 @@ export default async function BookOnline({
                   </fieldset>
 
                   <div className="flex flex-wrap items-center gap-4 pt-1">
-                    <button className="btn btn-gold">
+                    <SubmitButton pendingLabel="Taking you to payment…">
                       {deposit > 0 ? `Pay ${formatPence(deposit)} and confirm` : "Confirm booking"}
-                    </button>
+                    </SubmitButton>
                     <span className="text-xs text-pale/70">
                       {deposit > 0
                         ? "You'll be taken to our secure payment page. Your table isn't confirmed until payment succeeds."

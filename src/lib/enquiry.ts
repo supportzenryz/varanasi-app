@@ -1,5 +1,5 @@
 import "server-only";
-import { eq } from "drizzle-orm";
+import { and, eq, gte } from "drizzle-orm";
 import { db } from "@/db";
 import { enquiries, branches, privateRooms } from "@/db/schema";
 import { branchBySlug } from "@/lib/branches";
@@ -74,6 +74,16 @@ export async function submitEnquiry(input: EnquiryInput): Promise<EnquiryResult>
     input.location ? `Franchise location: ${input.location}` : null,
     input.message?.trim() || null,
   ].filter(Boolean).join("\n\n") || null;
+
+  /* A double-click used to create two enquiries, two alerts to the restaurant
+   * and two acknowledgements to the sender. The same person sending the same
+   * type of enquiry twice inside two minutes is one enquiry. */
+  const recent = db.select().from(enquiries).where(and(
+    eq(enquiries.email, email.value),
+    eq(enquiries.type, input.type),
+    gte(enquiries.createdAt, now - 120),
+  )).get();
+  if (recent) return { ok: true, enquiry: recent };
 
   const created = db.insert(enquiries).values({
     branchId: branch?.id ?? null,

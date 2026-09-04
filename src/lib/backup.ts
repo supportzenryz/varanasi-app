@@ -149,11 +149,28 @@ export function startBackupSchedule(): void {
   if (started) return;
   started = true;
 
-  const tick = () => {
+  const tick = async () => {
     if (isDue()) runBackup("scheduled");
+
+    /* Gift vouchers bought for a future date. This lived behind an admin
+     * button and nothing else, so a gift bought for Christmas morning went out
+     * only if somebody pressed that button on the day — otherwise the buyer
+     * was told it would be sent and it never was. Hourly, not daily, so one
+     * due today leaves in the morning rather than whenever the backup lands. */
+    try {
+      const { deliverDueVouchers, expireOldVouchers } = await import("@/lib/voucher");
+      const sent = await deliverDueVouchers();
+      if (sent) console.log(`[scheduler] delivered ${sent} scheduled gift voucher(s)`);
+      const gone = expireOldVouchers();
+      if (gone) console.log(`[scheduler] expired ${gone} voucher(s) past their date`);
+    } catch (err) {
+      // Never let this take the timer down — the backup half must keep running.
+      console.error("[scheduler] voucher pass failed:", err instanceof Error ? err.message : err);
+    }
   };
 
   setTimeout(tick, 30_000).unref?.();      // let the server finish booting first
-  setInterval(tick, 3600_000).unref?.();   // then look every hour
+  setInterval(tick, 3600_000).unref?.();   // then every hour
   console.log(`[backup] daily backups on, keeping ${KEEP}, in ${backupDir()}`);
+  console.log("[scheduler] hourly: due gift vouchers, expiries");
 }

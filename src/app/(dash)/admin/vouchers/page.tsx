@@ -156,6 +156,11 @@ export default async function VouchersAdmin({
             {looked.status === "active" && looked.balancePence > 0 && (
               <form action={redeemVoucher} className="mt-7 pt-6 border-t border-[--line] flex flex-wrap items-end gap-3">
                 <input type="hidden" name="code" value={looked.code} />
+                {/* The balance this form was rendered with. The action refuses
+                    if it no longer matches, so a double-tap behind the bar, a
+                    refreshed page or a replayed request cannot take the money
+                    twice — previously each replay succeeded and reported it. */}
+                <input type="hidden" name="expectedBalance" value={looked.balancePence} />
                 <div>
                   <label className={label} htmlFor="amount">Amount to take off (£)</label>
                   <input id="amount" name="amount" inputMode="decimal" required

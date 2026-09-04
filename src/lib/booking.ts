@@ -1,6 +1,6 @@
 import "server-only";
 import crypto from "node:crypto";
-import { and, eq, inArray, lt } from "drizzle-orm";
+import { and, eq, gte, inArray, lt } from "drizzle-orm";
 import { db } from "@/db";
 import { bookings, branches } from "@/db/schema";
 import { branchBySlug, type Branch } from "@/lib/branches";
@@ -100,6 +100,24 @@ export function holdBooking(input: HoldInput): HoldResult {
 
   const depositPence = depositFor(rules, input.date, partySize);
   const now = Math.floor(Date.now() / 1000);
+
+  /* The same guest, the same table, twice in two minutes is a double-click or
+   * a re-posted form, not two bookings. It used to be two: a triple-click on
+   * "Pay and confirm" produced three held bookings for one party and took 12
+   * covers out of a 30-cover evening, of which only the last ever reached
+   * checkout. The button now disables itself, but that needs JavaScript, and
+   * the covers are too expensive to protect with a client-side guard alone —
+   * so the existing hold is handed back instead, which also sends the guest to
+   * the payment page they were already going to. */
+  const recent = db.select().from(bookings).where(and(
+    eq(bookings.branchId, branch.id),
+    eq(bookings.email, email.value),
+    eq(bookings.date, input.date),
+    eq(bookings.time, input.time),
+    eq(bookings.status, "held"),
+    gte(bookings.createdAt, now - 120),
+  )).get();
+  if (recent) return { ok: true, booking: recent, depositPence, branch };
 
   const created = db.insert(bookings).values({
     reference: reference(branch.slug),

@@ -1,4 +1,5 @@
 import { submitEnquiryAction } from "@/app/(site)/[branch]/enquiry-actions";
+import { SubmitButton } from "@/components/SubmitButton";
 
 export type EnquiryField =
   | "phone" | "company" | "location" | "partySize" | "date" | "time" | "occasion" | "room" | "dietary";
@@ -139,7 +140,9 @@ export function EnquiryForm({
         </label>
       </div>
 
-      <button className="btn btn-gold justify-self-start">{submitLabel}</button>
+      <SubmitButton className="btn btn-gold justify-self-start" pendingLabel="Sending…">
+        {submitLabel}
+      </SubmitButton>
     </form>
   );
 }

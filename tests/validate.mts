@@ -22,6 +22,12 @@ for (const f of ["whatsapp.ts", "validate.ts"]) {
 }
 const { checkPhone, checkEmail, checkName } = await import(path.join(dir, "validate.ts"));
 
+/* parsePounds lives in money.ts and has no imports to rewrite. It is here
+   because it is the same class of problem: input a member of staff types. */
+fs.writeFileSync(path.join(dir, "money.ts"),
+  fs.readFileSync(new URL("../src/lib/money.ts", here), "utf8"));
+const { parsePounds } = await import(path.join(dir, "money.ts"));
+
 let pass = 0, fail = 0;
 const t = (name: string, ok: boolean, extra = "") => {
   console.log(`  ${ok ? "PASS" : "FAIL"}  ${name}${extra ? " — " + extra : ""}`);
@@ -109,6 +115,28 @@ for (const [n, why] of [["", "empty"], ["a", "one character"], ["...", "punctuat
   t(`rejects ${JSON.stringify(n)} (${why})`, !checkName(n).ok);
 }
 t("collapses runaway whitespace", (checkName("  Jo    Patel ") as any).value === "Jo Patel");
+
+console.log("\n── Money typed by staff ──");
+for (const [input, expected, why] of [
+  ["10", 1000, "plain pounds"],
+  ["10.50", 1050, "pence"],
+  ["£25", 2500, "with a currency symbol"],
+  ["1,250", 125000, "thousands separator"],
+  ["  40  ", 4000, "padded"],
+] as [string, number, string][]) {
+  t(`accepts ${JSON.stringify(input)} (${why})`, parsePounds(input) === expected, String(parsePounds(input)));
+}
+for (const [input, why] of [
+  ["-10", "negative — used to come back as +£10 and take the money again"],
+  ["14 / 18", "two measures in one box — used to become £1,418 on the live menu"],
+  ["1e9", "exponent — used to become £19"],
+  ["12.50.60", "two decimal points"],
+  ["14.999", "more precision than money has"],
+  ["TBC", "not a number — used to silently clear the stored price"],
+  ["", "empty"],
+] as [string, string][]) {
+  t(`refuses ${JSON.stringify(input)} (${why})`, parsePounds(input) === null, String(parsePounds(input)));
+}
 
 console.log(`\n${"─".repeat(60)}\n${pass}/${pass + fail} checks passed\n`);
 process.exit(fail ? 1 : 0);

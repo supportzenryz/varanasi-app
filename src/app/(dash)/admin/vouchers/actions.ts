@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { vouchers, auditLog } from "@/db/schema";
 import { requireAbility, type Session } from "@/lib/auth";
+import { branchBySlug } from "@/lib/branches";
 import { parsePounds, formatPence } from "@/lib/money";
 import {
   redeem, voucherByCode, voucherById, startPurchase, activatePaidVoucher, deliverDueVouchers,
@@ -24,7 +25,10 @@ export async function redeemVoucher(formData: FormData) {
   const back = (msg: string, ok = false) =>
     `/admin/vouchers?code=${encodeURIComponent(code)}&${ok ? "done" : "error"}=${encodeURIComponent(msg)}`;
 
-  if (!amount) redirectTo(back("Enter the amount to take off the voucher."));
+  if (amount == null) {
+    redirectTo(back("Enter the amount as a number, like 25 or 25.50."));
+  }
+  if (amount === 0) redirectTo(back("Enter an amount greater than zero."));
 
   const result = redeem({
     code,
@@ -33,6 +37,9 @@ export async function redeemVoucher(formData: FormData) {
     branchId: session.role === "owner" ? null : session.branchId,
     userId: session.userId,
     note: String(formData.get("note") ?? "") || null,
+    expectedBalancePence: formData.get("expectedBalance") != null
+      ? Number(formData.get("expectedBalance"))
+      : null,
   });
 
   if (!result.ok) redirectTo(back(result.error));
@@ -50,10 +57,31 @@ export async function redeemVoucher(formData: FormData) {
 export async function issueVoucher(formData: FormData) {
   const session = await requireAbility("issueVoucher");
   const value = parsePounds(String(formData.get("value") ?? ""));
-  if (!value) redirectTo(`/admin/vouchers?error=${encodeURIComponent("Enter a value for the voucher.")}`);
+  if (value == null) {
+    redirectTo(`/admin/vouchers?error=${encodeURIComponent("Enter the value as a number, like 50 or 50.00.")}`);
+  }
+  if (value === 0) {
+    redirectTo(`/admin/vouchers?error=${encodeURIComponent("Enter a value greater than zero.")}`);
+  }
+
+  /* Which restaurant the voucher is good at was taken straight from the form
+   * and never checked. A Birmingham manager could therefore mint £500 of
+   * Leicester liability — real money owed, against a branch they have no
+   * authority over, with no payment behind it. Owners may issue anywhere;
+   * everyone else gets their own branch or "either", and nothing else. */
+  const requested = String(formData.get("validAt") ?? "") || null;
+  let validAt = requested;
+  if (session.role !== "owner" && requested) {
+    const target = branchBySlug(requested);
+    if (!target || target.id !== session.branchId) {
+      redirectTo(`/admin/vouchers?error=${encodeURIComponent(
+        "You can only issue vouchers for your own restaurant, or ones valid at either.")}`);
+    }
+    validAt = requested;
+  }
 
   const started = startPurchase({
-    branchSlug: String(formData.get("validAt") ?? "") || null,
+    branchSlug: validAt,
     valuePence: value!,
     purchaserName: session.name,
     purchaserEmail: session.email,

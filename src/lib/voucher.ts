@@ -6,6 +6,7 @@ import { vouchers, voucherRedemptions, branches } from "@/db/schema";
 import { branchBySlug, type Branch } from "@/lib/branches";
 import { voucherRules } from "@/lib/booking-config";
 import { formatPence } from "@/lib/money";
+import { checkName, checkEmail } from "@/lib/validate";
 import { sendMail } from "@/lib/email";
 import { sendWhatsApp } from "@/lib/whatsapp";
 
@@ -97,13 +98,23 @@ export function startPurchase(input: PurchaseInput): PurchaseResult {
   if (!Number.isInteger(value) || value < rules.minPence || value > rules.maxPence) {
     return { ok: false, error: `Please choose an amount between ${formatPence(rules.minPence)} and ${formatPence(rules.maxPence)}.` };
   }
-  if (!input.purchaserName?.trim()) return { ok: false, error: "Please tell us your name." };
-  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(input.purchaserEmail ?? "")) {
-    return { ok: false, error: "Please give us a valid email address for your receipt." };
+  /* The same checks as every other form on the site. This one had the weakest
+   * validation of all of them — a bare regex that accepted a@b.c and, more to
+   * the point, accepted gmial.com without comment. That matters most here: the
+   * voucher is paid for and then sent to a third party who has no idea it was
+   * coming, so a mistyped recipient address is a gift that vanishes and nobody
+   * reports. */
+  const buyerName = checkName(input.purchaserName);
+  if (!buyerName.ok) return { ok: false, error: buyerName.error };
+  const buyerEmail = checkEmail(input.purchaserEmail);
+  if (!buyerEmail.ok) {
+    return { ok: false, error: buyerEmail.error.replace("your confirmation", "your receipt") };
   }
-  if (!input.recipientName?.trim()) return { ok: false, error: "Please tell us who the voucher is for." };
-  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(input.recipientEmail ?? "")) {
-    return { ok: false, error: "Please give us a valid email address for the recipient." };
+  const toName = checkName(input.recipientName);
+  if (!toName.ok) return { ok: false, error: "Please tell us who the voucher is for." };
+  const toEmail = checkEmail(input.recipientEmail);
+  if (!toEmail.ok) {
+    return { ok: false, error: `For the recipient: ${toEmail.error[0].toLowerCase()}${toEmail.error.slice(1)}` };
   }
   if (input.message && input.message.length > 500) {
     return { ok: false, error: "Please keep your message under 500 characters." };
@@ -111,6 +122,17 @@ export function startPurchase(input: PurchaseInput): PurchaseResult {
   if (input.deliverOn) {
     const today = new Date().toISOString().slice(0, 10);
     if (input.deliverOn < today) return { ok: false, error: "The delivery date can't be in the past." };
+    // A voucher expires 12 months from purchase, so scheduling delivery beyond
+    // that sends a gift that has already run out. 2099 was accepted before.
+    const latest = new Date();
+    latest.setMonth(latest.getMonth() + rules.expiryMonths);
+    if (input.deliverOn > latest.toISOString().slice(0, 10)) {
+      return {
+        ok: false,
+        error: `Please choose a delivery date within the next ${rules.expiryMonths} months — ` +
+          `the voucher expires after that.`,
+      };
+    }
   }
 
   const created = db.insert(vouchers).values({
@@ -118,10 +140,10 @@ export function startPurchase(input: PurchaseInput): PurchaseResult {
     valuePence: value,
     balancePence: 0,                 // credited only once paid
     status: "pending",
-    purchaserName: input.purchaserName.trim(),
-    purchaserEmail: input.purchaserEmail.trim().toLowerCase(),
-    recipientName: input.recipientName.trim(),
-    recipientEmail: input.recipientEmail.trim().toLowerCase(),
+    purchaserName: buyerName.value,
+    purchaserEmail: buyerEmail.value,
+    recipientName: toName.value,
+    recipientEmail: toEmail.value,
     message: input.message?.trim() || null,
     branchId: branch?.id ?? null,
     deliverOn: input.deliverOn || null,
@@ -286,8 +308,14 @@ ${v.message ? `Message:    "${v.message}"` : ""}`,
 }
 
 /**
- * Vouchers bought for a future date. Called opportunistically from the admin,
- * and safe to call from a scheduled job if one is ever added.
+ * Vouchers bought for a future date.
+ *
+ * This was called from one admin button and nowhere else, which meant a gift
+ * bought in November for Christmas morning was delivered only if a member of
+ * staff happened to press that button on the day. Otherwise the buyer's
+ * confirmation said "we'll send it on 25 December" and nothing ever did — a
+ * paid gift that silently never arrives, and the recipient has no idea to
+ * chase it. Now also run hourly by the scheduler in src/lib/backup.ts.
  */
 export async function deliverDueVouchers(): Promise<number> {
   const today = new Date().toISOString().slice(0, 10);
@@ -328,6 +356,18 @@ export function redeem(opts: {
   branchId: number | null;
   userId: number;
   note?: string | null;
+  /**
+   * The balance the screen was showing when the button was pressed.
+   *
+   * A redemption is money leaving the business, and this action had no guard
+   * against being applied twice: re-posting the same request took the amount
+   * again, and again, each time reporting success. A double-tap behind a bar
+   * did the same thing. Carrying the balance the form was rendered with turns
+   * that into a refusal — a replayed or stale submission no longer matches
+   * what is in the database, so only the first one lands. It also settles the
+   * case of two staff redeeming the same voucher at once.
+   */
+  expectedBalancePence?: number | null;
 }): RedeemResult {
   expireOldVouchers();
   const v = voucherByCode(opts.code);
@@ -342,6 +382,18 @@ export function redeem(opts: {
   if (v.branchId && opts.branchId && v.branchId !== opts.branchId) {
     const b = branchOf(v);
     return { ok: false, error: `That voucher is only valid at Varanasi ${b?.city ?? "the other branch"}.` };
+  }
+
+  if (
+    opts.expectedBalancePence != null &&
+    Number(opts.expectedBalancePence) !== v.balancePence
+  ) {
+    return {
+      ok: false,
+      error:
+        `This voucher has changed since the page was opened — it now holds ` +
+        `${formatPence(v.balancePence)}. Nothing has been taken off. Please check and try again.`,
+    };
   }
 
   const amount = Math.round(Number(opts.amountPence));

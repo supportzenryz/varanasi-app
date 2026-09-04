@@ -271,6 +271,27 @@ ${branch?.addressLine ?? ""}, ${branch?.postcode ?? ""}`,
     });
   }
 
+  // And the restaurant's own phone. Email is where the detail lives, but a
+  // deposit-paid booking is something the floor wants to know about now, not
+  // whenever somebody next opens an inbox. Same Meta constraint as every other
+  // message here: it needs an approved template before it will deliver, and
+  // until then it is written to data/outbox where the wording can be checked.
+  if (wa.enabled && wa.notifyTo && toE164(wa.notifyTo)) {
+    await sendWhatsApp({
+      to: wa.notifyTo,
+      kind: "staff-new-booking",
+      template: wa.templates.staffNewBooking ?? "varanasi_staff_new_booking",
+      variables: [
+        b.guestName.split(" ")[0],
+        branch?.city ?? "",
+        dateLabel(b.date),
+        prettyTime(b.time),
+        String(b.partySize),
+        b.reference,
+      ],
+    });
+  }
+
   if (rules.notifications.to.length) {
     await sendMail({
       to: rules.notifications.to,

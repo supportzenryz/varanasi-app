@@ -202,7 +202,7 @@ export default async function SettingsAdmin({
               be on a domain the email provider has verified. Sending from an
               unverified domain is rejected per-message, with nothing visible
               on the website to explain why confirmations stopped arriving. */}
-          <div className="mt-6 grid gap-4 sm:grid-cols-3">
+          <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <div>
               <label className={label} htmlFor="fromName">Emails appear from</label>
               <input id="fromName" name="fromName" defaultValue={rules.notifications.fromName}
@@ -216,6 +216,14 @@ export default async function SettingsAdmin({
               <span className="block text-xs text-ink-3 mt-1">
                 Must be on a domain verified with your email provider, or nothing sends.
                 Use onboarding@resend.dev while testing.
+              </span>
+            </div>
+            <div>
+              <label className={label} htmlFor="waNotifyTo">WhatsApp alerts to</label>
+              <input id="waNotifyTo" name="waNotifyTo" type="tel"
+                defaultValue={rules.whatsapp.notifyTo ?? ""} className={field} />
+              <span className="block text-xs text-ink-3 mt-1">
+                A mobile that gets a message the moment a table is booked. Blank for none.
               </span>
             </div>
             <div>

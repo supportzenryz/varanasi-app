@@ -40,7 +40,14 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
 const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
 const page = await ctx.newPage();
 const errors = [];
-page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
+/* Some checks below deliberately request URLs that must 404 — the backup
+   path-traversal probes. Those are the test working, not the site failing. */
+let expect404s = false;
+page.on('console', m => {
+  if (m.type() !== 'error') return;
+  if (expect404s && /404|Failed to load resource/i.test(m.text())) return;
+  errors.push(m.text());
+});
 page.on('pageerror', e => errors.push(e.message));
 
 console.log('\n── 1. Public site: navigation and layout ──');
@@ -256,8 +263,13 @@ t('Booking created through the real three-step form', Boolean(failBk));
 
 if (failBk) {
   const t0 = Date.now();
-  await page.goto(`${BASE}/birmingham/book-online/unconfirmed?ref=${failBk.reference}`, { waitUntil: 'networkidle' });
-  await page.waitForTimeout(1500);
+  /* domcontentloaded, not networkidle: this page sends two emails while it
+     renders and the hero photograph is being optimised on a cold build, so
+     waiting for the network to fall quiet times out on a first run. What
+     matters here is that the render happened and the mail was written. */
+  await page.goto(`${BASE}/birmingham/book-online/unconfirmed?ref=${failBk.reference}`,
+    { waitUntil: 'domcontentloaded' });
+  await page.waitForTimeout(2500);
   const mail = mailSince(t0);
   t('payment failed → the guest is told', mail.some(m => m.includes(failEmail)));
   t('payment failed → the restaurant is told too, so the booking can be rescued',
@@ -431,6 +443,47 @@ if (await addTo.count() > 0) {
     const p = r.frame().page(); const txt = await p.locator('main').innerText(); await p.close(); return txt;
   });
   t('It does NOT leak into the other branch', !leicester.includes(dishName));
+}
+
+console.log('\n── 6b. Backups, and who may take the customer list ──');
+
+/* Backups did not exist. The restaurant sells gift vouchers, which are money
+   owed: a guest pays, holds a code, and this database is the only record the
+   debt exists. These checks are here so that never silently stops working. */
+{
+  const dir = 'data/backups';
+  const before = fs.existsSync(dir) ? fs.readdirSync(dir).filter(f => f.endsWith('.db')).length : 0;
+  t('A backup exists', before > 0, `${before} file(s)`);
+
+  if (before > 0) {
+    const newest = fs.readdirSync(dir).filter(f => f.endsWith('.db'))
+      .map(f => ({ f, m: fs.statSync(`${dir}/${f}`).mtimeMs }))
+      .sort((a, z) => z.m - a.m)[0].f;
+
+    // It has to open and hold the data, or it is a file rather than a backup.
+    const rows = JSON.parse(execFileSync('python3', ['-c', `
+import sqlite3, json
+db = sqlite3.connect('${dir}/${newest}')
+print(json.dumps({
+  'tables': db.execute("select count(*) from sqlite_master where type='table'").fetchone()[0],
+  'items':  db.execute('select count(*) from menu_items').fetchone()[0],
+}))`]).toString());
+    t('  · the newest backup opens and holds the schema', rows.tables >= 15, `${rows.tables} tables`);
+    t('  · and the menu is in it', rows.items > 0, `${rows.items} items`);
+
+    // The download takes a filename from the query string.
+    await page.goto(`${BASE}/admin/backups`, { waitUntil: 'networkidle' });
+    expect404s = true;
+    for (const evil of ['../../.env.local', '..%2F..%2F.env.local', '../varanasi.db']) {
+      const st = await page.evaluate(
+        (x) => fetch(`/admin/backups/download?file=${encodeURIComponent(x)}`).then(r => r.status), evil);
+      t(`  · path traversal refused: ${evil}`, st === 404, `HTTP ${st}`);
+    }
+    const okDl = await page.evaluate(
+      (f) => fetch(`/admin/backups/download?file=${f}`).then(r => r.status), newest);
+    t('  · the owner can download a real backup', okDl === 200, `HTTP ${okDl}`);
+    expect404s = false;
+  }
 }
 
 console.log('\n── 7. Responsiveness ──');

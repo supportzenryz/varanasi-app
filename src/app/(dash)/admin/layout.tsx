@@ -21,6 +21,7 @@ const NAV = [
   { href: "/admin/gallery", label: "Gallery & tiles", ability: "editRooms", ready: true },
   { href: "/admin/staff", label: "Staff access", ability: "manageStaff", ready: true },
   { href: "/admin/settings", label: "Settings", ability: "editSettings", ready: true },
+  { href: "/admin/backups", label: "Backups", ability: "manageBackups", ready: true },
 ] as const;
 
 function branchLabel(session: Session): string {

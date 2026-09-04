@@ -1,5 +1,5 @@
 {
-  "_comment": "Reservation rules. Every value here is editable in the admin under Settings — this file is only the starting point the seed loads. Times, the deposit rate and the 12-guest phone rule are transcribed from the live varanasi.uk booking page; slot capacity and lead time are new (the old form had no availability logic at all) and should be confirmed by the restaurant.",
+  "_comment": "Reservation rules. Every value here is editable in the admin under Settings \u2014 this file is only the starting point the seed loads. Times, the deposit rate and the 12-guest phone rule are transcribed from the live varanasi.uk booking page; slot capacity and lead time are new (the old form had no availability logic at all) and should be confirmed by the restaurant.",
   "slots": {
     "_comment": "The live site offered a fixed 5:00pm-10:00pm dropdown at 30-minute intervals, identical on both branches. Kept as-is.",
     "first": "17:00",
@@ -7,7 +7,7 @@
     "intervalMinutes": 30
   },
   "capacity": {
-    "_comment": "coversPerSlot is how many guests the kitchen will seat in one 30-minute slot. NOT taken from the old site (it had no limit) — a starting figure for the restaurant to confirm. Birmingham seats 150 in the main hall, Leicester is much smaller, hence the split.",
+    "_comment": "coversPerSlot is how many guests the kitchen will seat in one 30-minute slot. NOT taken from the old site (it had no limit) \u2014 a starting figure for the restaurant to confirm. Birmingham seats 150 in the main hall, Leicester is much smaller, hence the split.",
     "coversPerSlot": {
       "birmingham": 40,
       "leicester": 20
@@ -21,7 +21,7 @@
     "maxDaysAhead": 180
   },
   "deposit": {
-    "_comment": "policy: 'always' takes a deposit on every booking; 'nights' only on the nights listed, which is what the live site does today (Fri/Sat/Sun, £10pp). Client asked for payment on every booking, so this ships as 'always' — flip it to 'nights' in the admin to go back to the published policy.",
+    "_comment": "policy: 'always' takes a deposit on every booking; 'nights' only on the nights listed, which is what the live site does today (Fri/Sat/Sun, \u00a310pp). Client asked for payment on every booking, so this ships as 'always' \u2014 flip it to 'nights' in the admin to go back to the published policy.",
     "policy": "always",
     "perPersonPence": 1000,
     "nights": [
@@ -69,7 +69,7 @@
     "_comment": "Three required tick-boxes plus optional marketing, wording taken verbatim from the live form. The deposit line is reworded only because payment now happens during booking rather than by a link in the confirmation email.",
     "terms": "I agree to the Varanasi Restaurant Terms & Conditions and GDPR Policy.",
     "deposit": "I understand that deposits are non-refundable, and that I will need to give at least 24 hours' notice in order to move my booking to another date.",
-    "depositRate": "I understand that a £10 deposit per person is required before the booking is confirmed, and that this amount will be deducted off the bill.",
+    "depositRate": "I understand that a \u00a310 deposit per person is required before the booking is confirmed, and that this amount will be deducted off the bill.",
     "marketing": "I'd like to hear about events, new menus and offers from Varanasi."
   },
   "notifications": {
@@ -82,7 +82,7 @@
     "replyTo": "reservations@varanasi.uk"
   },
   "vouchers": {
-    "_comment": "Gift vouchers. Values are what guests see as buttons; a custom amount is allowed between min and max. Expiry is months from purchase — 12 is the figure already in the old settings, and UK gift vouchers must be honoured for at least the stated period.",
+    "_comment": "Gift vouchers. Values are what guests see as buttons; a custom amount is allowed between min and max. Expiry is months from purchase \u2014 12 is the figure already in the old settings, and UK gift vouchers must be honoured for at least the stated period.",
     "valuesPence": [
       2500,
       5000,
@@ -104,7 +104,7 @@
     ]
   },
   "followUp": {
-    "_comment": "The after-dining message. Sent once a booking is marked completed: a thank you, a Google review link, and a complimentary voucher towards the next visit. Set 'enabled' to false to stop it, or complimentaryPence to 0 to send the review request without a voucher. Google review URLs must be the client's own — get them from the Google Business Profile 'Ask for reviews' short link.",
+    "_comment": "The after-dining message. Sent once a booking is marked completed: a thank you, a Google review link, and a complimentary voucher towards the next visit. Set 'enabled' to false to stop it, or complimentaryPence to 0 to send the review request without a voucher. Google review URLs must be the client's own \u2014 get them from the Google Business Profile 'Ask for reviews' short link.",
     "enabled": true,
     "delayHours": 18,
     "complimentaryPence": 1000,
@@ -115,17 +115,20 @@
     }
   },
   "whatsapp": {
-    "_comment": "WhatsApp needs a Meta Business account, a verified business, and templates approved in advance — outside a 24-hour window only approved templates can be delivered. Until credentials are set, messages are written to data/outbox so the wording can be reviewed and submitted for approval. The bodies to submit are in src/lib/whatsapp.ts.",
+    "_comment": "WhatsApp needs a Meta Business account, a verified business, and templates approved in advance \u2014 outside a 24-hour window only approved templates can be delivered. Until credentials are set, messages are written to data/outbox so the wording can be reviewed and submitted for approval. The bodies to submit are in src/lib/whatsapp.ts.",
     "enabled": true,
     "templates": {
       "bookingConfirmed": "varanasi_booking_confirmed",
       "bookingReminder": "varanasi_booking_reminder",
       "thankYou": "varanasi_thank_you",
-      "voucherDelivered": "varanasi_voucher_delivered"
-    }
+      "voucherDelivered": "varanasi_voucher_delivered",
+      "staffNewBooking": "varanasi_staff_new_booking"
+    },
+    "notifyTo": "07436210828",
+    "_notifyToComment": "A UK mobile that gets a WhatsApp the moment a table is booked. Editable in Admin -> Settings. Leave blank for none. Like every other WhatsApp message this needs an approved Meta template before it can actually be delivered; until then it is written to data/outbox."
   },
   "analytics": {
-    "_comment": "GA4 only loads after a visitor accepts cookies, and only if a measurement ID is set. The old site had no analytics at all, so there is no historical baseline to preserve — install this at launch to start one.",
+    "_comment": "GA4 only loads after a visitor accepts cookies, and only if a measurement ID is set. The old site had no analytics at all, so there is no historical baseline to preserve \u2014 install this at launch to start one.",
     "ga4MeasurementId": "",
     "consentRequired": true
   }

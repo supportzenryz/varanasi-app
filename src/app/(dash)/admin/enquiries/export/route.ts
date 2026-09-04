@@ -41,7 +41,7 @@ const stamp = (unix: number | null) =>
   unix ? new Date(unix * 1000).toISOString().replace("T", " ").slice(0, 19) : "";
 
 export async function GET(request: Request) {
-  const session = await requireAbility("viewEnquiries");
+  const session = await requireAbility("exportEnquiries");
   const sp = new URL(request.url).searchParams;
 
   const params: EnquiryQuery = {

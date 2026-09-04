@@ -154,4 +154,11 @@ export const TEMPLATE_BODIES: Record<string, string> = {
   varanasi_voucher_delivered:
     "Hello {{1}}, {{2}} has sent you a Varanasi gift voucher worth {{3}}. " +
     "Your code is {{4}}, valid until {{5}}. We look forward to welcoming you.",
+  // For the restaurant's own phone, not a guest's. It needs its own wording
+  // and its own Meta approval: sending the guest template to the floor reads
+  // "your table is confirmed, your deposit has been received", which is both
+  // confusing and useless to whoever is running the pass.
+  varanasi_staff_new_booking:
+    "New booking at Varanasi {{2}} — {{3}} at {{4}}, {{5}} guests, under {{1}}. Ref {{6}}. " +
+    "Deposit paid. Full details are in the admin and in your email.",
 };

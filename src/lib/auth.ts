@@ -25,12 +25,18 @@ export const CAN = {
   editBookings: ["owner", "manager"],
   viewEnquiries: ["owner", "manager", "staff"],
   editEnquiries: ["owner", "manager"],
+  // Reading one guest's enquiry on screen and walking out with the entire
+  // customer list as a file are different risks, and were the same permission.
+  // Under UK GDPR the second is a bulk export of personal data — names,
+  // phones, dietary and allergy notes — so it is not for the staff role.
+  exportEnquiries: ["owner", "manager"],
   redeemVoucher: ["owner", "manager", "staff"],
   issueVoucher: ["owner", "manager"],
   cancelVoucher: ["owner"],
   manageStaff: ["owner"],
   editSettings: ["owner"],
   viewAllBranches: ["owner"],
+  manageBackups: ["owner"],
 } as const satisfies Record<string, readonly Role[]>;
 
 export function can(session: Session, ability: keyof typeof CAN): boolean {

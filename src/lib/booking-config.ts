@@ -27,7 +27,7 @@ export type BookingRules = {
   notifications: { to: string[]; fromName: string; fromEmail: string; replyTo: string };
   vouchers: VoucherRules;
   followUp: FollowUpRules;
-  whatsapp: { enabled: boolean; templates: Record<string, string> };
+  whatsapp: { enabled: boolean; notifyTo: string; templates: Record<string, string> };
   analytics: { ga4MeasurementId: string; consentRequired: boolean };
 };
 

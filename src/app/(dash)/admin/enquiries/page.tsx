@@ -124,11 +124,15 @@ export default async function EnquiriesAdmin({
           {matching > LIMIT && ` — showing the ${LIMIT} most recent`}
         </p>
         {/* A plain link, so the browser handles the download and the export
-            inherits whatever is filtered right now. */}
-        <a href={href({}, "/admin/enquiries/export")}
-          className="text-sm border border-[--line] bg-white px-4 py-1.5 hover:bg-pale font-semibold">
-          Export {filtered ? "these" : "all"} to CSV
-        </a>
+            inherits whatever is filtered right now. Hidden for the staff role:
+            the route refuses them anyway, and offering a button that returns a
+            permission error is worse than not offering it. */}
+        {can(session, "exportEnquiries") && (
+          <a href={href({}, "/admin/enquiries/export")}
+            className="text-sm border border-[--line] bg-white px-4 py-1.5 hover:bg-pale font-semibold">
+            Export {filtered ? "these" : "all"} to CSV
+          </a>
+        )}
       </div>
 
       {/* ---------- status tabs ---------- */}
@@ -171,8 +175,8 @@ export default async function EnquiriesAdmin({
                 <span className={`inline-block px-2 py-1 text-xs font-semibold shrink-0 ${STATUS_COLOUR[e.status]}`}>
                   {e.status}
                 </span>
-                <span className="flex-1 min-w-48">
-                  <span className="block font-medium">
+                <span className="flex-1 min-w-48 min-w-0">
+                  <span className="block font-medium [overflow-wrap:anywhere]">
                     {e.name}
                     <span className="text-ink-3 font-normal"> · {TYPE_LABEL[e.type as EnquiryType]}</span>
                   </span>
@@ -199,9 +203,16 @@ export default async function EnquiriesAdmin({
                     ...(e.roomId ? [["Room", roomName.get(e.roomId) ?? "—"]] : []),
                     ...(e.dietary ? [["Dietary", e.dietary]] : []),
                   ].map(([k, v], i) => (
-                    <div key={i}>
+                    /* min-w-0 is the load-bearing part. A grid item defaults to
+                       min-width:auto and so refuses to shrink below its content,
+                       which means one long unbroken string a guest typed — a
+                       pasted URL in the dietary box — widens the whole column
+                       and, with it, the page. break-words alone cannot override
+                       that. Measured before: 33,583px wide at a 1440 viewport,
+                       pushing every filter and button off-screen. */
+                    <div key={i} className="min-w-0">
                       <dt className="text-xs font-semibold text-ink-3">{k as string}</dt>
-                      <dd className="mt-0.5">{v as React.ReactNode}</dd>
+                      <dd className="mt-0.5 [overflow-wrap:anywhere]">{v as React.ReactNode}</dd>
                     </div>
                   ))}
                 </dl>
@@ -209,7 +220,7 @@ export default async function EnquiriesAdmin({
                 {e.message && (
                   <div className="mt-5 border-l-2 border-[--line] pl-4">
                     <span className="text-xs font-semibold text-ink-3">Their message</span>
-                    <p className="mt-1 text-sm whitespace-pre-wrap">{e.message}</p>
+                    <p className="mt-1 text-sm whitespace-pre-wrap [overflow-wrap:anywhere]">{e.message}</p>
                   </div>
                 )}
 

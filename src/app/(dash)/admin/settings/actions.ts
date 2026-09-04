@@ -7,7 +7,7 @@ import { settings, auditLog, branches } from "@/db/schema";
 import { requireAbility } from "@/lib/auth";
 import { bookingRules, SETTINGS_KEY, type BookingRules } from "@/lib/booking-config";
 import { parsePounds } from "@/lib/money";
-import { checkEmail } from "@/lib/validate";
+import { checkEmail, checkPhone } from "@/lib/validate";
 
 const num = (v: FormDataEntryValue | null, fallback: number) => {
   const n = Number(String(v ?? "").replace(/[^0-9]/g, ""));
@@ -39,6 +39,15 @@ function save(next: BookingRules) {
 function senderAddress(raw: FormDataEntryValue | null, fallback: string): string {
   const checked = checkEmail(String(raw ?? ""));
   return checked.ok ? checked.value : fallback;
+}
+
+/** Blank clears it; a usable number is stored; anything else keeps what was
+ *  there, so a typo cannot silently switch the alerts off. */
+function staffMobile(raw: FormDataEntryValue | null, fallback: string): string {
+  const value = String(raw ?? "").trim();
+  if (!value) return "";
+  const checked = checkPhone(value, false);
+  return checked.ok && checked.e164 ? checked.value : fallback;
 }
 
 export async function saveBookingRules(formData: FormData) {
@@ -84,6 +93,13 @@ export async function saveBookingRules(formData: FormData) {
       fromName: String(formData.get("fromName") ?? "").trim() || current.notifications.fromName,
       fromEmail: senderAddress(formData.get("fromEmail"), current.notifications.fromEmail),
       replyTo: senderAddress(formData.get("replyTo"), current.notifications.replyTo),
+    },
+    whatsapp: {
+      ...current.whatsapp,
+      // Blank is a real choice (no alerts), so this one does not fall back —
+      // but anything that is not a dialable number is refused rather than
+      // stored, since a half-typed mobile is an alert nobody receives.
+      notifyTo: staffMobile(formData.get("waNotifyTo"), current.whatsapp?.notifyTo ?? ""),
     },
   };
 

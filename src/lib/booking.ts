@@ -8,6 +8,7 @@ import { bookingRules, depositFor, prettyTime, followUpRules, whatsappRules } fr
 import { slotStillAvailable } from "@/lib/availability";
 import { formatPence } from "@/lib/money";
 import { sendMail } from "@/lib/email";
+import { checkName, checkEmail, checkPhone } from "@/lib/validate";
 import { sendWhatsApp, toE164 } from "@/lib/whatsapp";
 import { issueThankYouVoucher, expiryLabel } from "@/lib/voucher";
 
@@ -80,9 +81,16 @@ export function holdBooking(input: HoldInput): HoldResult {
   if (partySize > rules.capacity.maxPartyOnline) {
     return { ok: false, error: `For parties of more than ${rules.capacity.maxPartyOnline}, please call us on ${branch.phone}.` };
   }
-  if (!input.guestName?.trim()) return { ok: false, error: "Please give us a name for the booking." };
-  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(input.email ?? "")) return { ok: false, error: "Please give us a valid email address so we can send your confirmation." };
-  if (!input.phone?.trim()) return { ok: false, error: "Please give us a phone number in case we need to reach you." };
+  // Contact details are checked properly rather than merely for being
+  // non-empty: the phone box used to accept "1", which is a table the
+  // restaurant cannot ring about a late arrival. See src/lib/validate.ts for
+  // why these rules are deliberately permissive.
+  const name = checkName(input.guestName);
+  if (!name.ok) return { ok: false, error: name.error };
+  const email = checkEmail(input.email);
+  if (!email.ok) return { ok: false, error: email.error };
+  const phone = checkPhone(input.phone, true);
+  if (!phone.ok) return { ok: false, error: phone.error };
 
   // Re-check availability at the moment of booking, not just when the slots
   // were rendered — two guests can reach the last table at the same time.
@@ -96,9 +104,12 @@ export function holdBooking(input: HoldInput): HoldResult {
   const created = db.insert(bookings).values({
     reference: reference(branch.slug),
     branchId: branch.id,
-    guestName: input.guestName.trim(),
-    email: input.email.trim().toLowerCase(),
-    phone: input.phone.trim(),
+    // Name with collapsed whitespace, email lowercased, phone as the guest
+    // typed it — staff recognise and search on the form they were given, and
+    // the WhatsApp sender derives E.164 itself when it needs to dial.
+    guestName: name.value,
+    email: email.value,
+    phone: phone.value,
     partySize,
     date: input.date,
     time: input.time,

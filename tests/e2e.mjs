@@ -148,6 +148,62 @@ await page.waitForURL(/\?(sent|error)=/, { timeout: 15000 }).catch(() => {});
 t('Enquiry without consent is refused server-side',
   q(`select id from enquiries where email = '${refusedEmail}'`).length === 0);
 
+console.log('\n── 3b. Junk contact details are refused by the server ──');
+
+/* The browser's own validation is trivially bypassed, so each of these strips
+   the HTML guards first and submits anyway — what is being tested is that the
+   server refuses, not that the input had a pattern attribute. */
+for (const [label, phone] of [
+  ['a single digit', '1'],
+  ['one digit repeated', '1111111111'],
+  ['letters', 'not a phone'],
+  ['a number too short to dial', '0770'],
+]) {
+  const email = `e2e.junk.${label.replace(/\W+/g, '')}.${stamp}@zenryz-test.com`;
+  await page.goto(`${BASE}/birmingham/catering`, { waitUntil: 'networkidle' });
+  await page.fill('input[name="name"]', 'E2E Junk Phone');
+  await page.fill('input[name="email"]', email);
+  await page.fill('input[name="phone"]', phone);
+  await page.fill('textarea[name="message"]', 'Automated check. Please ignore.');
+  await page.check('input[name="terms"]');
+  await page.evaluate(() => document.querySelectorAll('[required],[pattern]').forEach(el => {
+    el.removeAttribute('required'); el.removeAttribute('pattern');
+  }));
+  await page.click('form button:has-text("Send enquiry")');
+  await page.waitForURL(/\?(sent|error)=/, { timeout: 15000 }).catch(() => {});
+  t(`phone rejected: ${label}`, q(`select id from enquiries where email = '${email}'`).length === 0);
+}
+
+// The counterpart: a real number in a messy shape must still get through.
+const okEmail = `e2e.goodphone.${stamp}@zenryz-test.com`;
+await page.goto(`${BASE}/birmingham/catering`, { waitUntil: 'networkidle' });
+await page.fill('input[name="name"]', 'E2E Good Phone');
+await page.fill('input[name="email"]', okEmail);
+await page.fill('input[name="phone"]', '(07700) 900-123');
+await page.fill('textarea[name="message"]', 'Automated check. Please ignore.');
+await page.check('input[name="terms"]');
+await page.click('form button:has-text("Send enquiry")');
+await page.waitForURL(/\?(sent|error)=/, { timeout: 15000 }).catch(() => {});
+const good = q(`select phone from enquiries where email = '${okEmail}'`);
+t('a real number typed with brackets and dashes is accepted', good.length === 1);
+t('  · and stored the way the guest typed it, for staff to recognise',
+  good[0]?.phone === '(07700) 900-123', good[0]?.phone);
+
+// A mistyped provider is named rather than silently accepted.
+const typoEmail = `e2e.typo.${stamp}@gmial.com`;
+await page.goto(`${BASE}/birmingham/catering`, { waitUntil: 'networkidle' });
+await page.fill('input[name="name"]', 'E2E Typo');
+await page.fill('input[name="email"]', typoEmail);
+await page.fill('textarea[name="message"]', 'Automated check. Please ignore.');
+await page.check('input[name="terms"]');
+await page.evaluate(() => document.querySelectorAll('[required]').forEach(el => el.removeAttribute('required')));
+await page.click('form button:has-text("Send enquiry")');
+await page.waitForURL(/\?(sent|error)=/, { timeout: 15000 }).catch(() => {});
+t('gmial.com is refused, not silently accepted',
+  q(`select id from enquiries where email = '${typoEmail}'`).length === 0);
+t('  · and the guest is told what to fix',
+  /did you mean/i.test(await page.locator('main').innerText()));
+
 console.log('\n── 4. Admin: sign in ──');
 
 await page.goto(`${BASE}/admin/login`, { waitUntil: 'networkidle' });

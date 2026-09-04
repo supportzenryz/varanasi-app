@@ -5,6 +5,7 @@ import { enquiries, branches, privateRooms } from "@/db/schema";
 import { branchBySlug } from "@/lib/branches";
 import { bookingRules } from "@/lib/booking-config";
 import { sendMail } from "@/lib/email";
+import { checkName, checkEmail, checkPhone } from "@/lib/validate";
 
 export type Enquiry = typeof enquiries.$inferSelect;
 export type EnquiryType = "booking" | "private_room" | "corporate" | "catering" | "contact" | "franchise";
@@ -48,10 +49,14 @@ export type EnquiryInput = {
 export type EnquiryResult = { ok: true; enquiry: Enquiry } | { ok: false; error: string };
 
 export async function submitEnquiry(input: EnquiryInput): Promise<EnquiryResult> {
-  if (!input.name?.trim()) return { ok: false, error: "Please tell us your name." };
-  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(input.email ?? "")) {
-    return { ok: false, error: "Please give us a valid email address so we can reply." };
-  }
+  const name = checkName(input.name);
+  if (!name.ok) return { ok: false, error: name.error };
+  const email = checkEmail(input.email);
+  if (!email.ok) return { ok: false, error: email.error };
+  // Optional here — an enquiry can be answered by email alone — but if one is
+  // given it has to be usable, because a half-typed number is worse than none.
+  const phone = checkPhone(input.phone, false);
+  if (!phone.ok) return { ok: false, error: phone.error };
   if (!input.termsAccepted) {
     return { ok: false, error: "Please accept the privacy policy so we can respond to you." };
   }
@@ -73,9 +78,9 @@ export async function submitEnquiry(input: EnquiryInput): Promise<EnquiryResult>
   const created = db.insert(enquiries).values({
     branchId: branch?.id ?? null,
     type: input.type,
-    name: input.name.trim(),
-    email: input.email.trim().toLowerCase(),
-    phone: input.phone?.trim() || null,
+    name: name.value,
+    email: email.value,
+    phone: phone.value || null,
     company: input.company?.trim() || null,
     partySize: input.partySize ?? null,
     requestedDate: input.requestedDate || null,

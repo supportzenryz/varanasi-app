@@ -139,7 +139,12 @@ h1 { line-height: 1.04; }
 /* Buttons: the live site's square gold fill and its outlined counterpart */
 .btn {
   display: inline-block;
-  padding: .9rem 1.8rem;
+  /* A pill, not a rectangle. These are small, wide-tracked uppercase labels;
+     a full radius reads as a considered detail at that size, where a 4px
+     corner just looks like an unfinished rectangle. Padding is widened to
+     match — a pill needs room at the ends or the text crowds the curve. */
+  border-radius: 999px;
+  padding: .95rem 2.1rem;
   font-size: .8rem;
   font-weight: 700;
   letter-spacing: .14em;
@@ -166,6 +171,55 @@ h1 { line-height: 1.04; }
 /* Photographs sit behind a soft ink wash so gold type stays legible on them */
 .wash-ink { background: linear-gradient(to right, rgba(15,15,15,.92) 0%, rgba(15,15,15,.72) 45%, rgba(15,15,15,.35) 100%); }
 .wash-ink-y { background: linear-gradient(to top, rgba(15,15,15,.85) 0%, rgba(15,15,15,.15) 55%, rgba(15,15,15,.35) 100%); }
+
+/* ---- Menu sections -------------------------------------------------------
+   The menu opens as an index: each section is a closed <details>, and the
+   reader opens the ones they want. The styling below is what makes a
+   disclosure widget read as a menu card rather than as a form control. */
+.menu-section {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.015));
+  padding: 1.35rem 1.5rem;
+  transition: border-color .3s, background-color .3s;
+}
+.menu-section:hover { border-color: rgba(198,163,90,.42); }
+.menu-section[open] { border-color: rgba(198,163,90,.5); }
+
+.menu-summary {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1.5rem;
+  cursor: pointer;
+  list-style: none;          /* Firefox */
+}
+.menu-summary::-webkit-details-marker { display: none; }  /* Safari/Chrome */
+
+.menu-count {
+  display: inline-flex;
+  align-items: center;
+  gap: .6rem;
+  color: rgba(198,163,90,.72);
+  font-size: .58rem;
+  white-space: nowrap;
+}
+.menu-chevron {
+  width: .95rem;
+  height: .95rem;
+  transition: transform .35s cubic-bezier(.2,.7,.3,1);
+}
+.menu-section[open] .menu-chevron { transform: rotate(180deg); }
+
+/* The "pop in": the body fades up as it appears. Height cannot be animated
+   from a <details> without JavaScript, so this animates what it can —
+   opacity and a short rise — which reads as the content arriving rather
+   than snapping into place. */
+.menu-body { animation: menu-open .34s cubic-bezier(.2,.7,.3,1) both; }
+@keyframes menu-open {
+  from { opacity: 0; transform: translateY(-.4rem); }
+  to   { opacity: 1; transform: none; }
+}
 
 .hover-zoom img { transition: transform .7s cubic-bezier(.2,.7,.3,1); }
 .hover-zoom:hover img { transform: scale(1.05); }

@@ -10,7 +10,7 @@ import { pageHref } from "@/lib/nav";
 import { branchMedia } from "@/lib/brand";
 import { PageHero } from "@/components/PageHero";
 import { GiftVoucherBand } from "@/components/GiftVoucherBand";
-import { MenuSections, MenuJumpNav, type MenuItemRow } from "@/components/MenuList";
+import { MenuSections, type MenuItemRow } from "@/components/MenuList";
 
 export async function generateMetadata({ params }: { params: Promise<{ branch: string }> }): Promise<Metadata> {
   const { branch: slug } = await params;
@@ -69,8 +69,6 @@ export default async function MenuPage({ params }: { params: Promise<{ branch: s
         <Link href={pageHref(branch.slug, "book-online")} className="btn btn-gold">Reserve a table</Link>
         <Link href={pageHref(branch.slug, "drinks")} className="btn btn-outline">Drinks &amp; cocktails</Link>
       </PageHero>
-
-      <MenuJumpNav categories={withItems} />
 
       <div className="mx-auto max-w-3xl px-5 lg:px-8 py-16 sm:py-20">
         <MenuSections categories={alaCarte} itemsByCategory={byCat} />

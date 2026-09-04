@@ -264,10 +264,23 @@ if (await addTo.count() > 0) {
   }
 
   await page.goto(`${BASE}/birmingham/menu`, { waitUntil: 'networkidle' });
-  const menuText = await page.locator('main').innerText();
-  t('New section appears on the public menu', menuText.includes(catName));
-  t('New dish appears on the public menu', menuText.includes(dishName));
-  t('Its price appears on the public menu', menuText.includes('£23.50'));
+
+  /* Sections arrive closed, so the index is what's visible first. That is the
+     behaviour being asserted here: the section name shows without any
+     interaction, and the dishes only after the reader opens it. */
+  const indexText = await page.locator('main').innerText();
+  t('New section appears on the public menu', indexText.includes(catName));
+  t('Dishes stay hidden until the section is opened', !indexText.includes(dishName));
+
+  const section = page.locator('details.menu-section', { hasText: catName }).first();
+  await section.locator('summary').click();
+  await page.waitForFunction(
+    (n) => document.querySelector('main')?.innerText.includes(n),
+    dishName, { timeout: 5000 },
+  );
+  const openText = await page.locator('main').innerText();
+  t('New dish appears once the section is opened', openText.includes(dishName));
+  t('Its price appears on the public menu', openText.includes('£23.50'));
 
   const leicester = await (await ctx.newPage()).goto(`${BASE}/leicester/menu`).then(async r => {
     const p = r.frame().page(); const txt = await p.locator('main').innerText(); await p.close(); return txt;

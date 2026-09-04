@@ -4,6 +4,18 @@ import Image from "next/image";
  * The full-bleed banner every page opens with. Birmingham's home page plays the
  * restaurant film; everywhere else (and all of Leicester) uses a still. Both
  * cover the whole area, as they do on the live site.
+ *
+ * The two shapes differ on purpose:
+ *
+ * `full` is the home page. It is centred, it drops the standfirst, and its
+ * heading is deliberately smaller than a viewport-filling banner invites — the
+ * photograph is the argument there, and a wall of type competes with it. The
+ * job of that screen is a name, a line, and a way in.
+ *
+ * The shorter page banner keeps its standfirst, because on those pages the
+ * standfirst is often load-bearing: the deposit per head, which address the
+ * confirmation went to, or that no table is being held. Losing it would cost
+ * information, not decoration.
  */
 export function PageHero({
   image, video, kicker, heading, intro, children, full = false, align = "left",
@@ -18,11 +30,13 @@ export function PageHero({
   full?: boolean;
   align?: "left" | "center";
 }) {
-  const centred = align === "center";
+  const centred = full || align === "center";
   return (
     <section
       className={`relative isolate bg-ink text-pale overflow-hidden ${
-        full ? "min-h-[92svh] flex items-end" : "min-h-[58svh] sm:min-h-[62svh] flex items-end"
+        full
+          ? "min-h-[92svh] flex items-center"
+          : "min-h-[58svh] sm:min-h-[62svh] flex items-end"
       }`}
     >
       {video ? (
@@ -43,18 +57,33 @@ export function PageHero({
 
       <div className={`absolute inset-0 -z-10 ${centred ? "wash-ink-y" : "wash-ink"}`} aria-hidden="true" />
 
-      <div className={`relative mx-auto max-w-[84rem] w-full px-5 lg:px-10 pb-16 sm:pb-24 pt-40 ${
-        centred ? "text-center" : ""
-      }`}>
+      <div className={`relative mx-auto max-w-[84rem] w-full px-5 lg:px-10 ${
+        full ? "py-24 text-center" : "pb-16 sm:pb-24 pt-40"
+      } ${centred && !full ? "text-center" : ""}`}>
         <div className={centred ? "mx-auto max-w-[46ch]" : "max-w-[54ch]"}>
           {kicker && (
             <p className="accent text-[0.62rem] text-gold mb-5">{kicker}</p>
           )}
-          <h1 className={full ? "text-[2.6rem] leading-[1.06] sm:text-6xl lg:text-[4.25rem]" : "text-4xl sm:text-5xl"}>
+          <h1
+            className={
+              full
+                ? "text-[2rem] leading-[1.12] sm:text-[2.6rem] lg:text-[3.1rem] text-balance"
+                : "text-4xl sm:text-5xl"
+            }
+          >
             {heading}
           </h1>
-          {intro && <p className="mt-6 text-pale/75 leading-relaxed max-w-[52ch]">{intro}</p>}
-          {children && <div className={`mt-9 flex flex-wrap gap-3 ${centred ? "justify-center" : ""}`}>{children}</div>}
+
+          {/* Deliberately not rendered on the home page — see the note above. */}
+          {intro && !full && (
+            <p className="mt-6 text-pale/75 leading-relaxed max-w-[52ch]">{intro}</p>
+          )}
+
+          {children && (
+            <div className={`mt-10 flex flex-wrap gap-3 ${centred ? "justify-center" : ""}`}>
+              {children}
+            </div>
+          )}
         </div>
       </div>
     </section>

@@ -40,58 +40,85 @@ export function MenuSections({
   itemsByCategory: Map<number, MenuItemRow[]>;
 }) {
   return (
-    <div className="grid gap-16 sm:gap-20">
+    /* Every section is closed to begin with, so the page opens as an index of
+       the menu rather than several thousand words of it. Twenty-six food
+       sections unrolled is a scroll nobody reads to the end of; closed, the
+       whole repertoire is legible at a glance and the reader chooses what to
+       open.
+
+       <details> rather than React state: this stays a server component, it
+       works before hydration and without JavaScript at all, and the keyboard
+       and screen-reader behaviour is the browser's own rather than something
+       re-implemented with divs and aria attributes. */
+    <div className="grid gap-3 sm:gap-3.5">
       {categories.map((cat) => {
         const items = itemsByCategory.get(cat.id) ?? [];
         if (!items.length) return null;
         return (
-          <section key={cat.id} id={cat.slug} className="scroll-mt-28">
-            <header className="text-center">
-              <h2 className="display text-2xl sm:text-[2rem] text-gold">{cat.name}</h2>
-              {cat.pricePence != null && (
-                <p className="tnum text-sm text-gold mt-2">{formatPence(cat.pricePence)} per person</p>
-              )}
-              {cat.note && <p className="text-sm text-pale/70 mt-2 italic">{cat.note}</p>}
-              <div className="rule mt-5" aria-hidden="true">◆</div>
-            </header>
+          <details key={cat.id} id={cat.slug} className="menu-section scroll-mt-28 group">
+            <summary className="menu-summary">
+              <span className="min-w-0">
+                <span className="display block text-xl sm:text-2xl text-gold leading-tight">
+                  {cat.name}
+                </span>
+                {cat.pricePence != null && (
+                  <span className="tnum block text-sm text-gold/80 mt-1.5">
+                    {formatPence(cat.pricePence)} per person
+                  </span>
+                )}
+                {cat.note && (
+                  <span className="block text-sm text-pale/60 mt-1.5 italic">{cat.note}</span>
+                )}
+              </span>
 
-            <ul className="mt-9 grid gap-7">
-              {items.map((item) => (
-                <li key={item.id}>
-                  <div className="flex items-baseline gap-3">
-                    <span className="font-semibold">
-                      {item.name}
-                      {item.isSignature && (
-                        <span className="accent text-[0.5rem] text-gold ml-2.5 align-middle">Signature</span>
+              <span className="menu-count accent shrink-0">
+                {items.length} {items.length === 1 ? "dish" : "dishes"}
+                <svg className="menu-chevron" viewBox="0 0 12 12" aria-hidden="true">
+                  <path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor"
+                        strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </span>
+            </summary>
+
+            <div className="menu-body">
+              <ul className="grid gap-7 pt-8">
+                {items.map((item) => (
+                  <li key={item.id}>
+                    <div className="flex items-baseline gap-3">
+                      <span className="font-semibold">
+                        {item.name}
+                        {item.isSignature && (
+                          <span className="accent text-[0.5rem] text-gold ml-2.5 align-middle">Signature</span>
+                        )}
+                      </span>
+                      <span className="flex-1 border-b border-dotted border-gold/30 -translate-y-1 min-w-6" />
+                      <Price measure={item.measure} pence={item.pricePence} />
+                      {item.pricePence2 != null && (
+                        <span className="pl-3"><Price measure={item.measure2} pence={item.pricePence2} /></span>
                       )}
-                    </span>
-                    <span className="flex-1 border-b border-dotted border-gold/30 -translate-y-1 min-w-6" />
-                    <Price measure={item.measure} pence={item.pricePence} />
-                    {item.pricePence2 != null && (
-                      <span className="pl-3"><Price measure={item.measure2} pence={item.pricePence2} /></span>
+                    </div>
+                    {item.meta && (
+                      <p className="display italic text-[0.82rem] text-gold mt-1">{item.meta}</p>
                     )}
-                  </div>
-                  {item.meta && (
-                    <p className="display italic text-[0.82rem] text-gold mt-1">{item.meta}</p>
-                  )}
-                  {item.description && (
-                    <p className="text-sm text-pale/70 mt-1 max-w-[62ch] leading-relaxed italic">{item.description}</p>
-                  )}
-                  {item.dietary && (
-                    <p className="text-xs text-pale/45 mt-1.5">
-                      {item.dietary.split(",").filter(Boolean).map((c) => DIETARY_LABELS[c] ?? c).join(" · ")}
-                    </p>
-                  )}
-                </li>
-              ))}
-            </ul>
+                    {item.description && (
+                      <p className="text-sm text-pale/70 mt-1 max-w-[62ch] leading-relaxed italic">{item.description}</p>
+                    )}
+                    {item.dietary && (
+                      <p className="text-xs text-pale/45 mt-1.5">
+                        {item.dietary.split(",").filter(Boolean).map((c) => DIETARY_LABELS[c] ?? c).join(" · ")}
+                      </p>
+                    )}
+                  </li>
+                ))}
+              </ul>
 
-            {cat.image && (
-              <div className="relative h-56 sm:h-72 mt-14 -mx-5 lg:mx-0 overflow-hidden">
-                <Image src={cat.image} alt="" fill sizes="(min-width: 1024px) 900px, 100vw" className="object-cover" />
-              </div>
-            )}
-          </section>
+              {cat.image && (
+                <div className="relative h-56 sm:h-72 mt-12 overflow-hidden rounded-2xl">
+                  <Image src={cat.image} alt="" fill sizes="(min-width: 1024px) 900px, 100vw" className="object-cover" />
+                </div>
+              )}
+            </div>
+          </details>
         );
       })}
     </div>

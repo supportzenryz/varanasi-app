@@ -13,13 +13,18 @@ export const metadata: Metadata = {
 };
 
 /**
- * The branch chooser, matching the live varanasi.uk front door: the Buddha
- * corridor photograph full-bleed, a 69% black wash over it, and the logo,
- * prompt and two city names centred in the viewport.
+ * The front door.
  *
- * The hero photograph is committed to the repo rather than imported like the
- * rest of the media, because it belongs to the root site and isn't in either
- * branch's media library — same reasoning as the theme fonts.
+ * The photograph behind this already carries the Buddha and the wordmark, so
+ * the logo asset that used to sit on top of it was the same mark printed
+ * twice. It has been dropped in favour of the name set in gold, which leaves
+ * the photograph legible and the page quieter.
+ *
+ * The two restaurants sit side by side rather than stacked: they are a choice
+ * between equals, and a column implies a first and a second. Each carries its
+ * street address, which was previously screen-reader-only — a visitor deciding
+ * between Birmingham and Leicester is usually deciding on geography, so the
+ * address is the useful part and should be visible.
  */
 export default function ChooseBranch() {
   const branches = allBranches();
@@ -34,40 +39,41 @@ export default function ChooseBranch() {
         sizes="100vw"
         className="object-cover object-center -z-20"
       />
-      <div className="absolute inset-0 -z-10 bg-black/[0.69]" aria-hidden="true" />
+      <div className="absolute inset-0 -z-10 bg-black/[0.72]" aria-hidden="true" />
 
-      {/* Sizes and gaps below are measured off the live page, not guessed:
-          logo ~500px wide, prompt ~22px, city names ~56px, and the block sits
-          a little above true centre, as it does on varanasi.uk. */}
-      <div className="relative w-full px-5 py-16 text-center -translate-y-[6svh]">
-        {/* The Buddha mark and wordmark are one asset, drawn at 520×104. Held at
-            a generous width so the Buddha reads as the Buddha rather than a
-            smudge beside the type — it is the restaurant's signature. */}
-        <Image
-          src={brand.logo}
-          alt="Varanasi"
-          width={1040}
-          height={208}
-          priority
-          quality={95}
-          sizes="(min-width: 640px) 40rem, 88vw"
-          className="mx-auto h-auto w-[min(40rem,88vw)]"
-        />
+      <div className="relative w-full px-5 py-16 text-center">
+        <p className="display text-gold leading-none text-[3.2rem] sm:text-[4.5rem] lg:text-[5rem]">
+          Varanasi
+        </p>
+        <p className="accent text-[0.6rem] sm:text-[0.66rem] text-pale/55 mt-5">
+          Indian fine dining
+        </p>
 
-        <h1 className="display mt-10 sm:mt-12 text-pale text-xl sm:text-[1.6rem] leading-snug">
-          Please choose a location below:
+        <h1 className="display mt-14 sm:mt-16 text-pale/80 text-base sm:text-lg leading-snug">
+          Please choose a location
         </h1>
 
-        <ul className="mt-16 sm:mt-24 grid gap-14 sm:gap-[5.4rem]">
-          {branches.map((b) => (
-            <li key={b.id}>
-              <Link
-                href={`/${b.slug}`}
-                className="display inline-block text-gold text-[2.9rem] sm:text-[4rem] leading-none
-                           transition-colors duration-300 hover:text-pale"
-              >
-                {b.city}
-                <span className="sr-only"> — Varanasi {b.city}, {b.addressLine}</span>
+        {/* Two abreast from 640px up. The divider is a border rather than a
+            separate element so it never appears above the first card when the
+            row collapses to a column on a phone. */}
+        <ul className="mt-10 sm:mt-12 mx-auto grid max-w-3xl gap-10 sm:grid-cols-2 sm:gap-0">
+          {branches.map((b, i) => (
+            <li
+              key={b.id}
+              className={i > 0 ? "sm:border-l sm:border-white/15 sm:pl-10" : "sm:pr-10"}
+            >
+              <Link href={`/${b.slug}`} className="group block">
+                <span
+                  className="display block text-gold text-[2.6rem] sm:text-[3.1rem] leading-none
+                             transition-colors duration-300 group-hover:text-pale"
+                >
+                  {b.city}
+                </span>
+                <span className="mt-4 block text-sm text-pale/60 leading-relaxed">
+                  {b.addressLine}
+                  <br />
+                  {b.postcode}
+                </span>
               </Link>
             </li>
           ))}

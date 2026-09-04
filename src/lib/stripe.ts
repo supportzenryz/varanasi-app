@@ -53,15 +53,31 @@ function formEncode(obj: Record<string, unknown>, prefix = ""): string[] {
   return parts;
 }
 
-async function call<T>(path: string, body?: Record<string, unknown>, method = "POST"): Promise<T> {
+async function call<T>(
+  path: string,
+  body?: Record<string, unknown>,
+  method = "POST",
+  idempotencyKey?: string,
+): Promise<T> {
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${key()}`,
+    "Content-Type": "application/x-www-form-urlencoded",
+    // pinning avoids a future API change altering these shapes underneath us
+    "Stripe-Version": "2024-06-20",
+  };
+
+  // Stripe replays the original response for a repeated key rather than acting
+  // twice, which is what makes a create call safe to retry. Without it, a
+  // request that times out on the way back — the caller sees a failure, Stripe
+  // saw a success — leaves a second Checkout Session against the same booking,
+  // and the id we store points at only one of them. Keys are scoped to the
+  // booking reference or voucher code, both unique, and Stripe holds them for
+  // 24 hours, comfortably longer than any table hold.
+  if (idempotencyKey && method === "POST") headers["Idempotency-Key"] = idempotencyKey;
+
   const res = await fetch(`${API}${path}`, {
     method,
-    headers: {
-      Authorization: `Bearer ${key()}`,
-      "Content-Type": "application/x-www-form-urlencoded",
-      // pinning avoids a future API change altering these shapes underneath us
-      "Stripe-Version": "2024-06-20",
-    },
+    headers,
     body: body ? formEncode(body).join("&") : undefined,
     cache: "no-store",
   });
@@ -135,7 +151,7 @@ export async function createDepositCheckout(opts: {
         },
       },
     }],
-  });
+  }, "POST", `deposit:${opts.reference}`);
 }
 
 export async function retrieveSession(id: string): Promise<CheckoutSession> {
@@ -225,5 +241,5 @@ export async function createVoucherCheckout(opts: {
         },
       },
     }],
-  });
+  }, "POST", `voucher:${opts.code}`);
 }

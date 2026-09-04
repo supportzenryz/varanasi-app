@@ -13,7 +13,12 @@ const field = "w-full border border-[--line] bg-white px-3 py-2 text-sm outline-
 const label = "block text-xs font-semibold text-ink-3 mb-1";
 const pounds = (p: number) => (p / 100).toFixed(2).replace(/\.00$/, "");
 
-export default async function SettingsAdmin() {
+export default async function SettingsAdmin({
+  searchParams,
+}: {
+  searchParams: Promise<{ saved?: string }>;
+}) {
+  const saved = (await searchParams).saved === "1";
   await requireAbility("editSettings");
   const rules = bookingRules();
   const all = db.select().from(branches).orderBy(asc(branches.sort)).all();
@@ -61,6 +66,16 @@ export default async function SettingsAdmin() {
           </p>
         </div>
       </div>
+
+      {saved && (
+
+        <p role="status" className="mb-6 border-l-2 border-gold bg-gold/10 px-4 py-3 text-sm">
+
+          Saved. Your changes are live on the website now.
+
+        </p>
+
+      )}
 
       <form action={saveBookingRules} className="mt-10 grid gap-10">
         {/* deposits */}

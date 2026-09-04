@@ -1,5 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { settings, auditLog, branches } from "@/db/schema";
@@ -91,4 +92,9 @@ export async function saveBookingRules(formData: FormData) {
     userId: session.userId, action: "settings.booking", entity: "settings", entityId: SETTINGS_KEY,
     detail: `deposit ${next.deposit.policy} @ ${next.deposit.perPersonPence}p pp`,
   }).run();
+
+  // Say so. Saving used to re-render the same page with nothing changed on
+  // screen, which is indistinguishable from a button that does not work —
+  // and the honest reading of a silent form is that it failed.
+  redirect("/admin/settings?saved=1");
 }

@@ -4,16 +4,21 @@ import { GoldFrame } from "@/components/Ornament";
 /**
  * The home page's opening screen.
  *
- * It was 92svh of photograph carrying a kicker, a three-line heading and two
- * buttons — and the client's objection was the right one: at that height the
- * first screen *is* the page. Nothing below it exists until you scroll, and
- * nothing on it tells you there is anything below.
+ * It fills the screen, and the reason that is fine now is worth writing down,
+ * because it was not fine before.
  *
- * So this is shorter than a full viewport on purpose. The band underneath
- * shows above the fold on a laptop, which is what turns "a photograph" into
- * "the top of a page". And the type is now one line, because a line that short
- * can be set large enough to be an image in its own right — the previous
- * heading had to shrink to fit and ended up neither picture nor statement.
+ * The original was 92svh carrying a kicker, a three-line heading and two
+ * buttons, and the client's objection was right: at that height the first
+ * screen *was* the page. Nothing below existed until you scrolled and nothing
+ * on it said there was anything below. The fault was the clutter, not the
+ * height — a screen that busy has to be got past, and gives you no reason to
+ * think there is anywhere to get to.
+ *
+ * One line and a scroll cue changes what the same height means. The type can
+ * now be set large enough to be an image in its own right (the old heading had
+ * to shrink to fit and ended up neither picture nor statement), the film has
+ * the whole frame, and "Explore More" is an explicit promise that the page
+ * continues. So: full bleed, and nothing in it but the name of the thing.
  *
  * The buttons are gone at the client's request. Reserving is one tap away in
  * the header on every screen, so the hero was repeating a control rather than
@@ -24,7 +29,7 @@ export function HomeHero({
 }: { image: string | null; video?: string | null; city: string }) {
   return (
     <section
-      className="relative isolate flex min-h-[78svh] items-center justify-center overflow-hidden bg-ink text-pale sm:min-h-[82svh]"
+      className="relative isolate flex min-h-[100svh] items-center justify-center overflow-hidden bg-ink text-pale"
       aria-label={`Varanasi ${city}`}
     >
       {video ? (

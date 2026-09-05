@@ -68,9 +68,21 @@ t('Catering is linked in the main header nav', navLinks.some(l => /catering/i.te
 const cateringHref = await page.locator('header nav a', { hasText: /^Catering$/ }).first().getAttribute('href');
 t('Catering link points at the rebuilt route, not /exact', cateringHref === '/birmingham/catering', cateringHref);
 
+/* The footer was one line of copyright for a while and is a full one again.
+   What it has to carry is a utility question, not a taste one: address, phone
+   and hours are what a person wants at the moment they decide to come, and
+   that moment happens at the bottom of a page as often as the top. */
 const footerText = (await page.locator('footer').innerText()).replace(/\s+/g, ' ').trim();
-t('Footer is one line of small print', footerText.length < 80, JSON.stringify(footerText));
+t('Footer carries the address', footerText.includes('Broad Street') || /B\d/.test(footerText),
+  footerText.slice(0, 60));
+t('Footer carries the telephone number', /0121|0116/.test(footerText));
+t('Footer carries the opening hours', /Monday|Sunday/.test(footerText));
+t('Footer offers the other restaurant, which nothing else on a branch page does',
+  (await page.locator('footer a[href="/leicester"]').count()) > 0);
 t('Footer carries the copyright', /© \d{4} Varanasi Restaurant/.test(footerText));
+t('Footer keeps privacy and terms reachable from every page',
+  (await page.locator('footer a', { hasText: /Privacy/ }).count()) > 0 &&
+  (await page.locator('footer a', { hasText: /Terms/ }).count()) > 0);
 t('Only one footer on the page', await page.locator('footer').count() === 1,
   `${await page.locator('footer').count()} found`);
 
@@ -125,8 +137,10 @@ console.log('\n── 1b. The home page opens on one line, and shows the page be
   const h1 = (await page.locator('h1').first().innerText()).replace(/\s+/g, ' ').trim();
   t('The home page leads on one line', h1 === 'Exquisite Fine Dining', JSON.stringify(h1));
 
-  const heroH = await page.locator('section').first().evaluate((el) => el.getBoundingClientRect().height);
-  t('The hero no longer fills the whole screen', heroH < 900 * 0.9, `${Math.round(heroH)}px of 900`);
+  /* Full bleed, on the client's second thought. What was wrong before was the
+     clutter, not the height: a kicker, a three-line heading and two buttons
+     have to be got past, and gave no reason to think there was anywhere to get
+     to. One line plus a scroll cue changes what the same height means. */
 
   /* The city left the H1, so it has to be somewhere a search engine counts.
      If this fails, the restaurant has quietly lost "Indian restaurant
@@ -135,16 +149,30 @@ console.log('\n── 1b. The home page opens on one line, and shows the page be
   t('The city survives as an H2', h2s.some((x) => /Birmingham|Leicester/.test(x)),
     h2s.slice(0, 2).join(' | '));
 
-  /* Back to the top first: an earlier check scrolls the page to force the
-     images to decode, and without this the band sits above the viewport with
-     a negative y — which satisfies "less than 900" while proving nothing. */
-  /* `behavior: "instant"`, because the site sets scroll-behavior: smooth and a
-     2,000px smooth scroll is still travelling when the measurement is taken. */
-  await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
-  await page.waitForTimeout(600);
-  const band = await page.locator('#explore').boundingBox();
-  t('The band below the hero is visible without scrolling',
-    !!band && band.y > 0 && band.y < 900, band ? `y=${Math.round(band.y)} of 900` : 'not found');
+  /* Measured in one evaluate, from the document rather than the viewport.
+     Comparing two boundingBox() calls taken either side of a scroll made this
+     assert on where the page happened to be sitting, not on the layout — it
+     read 520 against a 738px hero and passed anyway. offsetTop cannot drift
+     with the scroll position. */
+  const layout = await page.evaluate(() => {
+    const hero = document.querySelector("section");
+    const band = document.querySelector("#explore");
+    return {
+      heroH: Math.round(hero.getBoundingClientRect().height),
+      bandTop: Math.round(band.offsetTop),
+      viewportH: window.innerHeight,
+    };
+  });
+  t('The hero fills the screen', layout.heroH >= layout.viewportH * 0.97,
+    `${layout.heroH}px of ${layout.viewportH}`);
+  t('The band sits directly under the hero, one scroll away',
+    Math.abs(layout.bandTop - layout.heroH) < 4,
+    `band at ${layout.bandTop}, hero ${layout.heroH}`);
+
+  /* The cue is what makes a full-bleed hero legible as the top of a page
+     rather than the whole of it. If it goes, the original complaint returns. */
+  const cue = page.locator('a[href="#explore"]');
+  t('The hero says there is a page below it', await cue.count() === 1);
 
   t('The hero carries no buttons any more',
     await page.locator('section').first().locator('a.btn').count() === 0);

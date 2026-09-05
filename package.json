@@ -15,7 +15,8 @@
     "test:e2e": "node tests/e2e.mjs",
     "db:ensure": "node scripts/ensure-db.mjs",
     "test:stripe": "npx --yes tsx tests/stripe.mts",
-    "test:validate": "npx --yes tsx tests/validate.mts"
+    "test:validate": "npx --yes tsx tests/validate.mts",
+    "test:production": "node tests/production.mjs"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

@@ -18,6 +18,13 @@ Start with the one that matches what you are about to do.
 | [EMAIL.md](./EMAIL.md) | Resend: keys, the sending domain, and what goes out to whom |
 | [ADMIN-SECURITY.md](./ADMIN-SECURITY.md) | Who sees which restaurant, how sign-in is checked, and what reaches the owner when something changes |
 
+## Going live
+
+| | |
+|---|---|
+| [PRODUCTION-READY.md](./PRODUCTION-READY.md) | The audit of the live deployment: what is ready, and the one thing that is not |
+| [CLIENT-TESTING.md](./CLIENT-TESTING.md) | A testing script to hand to the restaurant, written for someone who knows none of this |
+
 ## Money and the law
 
 | | |

@@ -230,6 +230,69 @@ if (row.length === 1) {
   t('  · marketing consent defaults to off', e.marketing_consent === 0, String(e.marketing_consent));
 }
 
+console.log('\n── 2b. The date picker knows what the restaurant is doing ──');
+
+{
+  /* <input type="date"> rendered the operating system's own calendar — pale
+     grey on a black page — and, worse, knew nothing: every day looked
+     bookable, so a guest picked a blocked Saturday, pressed Update, and only
+     then found out. If a manager blocks a date for a wedding, every guest who
+     wants that date discovers it one at a time, after committing to it. */
+  const blocked = new Date(Date.now() + 20 * 864e5).toISOString().slice(0, 10);
+  execFileSync('python3', ['-c', `
+import sqlite3
+db = sqlite3.connect('data/varanasi.db')
+b = db.execute("select id from branches where slug='birmingham'").fetchone()[0]
+db.execute("delete from blocked_dates where reason like 'E2E %'")
+db.execute("insert into blocked_dates (branch_id,date,all_day,reason) values (?,?,1,?)",
+           (b, '${blocked}', 'E2E Wedding'))
+db.commit()
+`]);
+
+  const book = `${BASE}/birmingham/book-online`;
+  await page.goto(`${book}?guests=2`, { waitUntil: 'networkidle' });
+
+  t('The browser date input is gone', await page.locator('input[type="date"]').count() === 0);
+  t('A calendar is drawn instead', await page.locator('a[href*="book-online?guests=2&date="]').count() > 5);
+
+  const day = Number(blocked.slice(8));
+  const cell = page.locator(`text="${day}"`).first();
+  void cell;
+
+  /* The blocked day must be present but unpressable — a guest looking for
+     "that Saturday" needs to find it and be told why, not wonder whether they
+     misremembered the date. */
+  t('A date blocked in the admin is not a link',
+    await page.locator(`a[href$="date=${blocked}"]`).count() === 0);
+  const blockedCell = page.locator(`[aria-label^="${blocked}"]`);
+  t('  · but it is still shown on the calendar', await blockedCell.count() === 1);
+  t('  · and says why, in the manager\'s own words',
+    /E2E Wedding/.test(await blockedCell.getAttribute('aria-label') ?? ''),
+    await blockedCell.getAttribute('aria-label'));
+
+  /* Asking for it anyway moves the guest on, and says so. Landing on a wall of
+     crossed-out times is a dead end dressed as a page. */
+  await page.goto(`${book}?guests=2&date=${blocked}`, { waitUntil: 'networkidle' });
+  const notice = (await page.locator('[role="status"]').first().innerText()).replace(/\s+/g, ' ');
+  t('Asking for a blocked date moves the guest to the next open one', /instead/.test(notice), notice);
+  t('  · naming the reason the manager gave', /E2E Wedding/.test(notice));
+  t('  · and the day it moved to is genuinely bookable',
+    await page.locator('a[href*="&time="]').count() > 0);
+
+  // An open date must NOT nag.
+  const openDay = await page.locator('a[href*="&date="]').first().getAttribute('href');
+  await page.goto(openDay.startsWith('http') ? openDay : BASE + openDay, { waitUntil: 'networkidle' });
+  t('An available date shows no warning at all',
+    await page.locator('[role="status"]').count() === 0);
+
+  execFileSync('python3', ['-c', `
+import sqlite3
+db = sqlite3.connect('data/varanasi.db')
+db.execute("delete from blocked_dates where reason like 'E2E %'")
+db.commit()
+`]);
+}
+
 console.log('\n── 3. Consent is enforced by the server, not just the browser ──');
 
 await page.goto(`${BASE}/birmingham/contact`, { waitUntil: 'networkidle' });

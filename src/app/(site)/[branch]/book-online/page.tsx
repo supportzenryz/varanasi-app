@@ -4,12 +4,13 @@ import type { Metadata } from "next";
 import { branchBySlug, telHref } from "@/lib/branches";
 import { branchMedia } from "@/lib/brand";
 import { bookingRules, prettyTime, depositFor } from "@/lib/booking-config";
-import { availabilityFor } from "@/lib/availability";
+import { availabilityFor, calendarFor, nextOpenDay } from "@/lib/availability";
 import { expireStaleHolds, dateLabel } from "@/lib/booking";
 import { formatPence } from "@/lib/money";
 import { PageHero } from "@/components/PageHero";
 import { startBooking } from "./actions";
 import { SubmitButton } from "@/components/SubmitButton";
+import { BookingCalendar } from "@/components/BookingCalendar";
 
 export async function generateMetadata({ params }: { params: Promise<{ branch: string }> }): Promise<Metadata> {
   const { branch: slug } = await params;
@@ -25,10 +26,6 @@ export async function generateMetadata({ params }: { params: Promise<{ branch: s
 const field =
   "w-full border border-[--line] bg-ink-2 px-3.5 py-3 text-[0.95rem] outline-none focus:border-gold rounded-none";
 const label = "block accent text-[0.6rem] text-gold mb-2";
-
-function todayISO() {
-  return new Date().toISOString().slice(0, 10);
-}
 
 /** The three steps are driven by the URL, so Back works and a slot can be shared. */
 export default async function BookOnline({
@@ -51,9 +48,47 @@ export default async function BookOnline({
   // an abandoned checkout shouldn't keep a table off the list
   expireStaleHolds();
 
-  const step = chosenTime && guests && date ? 3 : guests && date ? 2 : 1;
-  const availability = step >= 2 && guests && date ? availabilityFor(branch, date, guests, rules) : null;
-  const deposit = guests && date ? depositFor(rules, date, guests) : 0;
+  /* The calendar's own view of the next three months, for this party size.
+     Drawn from the same rules the booking enforces, so a day the guest can
+     press is a day the booking will accept. */
+  const party = guests ?? rules.capacity.minPartyOnline + 1;
+  const calendar = calendarFor(branch, party, 90, rules);
+
+  /* Where the guest lands when they arrive, or when the day they asked for has
+     nothing left. Sending them to today at 10pm — every sitting crossed out,
+     "no time left to book for today" — is a dead end dressed as a page: the
+     information is correct and the guest still has to work out what to do. */
+  const asked = date;
+  const askedDay = asked ? calendar.find((d) => d.date === asked) : undefined;
+  const needsMove = !asked || (askedDay && askedDay.state !== "open");
+  const suggestion = needsMove ? nextOpenDay(calendar, asked ?? undefined) ?? nextOpenDay(calendar) : undefined;
+  const effectiveDate = asked && askedDay?.state === "open" ? asked : suggestion?.date ?? asked ?? null;
+
+  /* Said on screen rather than left to be inferred, and phrased per reason:
+     "we're shut on Mondays", "there's a wedding in" and "tonight's last
+     sitting has gone" are three different problems for the guest, and only the
+     last one means come back tomorrow. The manager's own words for a block are
+     passed straight through — "Private event" tells someone to pick another
+     date rather than ring, where a bare "unavailable" makes them ring. */
+  const moved = (() => {
+    if (!asked || !askedDay || askedDay.state === "open") return null;
+    const to = suggestion ? ` Showing ${dateLabel(suggestion.date)} instead.` : "";
+    const head =
+      askedDay.state === "soon"
+        ? "Tonight's last sitting has already gone."
+        : askedDay.state === "closed"
+          ? `${askedDay.reason}.`
+          : `${dateLabel(asked)} isn't available: ${askedDay.reason}.`;
+    if (!suggestion) {
+      return `${head} We have nothing free in the next three months — please call us on ${branch.phone}.`;
+    }
+    return head + to;
+  })();
+
+  const step = chosenTime && guests && effectiveDate ? 3 : guests && effectiveDate ? 2 : 1;
+  const availability = step >= 2 && guests && effectiveDate
+    ? availabilityFor(branch, effectiveDate, guests, rules) : null;
+  const deposit = guests && effectiveDate ? depositFor(rules, effectiveDate, guests) : 0;
 
   const partyOptions = Array.from({ length: rules.capacity.maxPartyOnline }, (_, i) => i + 1);
   const here = `/${branch.slug}/book-online`;
@@ -100,7 +135,7 @@ export default async function BookOnline({
           <div className="mt-8 border border-[--line] bg-ink-2">
             <div className="px-5 sm:px-8 py-7">
               <h2 className="text-2xl sm:text-3xl">How many, and when?</h2>
-              <form method="GET" action={here} className="mt-6 grid gap-6 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+              <form method="GET" action={here} className="mt-6 grid gap-6 sm:grid-cols-[1fr_auto] sm:items-end">
                 <div>
                   <label className={label} htmlFor="guests">Guests</label>
                   <select id="guests" name="guests" defaultValue={guests ?? 2} className={field}>
@@ -109,15 +144,28 @@ export default async function BookOnline({
                     ))}
                   </select>
                 </div>
-                <div>
-                  <label className={label} htmlFor="date">Date</label>
-                  <input id="date" name="date" type="date" required
-                    min={todayISO()} defaultValue={date ?? todayISO()} className={field} />
-                </div>
                 <button className="btn btn-ink w-full sm:w-auto">
-                  {step === 1 ? "Find a table" : "Update"}
+                  {step === 1 ? "Find a table" : "Update party size"}
                 </button>
               </form>
+
+              {moved && (
+                <p role="status"
+                  className="mt-5 border-l-2 border-gold bg-gold/10 px-4 py-3 text-sm">
+                  {moved}
+                </p>
+              )}
+
+              <div className="mt-6">
+                <span className={label}>Date</span>
+                <div className="max-w-sm">
+                  <BookingCalendar
+                    days={calendar}
+                    selected={effectiveDate}
+                    hrefPrefix={`${here}?guests=${party}&date=`}
+                  />
+                </div>
+              </div>
               <p className="mt-4 text-xs text-pale/70">
                 Booking for more than {rules.capacity.maxPartyOnline}?{" "}
                 <a href={telHref(branch.phone)} className="underline hover:text-gold">
@@ -187,16 +235,16 @@ export default async function BookOnline({
             )}
 
             {/* ---------- step 3: details, then payment ---------- */}
-            {step === 3 && guests && date && chosenTime && (
+            {step === 3 && guests && effectiveDate && chosenTime && (
               <div className="border-t border-[--line] px-5 sm:px-8 py-7">
                 <h2 id="your-details" className="text-2xl sm:text-3xl scroll-mt-28">Your details</h2>
                 <p className="mt-1.5 text-sm text-pale/70">
-                  {dateLabel(date)} at {prettyTime(chosenTime)} · {guests} {guests === 1 ? "guest" : "guests"}
+                  {dateLabel(effectiveDate)} at {prettyTime(chosenTime)} · {guests} {guests === 1 ? "guest" : "guests"}
                 </p>
 
                 <form action={startBooking} className="mt-7 grid gap-6">
                   <input type="hidden" name="branch" value={branch.slug} />
-                  <input type="hidden" name="date" value={date} />
+                  <input type="hidden" name="date" value={effectiveDate} />
                   <input type="hidden" name="time" value={chosenTime} />
                   <input type="hidden" name="guests" value={guests} />
 

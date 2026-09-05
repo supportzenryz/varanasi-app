@@ -85,3 +85,61 @@ export function OrnamentCorner({ className = "" }: { className?: string }) {
     </svg>
   );
 }
+
+/**
+ * A hairline gold frame with a filigree at each corner.
+ *
+ * The client asked for "gold frames everywhere". Everywhere is the part to be
+ * careful with: a frame around every element turns a fine-dining room into a
+ * wedding-hall flyer, and the restraint is what reads as expensive. So this is
+ * one component, used on the things that are already doing the arguing — the
+ * hero, the menu panels, the photographs — and not on body copy.
+ *
+ * Position it with `className` rather than a single inset, because the frame
+ * on the hero has to clear a fixed header that sits over the photograph — a
+ * symmetric inset put the top rule and two corners behind the logo and the
+ * menu button. The corners are the same quarter-arch used elsewhere on the
+ * site, rotated into place, so the frame belongs to the same hand as the
+ * dividers rather than looking bought.
+ */
+export function GoldFrame({
+  className = "inset-4", opacity = 0.5,
+}: { className?: string; opacity?: number }) {
+  return (
+    <div className={`pointer-events-none absolute z-10 ${className}`} aria-hidden="true">
+      <div className="absolute inset-0 border border-gold" style={{ opacity: opacity * 0.55 }} />
+      {/* Four corners, each the same drawing turned a quarter. The wrapper is
+          what rotates, so the SVG stays one shared definition. */}
+      <OrnamentCorner className="absolute -top-px -right-px" />
+      <OrnamentCorner className="absolute -bottom-px -right-px rotate-90" />
+      <OrnamentCorner className="absolute -bottom-px -left-px rotate-180" />
+      <OrnamentCorner className="absolute -top-px -left-px -rotate-90" />
+    </div>
+  );
+}
+
+/**
+ * The small flourish that sits either side of a section heading — a stroke
+ * with a lotus bud at its tip, mirrored. Quieter than OrnamentDivider, which
+ * spans a whole column; this one hugs the words.
+ */
+export function OrnamentFlourish({
+  className = "", flip = false,
+}: { className?: string; flip?: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 64 12"
+      className={`h-3 w-16 text-gold shrink-0 ${flip ? "scale-x-[-1]" : ""} ${className}`}
+      fill="none"
+      aria-hidden="true"
+    >
+      <path d="M0 6 H 30" stroke="currentColor" strokeWidth="0.9" opacity="0.5" />
+      <path d="M36 6 H 52" stroke="currentColor" strokeWidth="0.9" opacity="0.35" />
+      <path d="M56 6 H 64" stroke="currentColor" strokeWidth="0.9" opacity="0.2" />
+      <g transform="translate(33 6)" stroke="currentColor" strokeWidth="0.9" strokeLinejoin="round">
+        <path d="M0 0 C 2.4 -2.2, 2.4 -5, 0 -6.6 C -2.4 -5, -2.4 -2.2, 0 0 Z" opacity="0.85" />
+        <path d="M0 0 C 2.4 2.2, 2.4 5, 0 6.6 C -2.4 5, -2.4 2.2, 0 0 Z" opacity="0.85" />
+      </g>
+    </svg>
+  );
+}

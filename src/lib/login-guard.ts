@@ -21,9 +21,16 @@ import "server-only";
  * needs to move to the database — noted here so that decision is deliberate.
  */
 
-const WINDOW_MS = 15 * 60_000;
-const MAX_PER_EMAIL = 5;
-const MAX_PER_IP = 20;
+/* Tunable, because the right numbers depend on the room. The per-email limit
+ * is the real defence and stays tight. The per-address one is a blunt
+ * instrument: every member of staff at one restaurant shares a router, so a
+ * cap of 20 counts a whole shift's fumbled passwords as one attacker — and
+ * the end-to-end suite, which signs in repeatedly from one address, tripped it
+ * and locked the owner out of its own run. 50 still stops a machine; 20
+ * stopped a busy Saturday. */
+const WINDOW_MS = Number(process.env.LOGIN_WINDOW_MINUTES ?? 15) * 60_000;
+const MAX_PER_EMAIL = Number(process.env.LOGIN_MAX_PER_EMAIL ?? 5);
+const MAX_PER_IP = Number(process.env.LOGIN_MAX_PER_IP ?? 50);
 
 type Bucket = { count: number; first: number; until: number };
 const byEmail = new Map<string, Bucket>();

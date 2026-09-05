@@ -9,7 +9,9 @@ import { branchBySlug, openingHours, telHref } from "@/lib/branches";
 import { formatPence } from "@/lib/money";
 import { pageHref } from "@/lib/nav";
 import { brand, branchMedia } from "@/lib/brand";
-import { PageHero } from "@/components/PageHero";
+import { HomeHero } from "@/components/HomeHero";
+import { BranchBand } from "@/components/BranchBand";
+import { MenuStacks } from "@/components/MenuStacks";
 import { GiftVoucherBand } from "@/components/GiftVoucherBand";
 import { OrnamentDivider, JaliBand } from "@/components/Ornament";
 
@@ -53,19 +55,41 @@ export default async function BranchHome({ params }: { params: Promise<{ branch:
 
   const hours = openingHours(branch);
 
+  /* The four menus the home page offers as panels. A la carte and drinks are
+     whole pages; the two set menus are anchors on the menu page, and the
+     anchors are the category slugs MenuList already emits, so these cannot
+     drift apart from the menu itself without the link visibly breaking. */
+  const menuArt = media.menuBanners;
+  const stacks = [
+    { label: "A La Carte", href: pageHref(branch.slug, "menu"), image: menuArt[0] ?? media.menuHero },
+    { label: "Set Menus", href: `${pageHref(branch.slug, "menu")}#shahi-set-menu`, image: menuArt[1] ?? media.menuHero },
+    { label: "Vegetarian", href: `${pageHref(branch.slug, "menu")}#vegetarian-set-menu`, image: menuArt[2] ?? media.menuHero },
+    { label: "Drinks & Cocktails", href: pageHref(branch.slug, "drinks"), image: media.drinksHero },
+  ];
+
   return (
     <>
-      <PageHero
-        full
-        image={branch.heroImage}
-        video={branch.heroVideo}
-        kicker={branch.heroKicker}
-        heading={branch.heroHeading ?? `Indian fine dining in ${branch.city}`}
-        intro={branch.intro}
-      >
-        <Link href={pageHref(branch.slug, "book-online")} className="btn btn-gold">Reserve a table</Link>
-        <Link href={pageHref(branch.slug, "menu")} className="btn btn-outline">View the menu</Link>
-      </PageHero>
+      <HomeHero image={branch.heroImage} video={branch.heroVideo} city={branch.city} />
+
+      {/* The city moved here when the hero was cut to one line — see BranchBand. */}
+      <BranchBand city={branch.city} />
+
+      {/* The four menus, as tall panels. Placed above the about section because
+          this is what most people arrive wanting: on the old site the menu was
+          three scrolls down and the most-clicked link in the header. */}
+      <section className="reveal mx-auto max-w-[84rem] px-5 lg:px-10 pt-14 sm:pt-16">
+        {/* Held to a column rather than the full width: the jali unit is
+            24px wide and stretching it across 1,300px turns a lattice into
+            four faint scratches. */}
+        <JaliBand className="opacity-45 mb-12 mx-auto max-w-md" />
+        <header className="text-center">
+          <p className="accent text-[0.62rem] text-gold">The menus</p>
+          <h2 className="text-3xl sm:text-[2.5rem] mt-4">A dynamic menu that celebrates heritage</h2>
+        </header>
+        <div className="mt-10 sm:mt-12">
+          <MenuStacks stacks={stacks} />
+        </div>
+      </section>
 
 
       {/* the about section — heading, copy, and the photo collage the live site runs */}

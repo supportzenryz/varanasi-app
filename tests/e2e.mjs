@@ -26,6 +26,13 @@ print(json.dumps([dict(r) for r in db.execute(${JSON.stringify(sql)})]))
 
 const stamp = Date.now();
 
+/* The sign-in throttle lives in the server's memory, and this suite spends a
+   whole run's worth of failed attempts from one address on purpose (section
+   6c). Three runs inside the fifteen-minute window used to trip the per-address
+   cap and fail "Owner can sign in" — the guard working, and the suite unable to
+   tell that apart from a broken login. Restart the server between runs, or set
+   LOGIN_MAX_PER_IP higher for the run. */
+
 // Reset the owner to the seeded credentials so the run does not depend on
 // whether a previous run already changed the password.
 execFileSync('python3', ['-c', `
@@ -108,6 +115,60 @@ const roomImgs = await page.evaluate(() =>
 t(`All ${roomImgs.length} private-dining cards show a photograph`,
   roomImgs.length > 0 && roomImgs.every(Boolean),
   `${roomImgs.filter(Boolean).length}/${roomImgs.length} loaded`);
+
+console.log('\n── 1b. The home page opens on one line, and shows the page below it ──');
+
+{
+  /* The hero used to be 92svh of photograph carrying a kicker, a three-line
+     heading and two buttons — at that height the first screen *was* the page,
+     and nothing on it said there was anything below. */
+  const h1 = (await page.locator('h1').first().innerText()).replace(/\s+/g, ' ').trim();
+  t('The home page leads on one line', h1 === 'Exquisite Fine Dining', JSON.stringify(h1));
+
+  const heroH = await page.locator('section').first().evaluate((el) => el.getBoundingClientRect().height);
+  t('The hero no longer fills the whole screen', heroH < 900 * 0.9, `${Math.round(heroH)}px of 900`);
+
+  /* The city left the H1, so it has to be somewhere a search engine counts.
+     If this fails, the restaurant has quietly lost "Indian restaurant
+     Leicester" — the phrase most of its customers actually type. */
+  const h2s = await page.locator('h2').allTextContents();
+  t('The city survives as an H2', h2s.some((x) => /Birmingham|Leicester/.test(x)),
+    h2s.slice(0, 2).join(' | '));
+
+  /* Back to the top first: an earlier check scrolls the page to force the
+     images to decode, and without this the band sits above the viewport with
+     a negative y — which satisfies "less than 900" while proving nothing. */
+  /* `behavior: "instant"`, because the site sets scroll-behavior: smooth and a
+     2,000px smooth scroll is still travelling when the measurement is taken. */
+  await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
+  await page.waitForTimeout(600);
+  const band = await page.locator('#explore').boundingBox();
+  t('The band below the hero is visible without scrolling',
+    !!band && band.y > 0 && band.y < 900, band ? `y=${Math.round(band.y)} of 900` : 'not found');
+
+  t('The hero carries no buttons any more',
+    await page.locator('section').first().locator('a.btn').count() === 0);
+
+  // The four menus, as panels.
+  const stacks = page.locator('a:has(span:text-is("A La Carte"))');
+  t('The menu panels are on the home page', await stacks.count() === 1);
+  for (const [label, expect] of [['A La Carte', '/menu'], ['Set Menus', '#shahi-set-menu'],
+                                 ['Vegetarian', '#vegetarian-set-menu'], ['Drinks & Cocktails', '/drinks']]) {
+    const href = await page.locator(`a:has(span:text-is("${label}"))`).first().getAttribute('href');
+    t(`  · "${label}" links to a real menu`, String(href).includes(expect), String(href));
+  }
+
+  /* Rotated labels only above lg. A 90px column of sideways text on a handset
+     is a party trick that costs legibility, and the old site's menu columns
+     were unreadable there. */
+  const phone = await ctx.newPage();
+  await phone.setViewportSize({ width: 390, height: 844 });
+  await phone.goto(`${BASE}/leicester`, { waitUntil: 'networkidle' });
+  const mode = await phone.locator('a:has(span:text-is("A La Carte")) span').first()
+    .evaluate((el) => getComputedStyle(el).writingMode);
+  t('On a phone the menu labels are the right way up', mode === 'horizontal-tb', mode);
+  await phone.close();
+}
 
 console.log('\n── 2. Front-end form writes to the database ──');
 
@@ -1113,6 +1174,8 @@ console.log('\n── 6h. Erasure: answering a GDPR request ──');
 
 {
   const personEmail = `e2e.erase.${stamp}@zenryz-test.com`;
+  const eraseRef = `VB-E2E${String(stamp).slice(-5)}R`;
+  const eraseCode = `VG-E2E${String(stamp).slice(-5)}R`;
   execFileSync('python3', ['-c', `
 import sqlite3, time
 db = sqlite3.connect('data/varanasi.db')
@@ -1124,7 +1187,7 @@ db.execute("insert into enquiries (branch_id,type,name,email,phone,dietary,messa
             'Please note a severe nut allergy.','new',now))
 db.execute("insert into bookings (reference,branch_id,guest_name,email,phone,party_size,date,time,"
            "status,deposit_status,source,cancel_token) values (?,?,?,?,?,?,?,?,?,?,?,?)",
-           ('VB-E2ERAS', b, 'E2E Erase Me', '${personEmail}', '07700900321', 2,
+           ('${eraseRef}', b, 'E2E Erase Me', '${personEmail}', '07700900321', 2,
             '2026-01-15','19:00','completed','none','website','tok123'))
 db.commit()
 `]);
@@ -1132,7 +1195,7 @@ db.commit()
   await page.goto(`${BASE}/admin/erasure?q=${encodeURIComponent(personEmail)}`, { waitUntil: 'networkidle' });
   let text = await page.locator('main').innerText();
   t('Searching by email finds everything held about them',
-    text.includes('E2E Erase Me') && text.includes('VB-E2ERAS'));
+    text.includes('E2E Erase Me') && text.includes(eraseRef));
 
   // A live voucher blocks erasure — that is money owed to whoever holds the code.
   execFileSync('python3', ['-c', `
@@ -1141,21 +1204,21 @@ db = sqlite3.connect('data/varanasi.db')
 now = int(time.time())
 db.execute("insert into vouchers (code,value_pence,balance_pence,status,recipient_name,"
            "recipient_email,origin,issued_at) values (?,?,?,?,?,?,?,?)",
-           ('VG-E2ERAS', 5000, 5000, 'active', 'E2E Erase Me', '${personEmail}', 'manual', now))
+           ('${eraseCode}', 5000, 5000, 'active', 'E2E Erase Me', '${personEmail}', 'manual', now))
 db.commit()
 `]);
   await page.goto(`${BASE}/admin/erasure?q=${encodeURIComponent(personEmail)}`, { waitUntil: 'networkidle' });
   text = await page.locator('main').innerText();
   t('A live gift voucher blocks erasure', /can.t be erased yet/i.test(text));
   t('  · and names the code and the amount',
-    text.includes('VG-E2ERAS') && text.includes('£50'));
+    text.includes(eraseCode) && text.includes('£50'));
   t('  · with no erase button offered', await page.locator('button', { hasText: /Erase permanently/ }).count() === 0);
 
   // Spend it down, and erasure becomes possible.
   execFileSync('python3', ['-c', `
 import sqlite3
 db = sqlite3.connect('data/varanasi.db')
-db.execute("update vouchers set balance_pence=0, status='redeemed' where code='VG-E2ERAS'")
+db.execute("update vouchers set balance_pence=0, status='redeemed' where code='${eraseCode}'")
 db.commit()
 `]);
   await page.goto(`${BASE}/admin/erasure?q=${encodeURIComponent(personEmail)}`, { waitUntil: 'networkidle' });
@@ -1186,11 +1249,11 @@ db.commit()
   t('  · including the allergy note, which is health data',
     enq.length === 1 && enq[0].dietary === null && enq[0].message === null,
     JSON.stringify(enq[0] ?? {}));
-  const bk = q(`select guest_name, email, phone, cancel_token from bookings where reference='VB-E2ERAS'`)[0];
+  const bk = q(`select guest_name, email, phone, cancel_token from bookings where reference='${eraseRef}'`)[0];
   t('The booking survives as a trading record', Boolean(bk));
   t('  · with the guest removed', bk.email === null && bk.phone === null && /erased/i.test(bk.guest_name));
   t('  · and their self-service link revoked', bk.cancel_token === null);
-  const v = q(`select recipient_name, recipient_email from vouchers where code='VG-E2ERAS'`)[0];
+  const v = q(`select recipient_name, recipient_email from vouchers where code='${eraseCode}'`)[0];
   t('The spent voucher keeps its code but loses the names',
     v.recipient_name === null && v.recipient_email === null);
 
@@ -1241,8 +1304,8 @@ db.execute("delete from menu_items where name like 'E2E Dish %' or name like 'E2
 db.execute("delete from menu_categories where name like 'E2E Section %'")
 db.execute("delete from enquiries where email like 'e2e.%@zenryz-test.com'")
 db.execute("delete from users where email like 'e2e.%@zenryz-test.com'")
-db.execute("delete from bookings where guest_name like 'E2E Guest %' or guest_name like 'E2E Unpaid%' or guest_name like 'E2E Refund%' or reference='VB-E2ERAS'")
-db.execute("delete from vouchers where code='VG-E2ERAS' or recipient_name like 'E2E %'")
+db.execute("delete from bookings where guest_name like 'E2E Guest %' or guest_name like 'E2E Unpaid%' or guest_name like 'E2E Refund%' or reference like 'VB-E2E%R'")
+db.execute("delete from vouchers where code like 'VG-E2E%R' or recipient_name like 'E2E %'")
 db.execute("delete from enquiries where name like 'E2E Erase%'")
 # the erased one no longer carries its name, so bound it by this run's window
 db.execute("delete from enquiries where name like '%erased at the person%' and created_at > ${Math.floor(stamp / 1000) - 60}")

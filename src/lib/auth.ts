@@ -36,11 +36,17 @@ export const CAN = {
   redeemVoucher: ["owner", "manager", "staff"],
   issueVoucher: ["owner", "manager"],
   cancelVoucher: ["owner"],
+  // Money going back out of the business. Managers run their own service and
+  // need to settle a cancellation on the spot; staff do not.
+  refundDeposit: ["owner", "manager"],
   manageStaff: ["owner"],
   editSettings: ["owner"],
   viewAllBranches: ["owner"],
   manageBackups: ["owner"],
   viewAuditLog: ["owner"],
+  /* Answering a GDPR erasure request rewrites customer records across the
+     whole business and cannot be undone. One person decides that. */
+  erasePersonalData: ["owner"],
 } as const satisfies Record<string, readonly Role[]>;
 
 export function can(session: Session, ability: keyof typeof CAN): boolean {

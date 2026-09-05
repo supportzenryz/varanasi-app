@@ -24,12 +24,13 @@ process.env.STRIPE_WEBHOOK_SECRET = "whsec_dummy_local";
 const src = fs.readFileSync(new URL("../src/lib/stripe.ts", import.meta.url), "utf8");
 const tmp = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "stripe-test-")), "stripe.ts");
 fs.writeFileSync(tmp, src.replace(/^import "server-only";\s*$/m, ""));
-const { verifyWebhook, createDepositCheckout, createVoucherCheckout } = await import(tmp);
+const { verifyWebhook, createDepositCheckout, createVoucherCheckout, refundDeposit, refundedSoFar } =
+  await import(tmp);
 
 let pass = 0, fail = 0;
 const t = (name: string, ok: boolean, extra = "") => {
   console.log(`  ${ok ? "PASS" : "FAIL"}  ${name}${extra ? " — " + extra : ""}`);
-  ok ? pass++ : fail++;
+  if (ok) pass++; else fail++;
 };
 
 console.log("\n── Webhook signature ──");
@@ -48,11 +49,33 @@ t("a signature for a different body is rejected",
   !verifyWebhook(body, sign(now, JSON.stringify({ id: "evt_other" }))).ok);
 
 console.log("\n── Idempotency and headers ──");
-const seen: any[] = [];
-globalThis.fetch = (async (url: any, init: any) => {
-  seen.push({ url: String(url), headers: init.headers, body: String(init.body ?? "") });
-  return { ok: true, json: async () => ({ id: "cs_test", url: "https://stripe.test/x", payment_status: "unpaid", status: "open" }) };
-}) as any;
+
+/* The stub records what would have gone to Stripe. Typed, so that a change to
+   the call shape shows up here as a compile error rather than as a test that
+   quietly asserts against `undefined`. */
+type SeenCall = {
+  url: string;
+  method?: string;
+  headers: Record<string, string>;
+  body: string;
+};
+const seen: SeenCall[] = [];
+
+const stub = (respond: (url: string) => unknown): typeof fetch =>
+  (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    seen.push({
+      url,
+      method: init?.method,
+      headers: (init?.headers ?? {}) as Record<string, string>,
+      body: String(init?.body ?? ""),
+    });
+    return { ok: true, json: async () => respond(url) } as Response;
+  }) as typeof fetch;
+
+globalThis.fetch = stub(() => ({
+  id: "cs_test", url: "https://stripe.test/x", payment_status: "unpaid", status: "open",
+}));
 
 const deposit = {
   amountPence: 2000, bookingId: 7, reference: "VB-ABC123", branchCity: "Birmingham",
@@ -81,6 +104,49 @@ await createVoucherCheckout({
 t("a voucher purchase is keyed on its voucher code",
   String(seen[0].headers["Idempotency-Key"]).includes("VG-XYZ789"),
   seen[0].headers["Idempotency-Key"]);
+
+console.log("\n── Refunds ──");
+
+/* A refund is the one call where a retry costs real money: a request that
+   times out on the way back looks identical to one that never happened, and
+   repeating it without a key pays the guest twice out of the restaurant's
+   balance. */
+seen.length = 0;
+globalThis.fetch = stub((url) =>
+  url.includes("/refunds?")
+    ? { data: [
+        { id: "re_1", status: "succeeded", amount: 1000, currency: "gbp", payment_intent: "pi_1" },
+        { id: "re_2", status: "failed",    amount: 500,  currency: "gbp", payment_intent: "pi_1" },
+        { id: "re_3", status: "pending",   amount: 250,  currency: "gbp", payment_intent: "pi_1" },
+      ] }
+    : { id: "re_new", status: "succeeded", amount: 2000, currency: "gbp", payment_intent: "pi_1" });
+
+await refundDeposit({ paymentIntent: "pi_1", amountPence: 2000 });
+t("a refund carries an Idempotency-Key, so a retry cannot pay the guest twice",
+  Boolean(seen[0].headers["Idempotency-Key"]), String(seen[0].headers["Idempotency-Key"]));
+t("  · keyed on the payment it is refunding",
+  String(seen[0].headers["Idempotency-Key"]).includes("pi_1"), seen[0].headers["Idempotency-Key"]);
+t("the amount is sent in pence", /(^|&)amount=2000(&|$)/.test(seen[0].body), seen[0].body);
+t("the payment intent is sent", seen[0].body.includes("payment_intent=pi_1"));
+t("a reason is sent, defaulting to the customer's request",
+  seen[0].body.includes("reason=requested_by_customer"), seen[0].body);
+t("the secret key stays in the header", !seen[0].body.includes("sk_test"));
+
+seen.length = 0;
+await refundDeposit({ paymentIntent: "pi_1" });
+t("omitting the amount refunds the whole payment — no amount is sent",
+  !/(^|&)amount=/.test(seen[0].body), seen[0].body);
+
+seen.length = 0;
+await refundDeposit({ paymentIntent: "pi_1", amountPence: 500, idempotencyKey: "refund:pi_1:500" });
+t("a partial refund of the remainder is a different key, not a replay of the first",
+  seen[0].headers["Idempotency-Key"] === "refund:pi_1:500", seen[0].headers["Idempotency-Key"]);
+
+/* Succeeded and pending both count against what is left. Treating a pending
+   refund as not-yet-refunded is how a deposit gets given back twice. */
+const already = await refundedSoFar("pi_1");
+t("what has already gone back counts succeeded and pending, and ignores failed",
+  already === 1250, `£${(already / 100).toFixed(2)} (expected £12.50)`);
 
 console.log(`\n${"─".repeat(60)}\n${pass}/${pass + fail} checks passed\n`);
 process.exit(fail ? 1 : 0);

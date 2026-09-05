@@ -7,7 +7,8 @@ import { record } from "@/lib/audit";
 import { requireAbility, branchAllowed, type Session } from "@/lib/auth";
 import { ok, problem } from "@/lib/admin-feedback";
 import { checkDate, checkEmail, checkName, checkPartySize, checkPhone, checkTime, todayInLondon } from "@/lib/validate";
-import { sendPostDiningFollowUp } from "@/lib/booking";
+import { sendPostDiningFollowUp, refundBookingDeposit } from "@/lib/booking";
+import { formatPence, parsePounds } from "@/lib/money";
 
 function bookingBranch(id: number): number {
   const row = db.select({ branchId: bookings.branchId }).from(bookings).where(eq(bookings.id, id)).get();
@@ -141,11 +142,68 @@ export async function updateBookingStatus(formData: FormData) {
   // Marking a booking `completed` is what triggers the after-dining message:
   // the Google review link and the complimentary voucher. It's idempotent, so
   // re-marking the same booking won't send twice or mint a second voucher.
+  let note = "";
   if (status === "completed") {
     const result = await sendPostDiningFollowUp(id);
-    if (result.sent) log(session, "booking.followup", String(id), "thank-you sent");
+    if (result.sent) {
+      log(session, "booking.followup", String(id), "thank-you sent");
+      note = " The thank-you and its complimentary voucher have gone out.";
+    } else if (result.reason?.includes("never paid")) {
+      /* Say it plainly rather than nothing. Staff mark unpaid holds "completed"
+         when clearing down the day's list; this used to mint a real voucher
+         and email the code to someone who never arrived. Now it doesn't, and
+         the person who pressed the button is told why. */
+      log(session, "booking.followup.skipped", String(id), "deposit never paid");
+      note = " No thank-you was sent — the deposit for this table was never paid, " +
+        "so no complimentary voucher has been issued.";
+    } else if (result.reason && !result.reason.includes("already sent")) {
+      note = ` No thank-you was sent — ${result.reason}.`;
+    }
   }
 
   revalidatePath("/admin/bookings");
-  ok(back, `Booking marked ${status.replace("_", " ")}.`);
+  ok(back, `Booking marked ${status.replace("_", " ")}.${note}`);
+}
+
+/**
+ * Give a deposit back from the admin, rather than from the Stripe dashboard.
+ *
+ * Whole deposit by default; an amount can be given for a late cancellation
+ * where the restaurant keeps part of it. The money moves at Stripe first and
+ * the row is only marked afterwards — see refundBookingDeposit for why that
+ * order matters.
+ */
+export async function refundBookingAction(formData: FormData) {
+  const session = await requireAbility("refundDeposit");
+  const id = Number(formData.get("id"));
+  const branchId = bookingBranch(id);
+  const slug = db.select({ slug: branches.slug }).from(branches).where(eq(branches.id, branchId)).get()?.slug;
+  const back = "/admin/bookings" + (slug ? `?branch=${slug}` : "");
+
+  if (!branchAllowed(session, branchId)) {
+    problem(back, "That booking belongs to the other restaurant.");
+  }
+
+  // An empty box means "all of it", which is the ordinary case. Anything typed
+  // has to be a real amount — a mistyped partial refund is money out of the
+  // door, so it is refused rather than rounded or ignored.
+  const typed = String(formData.get("amount") ?? "").trim();
+  let amountPence: number | undefined;
+  if (typed) {
+    const parsed = parsePounds(typed);
+    if (parsed == null) {
+      problem(back, `"${typed}" isn't an amount we can read. Use figures only, like 25 or 25.50 — ` +
+        `or leave it empty to refund the whole deposit.`);
+    }
+    amountPence = parsed!;
+  }
+
+  const result = await refundBookingDeposit({ bookingId: id, amountPence, by: session.name });
+  if (!result.ok) problem(back, result.error);
+
+  log(session, "booking.refund", String(id),
+    `${formatPence(result.amountPence)} refunded${result.simulated ? " (simulated)" : ""}`);
+  revalidatePath("/admin/bookings");
+  ok(back, `${formatPence(result.amountPence)} refunded to the guest, and both of you have been emailed.` +
+    (result.simulated ? " No money actually moved — this site is running the payment simulator." : ""));
 }

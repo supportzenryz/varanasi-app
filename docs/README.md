@@ -18,6 +18,13 @@ Start with the one that matches what you are about to do.
 | [EMAIL.md](./EMAIL.md) | Resend: keys, the sending domain, and what goes out to whom |
 | [ADMIN-SECURITY.md](./ADMIN-SECURITY.md) | Who sees which restaurant, how sign-in is checked, and what reaches the owner when something changes |
 
+## Money and the law
+
+| | |
+|---|---|
+| [REFUNDS.md](./REFUNDS.md) | Giving a deposit back from the admin, and why the order of operations matters |
+| [GDPR.md](./GDPR.md) | Answering an erasure request: what gets removed, what has to stay, and what this cannot reach |
+
 ## How the site works
 
 | | |

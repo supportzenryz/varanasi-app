@@ -40,9 +40,9 @@ const IMMEDIATE = [
   "voucher.issue",    // mints liability with no payment behind it
   "backup.download",  // the whole customer database leaves in a file
   "enquiry.export",   // bulk personal data leaves in a file
-  "enquiry.erase",
-  "booking.erase",
-  "login.locked",   // repeated failures against one account or from one address
+  "gdpr.erase",       // a person erased under Article 17 — irreversible
+  "booking.refund",   // money leaving the account
+  "login.locked",     // repeated failures against one account or from one address
 ] as const;
 
 const DIGEST_KEY = "audit_digest_cursor";

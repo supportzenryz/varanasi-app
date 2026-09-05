@@ -243,3 +243,70 @@ export async function createVoucherCheckout(opts: {
     }],
   }, "POST", `voucher:${opts.code}`);
 }
+
+/* ------------------------------------------------------------------ refunds */
+
+export type Refund = {
+  id: string;
+  status: "pending" | "succeeded" | "failed" | "canceled" | "requires_action";
+  amount: number;
+  currency: string;
+  payment_intent: string;
+  failure_reason?: string;
+};
+
+/**
+ * Give a deposit back.
+ *
+ * There was no way to do this from the admin at all. Cancelling a booking that
+ * had paid released the table and told the guest it was cancelled, and left
+ * their money sitting with Stripe — so a manager either opened the Stripe
+ * dashboard themselves, or the restaurant quietly kept a deposit for a table
+ * it had cancelled. Neither is a position to be in with a guest, and under the
+ * Consumer Rights Act the second one is not a position to be in at all.
+ *
+ * Idempotency-Key is doing real work here rather than being belt-and-braces.
+ * A refund that times out on the way back looks to the caller exactly like one
+ * that never happened; retrying without a key refunds the guest twice, and the
+ * second one comes out of the restaurant's balance. The key is scoped to the
+ * payment intent, so a retry returns the original refund instead of making a
+ * new one, and Stripe holds it for 24 hours.
+ *
+ * A partial refund is allowed — a late cancellation where the restaurant keeps
+ * part of the deposit is a normal thing for a restaurant to do — but the
+ * amount is decided by the caller, never by the form.
+ */
+export async function refundDeposit(opts: {
+  paymentIntent: string;
+  amountPence?: number;            // omit to refund the whole thing
+  reason?: "duplicate" | "fraudulent" | "requested_by_customer";
+  idempotencyKey?: string;
+}): Promise<Refund> {
+  const body: Record<string, unknown> = {
+    payment_intent: opts.paymentIntent,
+    reason: opts.reason ?? "requested_by_customer",
+  };
+  if (opts.amountPence != null) body.amount = opts.amountPence;
+
+  return call<Refund>(
+    "/refunds",
+    body,
+    "POST",
+    opts.idempotencyKey ?? `refund:${opts.paymentIntent}`,
+  );
+}
+
+/** What has already been given back on one payment, in pence. Asked before
+ *  every refund, so that a second attempt cannot quietly exceed what was
+ *  taken — Stripe would refuse it, but refusing it here means the admin can
+ *  say what is left rather than showing a raw API error. */
+export async function refundedSoFar(paymentIntent: string): Promise<number> {
+  const res = await call<{ data: Refund[] }>(
+    `/refunds?payment_intent=${encodeURIComponent(paymentIntent)}&limit=100`,
+    undefined,
+    "GET",
+  );
+  return (res.data ?? [])
+    .filter((r) => r.status === "succeeded" || r.status === "pending")
+    .reduce((sum, r) => sum + (r.amount ?? 0), 0);
+}

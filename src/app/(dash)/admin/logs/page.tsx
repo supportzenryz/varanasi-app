@@ -16,7 +16,7 @@ const PER_PAGE = 100;
 const AREAS: { key: string; label: string; match: string[] }[] = [
   { key: "money", label: "Money", match: ["voucher.", "booking.refund", "settings.booking"] },
   { key: "access", label: "Accounts & access", match: ["user.", "password.", "login", "logout"] },
-  { key: "data", label: "Data leaving", match: ["enquiry.export", "backup."] },
+  { key: "data", label: "Data & erasure", match: ["enquiry.export", "backup.", "gdpr."] },
   { key: "menu", label: "Menus & rooms", match: ["menu.", "room.", "gallery.", "stat."] },
   { key: "bookings", label: "Reservations", match: ["booking.", "blocked_date.", "enquiry."] },
 ];
@@ -29,7 +29,7 @@ function when(at: number): string {
 
 /** Entries nobody has to go looking for — they are emailed as they happen. */
 const LOUD = ["user.", "settings.", "voucher.cancel", "voucher.issue",
-  "backup.download", "enquiry.export", "login.locked"];
+  "backup.download", "enquiry.export", "gdpr.erase", "booking.refund", "login.locked"];
 const isLoud = (a: string) => LOUD.some((p) => a.startsWith(p));
 
 export default async function LogsPage({ searchParams }: {

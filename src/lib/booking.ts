@@ -8,6 +8,7 @@ import { bookingRules, depositFor, prettyTime, followUpRules, whatsappRules } fr
 import { slotStillAvailable } from "@/lib/availability";
 import { formatPence } from "@/lib/money";
 import { sendMail } from "@/lib/email";
+import { refundDeposit, refundedSoFar, stripeSimulated } from "@/lib/stripe";
 import { checkName, checkEmail, checkPhone } from "@/lib/validate";
 import { sendWhatsApp, toE164 } from "@/lib/whatsapp";
 import { issueThankYouVoucher, expiryLabel } from "@/lib/voucher";
@@ -212,6 +213,145 @@ export function cancelByToken(reference: string, token: string): { ok: boolean; 
   db.update(bookings).set({ status: "cancelled" }).where(eq(bookings.id, b.id)).run();
   void notifyCancelled(b);
   return { ok: true };
+}
+
+/* ---------------- refunds ---------------- */
+
+export type RefundOutcome =
+  | { ok: true; amountPence: number; simulated: boolean }
+  | { ok: false; error: string };
+
+/**
+ * Give a guest their deposit back, and tell both sides.
+ *
+ * There was no path for this. Cancelling a paid booking released the table,
+ * emailed the guest to say so, and left the money with Stripe — so either a
+ * manager opened the Stripe dashboard by hand, or the restaurant kept a
+ * deposit for a table it had cancelled itself.
+ *
+ * The awkward part is that the money lives at Stripe and the record lives
+ * here, and they can disagree. So the order is: ask Stripe what it has already
+ * refunded, refund the remainder there, and only mark the booking refunded
+ * once Stripe has said yes. A failure leaves the row untouched and the error
+ * on screen, which is recoverable; the other order would leave a booking
+ * marked refunded against money still sitting in the account.
+ */
+export async function refundBookingDeposit(opts: {
+  bookingId: number;
+  amountPence?: number;
+  by: string;
+}): Promise<RefundOutcome> {
+  const b = bookingById(opts.bookingId);
+  if (!b) return { ok: false, error: "That booking no longer exists." };
+  if (!b.depositPence || b.depositPence <= 0) {
+    return { ok: false, error: "No deposit was taken for this booking." };
+  }
+  if (b.depositStatus === "refunded") {
+    return { ok: false, error: "This deposit has already been refunded." };
+  }
+  if (b.depositStatus !== "captured") {
+    return { ok: false, error: `There is nothing to refund — the deposit is "${b.depositStatus}".` };
+  }
+
+  const want = opts.amountPence ?? b.depositPence;
+  if (want <= 0) return { ok: false, error: "Enter an amount greater than zero." };
+  if (want > b.depositPence) {
+    return { ok: false, error: `That is more than the ${formatPence(b.depositPence)} taken.` };
+  }
+
+  /* The simulator path. Without Stripe keys the whole booking journey runs on
+   * a built-in payment simulator, and a refund that threw here would make the
+   * demo dead-end at exactly the point someone wants to see. It moves the row
+   * and sends the emails, and says plainly that no money moved. */
+  if (stripeSimulated()) {
+    db.update(bookings).set({ depositStatus: "refunded" }).where(eq(bookings.id, b.id)).run();
+    void notifyRefunded(bookingById(b.id)!, want, true);
+    return { ok: true, amountPence: want, simulated: true };
+  }
+
+  if (!b.stripePaymentIntent) {
+    return {
+      ok: false,
+      error: "This booking has no Stripe payment on it, so there is nothing to refund automatically. " +
+        "If money was taken another way, refund it the same way.",
+    };
+  }
+
+  try {
+    const already = await refundedSoFar(b.stripePaymentIntent);
+    const left = b.depositPence - already;
+    if (left <= 0) {
+      db.update(bookings).set({ depositStatus: "refunded" }).where(eq(bookings.id, b.id)).run();
+      return { ok: false, error: "Stripe has already refunded this deposit in full. The booking now says so too." };
+    }
+    const amount = Math.min(want, left);
+
+    const refund = await refundDeposit({
+      paymentIntent: b.stripePaymentIntent,
+      amountPence: amount,
+      // Keyed on the intent AND the amount, so refunding the remainder of a
+      // partial refund is a new request rather than a replay of the first.
+      idempotencyKey: `refund:${b.stripePaymentIntent}:${amount}`,
+    });
+
+    if (refund.status === "failed" || refund.status === "canceled") {
+      return { ok: false, error: `Stripe refused the refund (${refund.failure_reason ?? refund.status}).` };
+    }
+
+    // Only now. A "pending" refund is on its way and will not bounce back.
+    const full = amount >= b.depositPence - already;
+    db.update(bookings).set({ depositStatus: full ? "refunded" : "captured" })
+      .where(eq(bookings.id, b.id)).run();
+
+    void notifyRefunded(bookingById(b.id)!, amount, false);
+    return { ok: true, amountPence: amount, simulated: false };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`[refund] booking ${b.reference} failed: ${message}`);
+    return { ok: false, error: `The refund did not go through: ${message}` };
+  }
+}
+
+/** Both sides, as with every other money event on a booking. */
+async function notifyRefunded(b: Booking, amountPence: number, simulated: boolean): Promise<void> {
+  const rules = bookingRules();
+  const branch = branchFor(b);
+  const note = simulated
+    ? "\n(No money has actually moved — this site is running the payment simulator.)\n"
+    : "";
+
+  if (b.email) {
+    await sendMail({
+      to: [b.email],
+      subject: `Your deposit has been refunded — ${b.reference}`,
+      replyTo: rules.notifications.replyTo,
+      fromName: rules.notifications.fromName,
+      fromEmail: rules.notifications.fromEmail,
+      text:
+`Dear ${b.guestName},
+
+We have refunded ${formatPence(amountPence)} to the card you booked with.
+
+${summary(b, branch)}
+
+Refunds usually appear on a statement within five to ten working days,
+depending on the bank. Nothing further is needed from you.
+${note}
+We are sorry not to be seeing you on this occasion, and hope to another time.
+
+With our regards,
+Varanasi ${branch?.city ?? ""}
+${branch?.addressLine ?? ""}, ${branch?.postcode ?? ""}`,
+    });
+  }
+
+  if (rules.notifications.to.length) {
+    await sendMail({
+      to: rules.notifications.to,
+      subject: `Deposit refunded — ${branch?.city ?? ""} — ${formatPence(amountPence)} — ${b.reference}`,
+      text: `${formatPence(amountPence)} refunded to the guest.\n\n${summary(b, branch)}${note}`,
+    });
+  }
 }
 
 /* ---------------- emails ---------------- */
@@ -455,6 +595,32 @@ export async function sendPostDiningFollowUp(bookingId: number): Promise<{ sent:
   if (b.followUpSentAt) return { sent: false, reason: "already sent" };
   if (b.status !== "completed") return { sent: false, reason: `status is ${b.status}, not completed` };
   if (!b.email && !b.phone) return { sent: false, reason: "no way to contact this guest" };
+
+  /* The guest has to have actually dined before we thank them for it — and,
+   * more to the point, before we hand them money.
+   *
+   * "Completed" is what staff mark a booking when they are tidying the day's
+   * list, including the ones that never happened. A table held for a deposit
+   * that was never paid sits there unpaid; mark it completed and this function
+   * minted a real gift voucher, emailed the code to someone who never came,
+   * and put a live balance on the restaurant's books. `expireStaleHolds()`
+   * eventually moves those to cancelled, but only after the hold window — and
+   * a member of staff clearing down at midnight beats it to the list.
+   *
+   * A deposit that was *required* must therefore have been paid. Everything
+   * else is allowed through: a phone booking or a walk-in carries no deposit
+   * at all ("none"), and those are the most ordinary completed bookings there
+   * are. A refunded deposit means the booking was cancelled and the money
+   * given back, and a failed one means it never went through.
+   */
+  if (["required", "failed", "refunded"].includes(b.depositStatus)) {
+    return {
+      sent: false,
+      reason: b.depositStatus === "required"
+        ? "the deposit for this table was never paid, so nothing is sent and no voucher is issued"
+        : `the deposit was ${b.depositStatus}`,
+    };
+  }
 
   const branch = branchFor(b);
   const site = (process.env.SITE_URL ?? "https://varanasi.uk").replace(/\/$/, "");

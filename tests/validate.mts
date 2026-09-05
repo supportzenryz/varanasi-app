@@ -29,10 +29,18 @@ fs.writeFileSync(path.join(dir, "money.ts"),
   fs.readFileSync(new URL("../src/lib/money.ts", here), "utf8"));
 const { parsePounds } = await import(path.join(dir, "money.ts"));
 
+/* The checkers are loaded dynamically from a rewritten copy, so TypeScript
+   sees `any` coming back and cannot narrow the discriminated union for us.
+   Two readers rather than a cast at every call site. */
+type Check = { ok: true; value: string } | { ok: false; error: string };
+type NumCheck = { ok: true; value: number } | { ok: false; error: string };
+const valueOf = (r: Check | NumCheck) => (r.ok ? r.value : undefined);
+const errorOf = (r: Check | NumCheck) => (r.ok ? "" : r.error);
+
 let pass = 0, fail = 0;
 const t = (name: string, ok: boolean, extra = "") => {
   console.log(`  ${ok ? "PASS" : "FAIL"}  ${name}${extra ? " — " + extra : ""}`);
-  ok ? pass++ : fail++;
+  if (ok) pass++; else fail++;
 };
 const accepts = (raw: string, why = "") => {
   const r = checkPhone(raw);
@@ -102,9 +110,9 @@ for (const [e, why] of [
   t(`rejects ${JSON.stringify(e)} (${why})`, !checkEmail(e).ok);
 }
 const typo = checkEmail("guest@gmial.com");
-t("catches gmial.com and suggests the fix", !typo.ok && /gmail\.com/.test((typo as any).error),
-  (typo as any).error);
-t("normalises case and padding", (checkEmail("  Guest@GMAIL.com ") as any).value === "guest@gmail.com");
+t("catches gmial.com and suggests the fix", !typo.ok && /gmail\.com/.test(errorOf(typo)),
+  errorOf(typo));
+t("normalises case and padding", valueOf(checkEmail("  Guest@GMAIL.com ")) === "guest@gmail.com");
 
 console.log("\n── Name ──");
 for (const n of ["Asha", "Jo Patel", "Seán Ó Briain", "Anne-Marie de la Cruz", "李小龍"]) {
@@ -115,7 +123,7 @@ for (const [n, why] of [["", "empty"], ["a", "one character"], ["...", "punctuat
   ["1", "a digit"], ["http://spam.example", "a URL"]] as [string, string][]) {
   t(`rejects ${JSON.stringify(n)} (${why})`, !checkName(n).ok);
 }
-t("collapses runaway whitespace", (checkName("  Jo    Patel ") as any).value === "Jo Patel");
+t("collapses runaway whitespace", valueOf(checkName("  Jo    Patel ")) === "Jo Patel");
 
 console.log("\n── Money typed by staff ──");
 for (const [input, expected, why] of [
@@ -147,7 +155,7 @@ for (const [input, why] of [
  */
 console.log("\n── Dates the admin will store ──");
 for (const good of ["2026-09-04", "2026-12-31", "2028-02-29"]) {
-  t(`accepts ${good}`, checkDate(good).ok, checkDate(good).ok ? "" : (checkDate(good) as any).error);
+  t(`accepts ${good}`, checkDate(good).ok, errorOf(checkDate(good)));
 }
 for (const [bad, why] of [
   ["banana", "not a date at all — used to be stored verbatim"],
@@ -163,7 +171,7 @@ for (const [bad, why] of [
 console.log("\n── Times ──");
 t("accepts 19:30", checkTime("19:30").ok);
 t("accepts 09:00", checkTime("09:00").ok);
-t("pads 9:00 to 09:00", (checkTime("9:00") as any).value === "09:00");
+t("pads 9:00 to 09:00", valueOf(checkTime("9:00")) === "09:00");
 for (const [bad, why] of [
   ["99:99", "used to be stored as a booking time"],
   ["24:00", "hours stop at 23"],
@@ -175,7 +183,7 @@ for (const [bad, why] of [
 }
 
 console.log("\n── Party sizes ──");
-t("accepts 2", (checkPartySize("2") as any).value === 2);
+t("accepts 2", valueOf(checkPartySize("2")) === 2);
 t("accepts 120 (a buyout)", checkPartySize("120").ok);
 for (const [bad, why] of [
   ["-5", "a negative party — used to be accepted"],

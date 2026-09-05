@@ -8,7 +8,8 @@ import { formatPence } from "@/lib/money";
 import { prettyTime } from "@/lib/booking-config";
 import { expireStaleHolds } from "@/lib/booking";
 import { AdminNotice } from "@/components/AdminNotice";
-import { addBooking, updateBookingStatus } from "./actions";
+import { ConfirmButton } from "@/components/ConfirmButton";
+import { addBooking, updateBookingStatus, refundBookingAction } from "./actions";
 
 export const metadata = { title: "Reservations" };
 
@@ -59,6 +60,7 @@ export default async function BookingsAdmin({
   const rooms = db.select().from(privateRooms).where(eq(privateRooms.branchId, active.id)).all();
   const roomName = new Map(rooms.map((r) => [r.id, r.name]));
   const editable = can(session, "editBookings");
+  const canRefund = can(session, "refundDeposit");
 
   const partyTotal = rows.reduce((sum, r) =>
     ["cancelled", "no_show"].includes(r.status) ? sum : sum + r.partySize, 0);
@@ -175,6 +177,32 @@ export default async function BookingsAdmin({
                           </button>
                         ))}
                     </form>
+
+                    {/* Refunding used to mean opening the Stripe dashboard, so
+                        in practice a cancelled table's deposit often just
+                        stayed with the restaurant. Shown only where there is
+                        actually money to give back. */}
+                    {canRefund && r.depositStatus === "captured" && r.depositPence ? (
+                      <details className="mt-2">
+                        <summary className="text-[0.7rem] text-brick cursor-pointer hover:underline">
+                          Refund {formatPence(r.depositPence)}
+                        </summary>
+                        <form action={refundBookingAction} className="mt-2 flex flex-wrap items-center gap-1.5">
+                          <input type="hidden" name="id" value={r.id} />
+                          <input name="amount" inputMode="decimal" placeholder="all of it"
+                            aria-label={`Amount to refund for ${r.reference}`}
+                            className="w-24 border border-[--line] bg-white px-2 py-1 text-[0.7rem]" />
+                          <ConfirmButton
+                            ask={`Refund this deposit to ${r.guestName}? The money leaves the account and they are emailed. This cannot be undone from here.`}
+                            className="text-[0.7rem] border border-brick/40 text-brick px-2 py-1 hover:bg-clay/10">
+                            Refund
+                          </ConfirmButton>
+                          <span className="block basis-full text-[0.62rem] text-ink-3">
+                            Leave the box empty for the whole {formatPence(r.depositPence)}.
+                          </span>
+                        </form>
+                      </details>
+                    ) : null}
                   </td>
                 )}
               </tr>

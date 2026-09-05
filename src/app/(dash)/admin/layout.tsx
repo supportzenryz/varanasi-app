@@ -22,6 +22,7 @@ const NAV = [
   { href: "/admin/staff", label: "Staff access", ability: "manageStaff", ready: true },
   { href: "/admin/settings", label: "Settings", ability: "editSettings", ready: true },
   { href: "/admin/logs", label: "Activity log", ability: "viewAuditLog", ready: true },
+  { href: "/admin/erasure", label: "Erasure requests", ability: "erasePersonalData", ready: true },
   { href: "/admin/backups", label: "Backups", ability: "manageBackups", ready: true },
 ] as const;
 

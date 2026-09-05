@@ -1016,6 +1016,191 @@ console.log('\n── 6e. Admin forms answer back ──');
   }
 }
 
+console.log('\n── 6f. A voucher is not minted for a table nobody paid for ──');
+
+{
+  /* "Completed" is what staff mark a booking when clearing down the day's
+     list, including the ones that never happened. A table held for a deposit
+     that was never paid used to mint a real gift voucher on that click, email
+     the code to someone who never came, and put a live balance on the books. */
+  const ref = `VB-E2E${String(stamp).slice(-6)}`;
+  execFileSync('python3', ['-c', `
+import sqlite3
+db = sqlite3.connect('data/varanasi.db')
+b = db.execute("select id from branches where slug='birmingham'").fetchone()[0]
+db.execute("insert into bookings (reference,branch_id,guest_name,email,party_size,date,time,"
+           "status,deposit_pence,deposit_status,source) values (?,?,?,?,?,?,?,?,?,?,?)",
+           ('${ref}', b, 'E2E Unpaid Hold', 'e2e.unpaid.${stamp}@zenryz-test.com', 2,
+            '${new Date().toISOString().slice(0, 10)}', '19:00', 'held', 2000, 'required', 'website'))
+db.commit()
+`]);
+
+  const before = q(`select count(*) as n from vouchers where origin='thank_you'`)[0].n;
+  const id = q(`select id from bookings where reference='${ref}'`)[0].id;
+
+  await page.goto(`${BASE}/admin/bookings?branch=birmingham`, { waitUntil: 'networkidle' });
+  const row = page.locator(`tr:has-text("${ref}")`);
+  t('The unpaid hold is on the list', await row.count() > 0, `${await row.count()} row(s)`);
+  await row.locator('button', { hasText: /^Completed$/ }).first().click();
+  await settled();
+
+  const banner = await page.locator('main').innerText();
+  const after = q(`select count(*) as n from vouchers where origin='thank_you'`)[0].n;
+  t('Marking an unpaid hold "completed" mints no voucher', after === before, `${before} → ${after}`);
+  t('  · and the screen says why', /deposit for this table was never paid/i.test(banner),
+    banner.slice(0, 140).replace(/\n/g, ' | '));
+  t('  · no thank-you voucher is attached to it',
+    q(`select id from vouchers where booking_id=${id}`).length === 0);
+}
+
+console.log('\n── 6g. Refunding a deposit ──');
+
+{
+  const ref = `VB-E2R${String(stamp).slice(-6)}`;
+  execFileSync('python3', ['-c', `
+import sqlite3
+db = sqlite3.connect('data/varanasi.db')
+b = db.execute("select id from branches where slug='birmingham'").fetchone()[0]
+db.execute("insert into bookings (reference,branch_id,guest_name,email,party_size,date,time,"
+           "status,deposit_pence,deposit_status,source) values (?,?,?,?,?,?,?,?,?,?,?)",
+           ('${ref}', b, 'E2E Refund Me', 'e2e.refund.${stamp}@zenryz-test.com', 4,
+            '${new Date().toISOString().slice(0, 10)}', '20:00', 'cancelled', 4000, 'captured', 'website'))
+db.commit()
+`]);
+
+  const t0 = Date.now();
+  await page.goto(`${BASE}/admin/bookings?branch=birmingham`, { waitUntil: 'networkidle' });
+  const row = page.locator(`tr:has-text("${ref}")`);
+  t('A paid, cancelled booking offers a refund', await row.locator('summary', { hasText: /Refund/ }).count() > 0);
+
+  // A partial refund of more than was taken must be refused, not attempted.
+  await row.locator('summary', { hasText: /Refund/ }).first().click();
+  await row.locator('input[name="amount"]').fill('500');
+  page.once('dialog', d => d.accept());
+  await row.locator('button', { hasText: /^Refund$/ }).click();
+  await settled();
+  t('Refunding more than was taken is refused',
+    /more than the £40 taken/i.test(await page.locator('main').innerText()),
+    (await page.locator('main').innerText()).slice(0, 120).replace(/\n/g, ' | '));
+  t('  · and nothing changed',
+    q(`select deposit_status as s from bookings where reference='${ref}'`)[0].s === 'captured');
+
+  // Then the real thing.
+  await page.goto(`${BASE}/admin/bookings?branch=birmingham`, { waitUntil: 'networkidle' });
+  const row2 = page.locator(`tr:has-text("${ref}")`);
+  await row2.locator('summary', { hasText: /Refund/ }).first().click();
+  page.once('dialog', d => d.accept());
+  await row2.locator('button', { hasText: /^Refund$/ }).click();
+  await settled();
+
+  const text = await page.locator('main').innerText();
+  t('A full refund is confirmed on screen', /£40 refunded to the guest/i.test(text),
+    text.slice(0, 140).replace(/\n/g, ' | '));
+  t('  · the booking records it', 
+    q(`select deposit_status as s from bookings where reference='${ref}'`)[0].s === 'refunded');
+  t('  · the guest is emailed', mailSince(t0).some(m => /deposit has been refunded/i.test(m)));
+  t('  · and so is the restaurant', mailSince(t0).some(m => /Deposit refunded —/i.test(m)));
+  t('  · it is in the audit log',
+    q(`select id from audit_log where action='booking.refund'`).length > 0);
+
+  // Twice is refused.
+  await page.goto(`${BASE}/admin/bookings?branch=birmingham`, { waitUntil: 'networkidle' });
+  t('A refunded deposit offers no second refund button',
+    await page.locator(`tr:has-text("${ref}")`).locator('summary', { hasText: /Refund/ }).count() === 0);
+}
+
+console.log('\n── 6h. Erasure: answering a GDPR request ──');
+
+{
+  const personEmail = `e2e.erase.${stamp}@zenryz-test.com`;
+  execFileSync('python3', ['-c', `
+import sqlite3, time
+db = sqlite3.connect('data/varanasi.db')
+b = db.execute("select id from branches where slug='birmingham'").fetchone()[0]
+now = int(time.time())
+db.execute("insert into enquiries (branch_id,type,name,email,phone,dietary,message,status,created_at)"
+           " values (?,?,?,?,?,?,?,?,?)",
+           (b,'contact','E2E Erase Me','${personEmail}','07700900321','nuts,dairy',
+            'Please note a severe nut allergy.','new',now))
+db.execute("insert into bookings (reference,branch_id,guest_name,email,phone,party_size,date,time,"
+           "status,deposit_status,source,cancel_token) values (?,?,?,?,?,?,?,?,?,?,?,?)",
+           ('VB-E2ERAS', b, 'E2E Erase Me', '${personEmail}', '07700900321', 2,
+            '2026-01-15','19:00','completed','none','website','tok123'))
+db.commit()
+`]);
+
+  await page.goto(`${BASE}/admin/erasure?q=${encodeURIComponent(personEmail)}`, { waitUntil: 'networkidle' });
+  let text = await page.locator('main').innerText();
+  t('Searching by email finds everything held about them',
+    text.includes('E2E Erase Me') && text.includes('VB-E2ERAS'));
+
+  // A live voucher blocks erasure — that is money owed to whoever holds the code.
+  execFileSync('python3', ['-c', `
+import sqlite3, time
+db = sqlite3.connect('data/varanasi.db')
+now = int(time.time())
+db.execute("insert into vouchers (code,value_pence,balance_pence,status,recipient_name,"
+           "recipient_email,origin,issued_at) values (?,?,?,?,?,?,?,?)",
+           ('VG-E2ERAS', 5000, 5000, 'active', 'E2E Erase Me', '${personEmail}', 'manual', now))
+db.commit()
+`]);
+  await page.goto(`${BASE}/admin/erasure?q=${encodeURIComponent(personEmail)}`, { waitUntil: 'networkidle' });
+  text = await page.locator('main').innerText();
+  t('A live gift voucher blocks erasure', /can.t be erased yet/i.test(text));
+  t('  · and names the code and the amount',
+    text.includes('VG-E2ERAS') && text.includes('£50'));
+  t('  · with no erase button offered', await page.locator('button', { hasText: /Erase permanently/ }).count() === 0);
+
+  // Spend it down, and erasure becomes possible.
+  execFileSync('python3', ['-c', `
+import sqlite3
+db = sqlite3.connect('data/varanasi.db')
+db.execute("update vouchers set balance_pence=0, status='redeemed' where code='VG-E2ERAS'")
+db.commit()
+`]);
+  await page.goto(`${BASE}/admin/erasure?q=${encodeURIComponent(personEmail)}`, { waitUntil: 'networkidle' });
+  t('Once the voucher is spent, erasure is offered',
+    await page.locator('button', { hasText: /Erase permanently/ }).count() === 1);
+
+  // Typing the wrong confirmation must not erase anything.
+  await page.fill('#confirm', 'something else');
+  page.once('dialog', d => d.accept());
+  await page.locator('button', { hasText: /Erase permanently/ }).click();
+  await settled();
+  t('A mistyped confirmation erases nothing',
+    /type the same email address/i.test(await page.locator('main').innerText()));
+  t('  · the records are untouched',
+    q(`select name from enquiries where email='${personEmail}'`).length === 1);
+
+  const t0 = Date.now();
+  await page.goto(`${BASE}/admin/erasure?q=${encodeURIComponent(personEmail)}`, { waitUntil: 'networkidle' });
+  await page.fill('#confirm', personEmail);
+  page.once('dialog', d => d.accept());
+  await page.locator('button', { hasText: /Erase permanently/ }).click();
+  await settled();
+  t('Erasing says what was done', /anonymised/i.test(await page.locator('main').innerText()));
+
+  const enq = q(`select name, email, phone, dietary, message from enquiries where id = (select max(id) from enquiries where name like '%erased%')`);
+  t('The enquiry keeps its row but loses the person',
+    q(`select id from enquiries where email='${personEmail}'`).length === 0);
+  t('  · including the allergy note, which is health data',
+    enq.length === 1 && enq[0].dietary === null && enq[0].message === null,
+    JSON.stringify(enq[0] ?? {}));
+  const bk = q(`select guest_name, email, phone, cancel_token from bookings where reference='VB-E2ERAS'`)[0];
+  t('The booking survives as a trading record', Boolean(bk));
+  t('  · with the guest removed', bk.email === null && bk.phone === null && /erased/i.test(bk.guest_name));
+  t('  · and their self-service link revoked', bk.cancel_token === null);
+  const v = q(`select recipient_name, recipient_email from vouchers where code='VG-E2ERAS'`)[0];
+  t('The spent voucher keeps its code but loses the names',
+    v.recipient_name === null && v.recipient_email === null);
+
+  t('The erasure is in the audit log', q(`select id from audit_log where action='gdpr.erase'`).length > 0);
+  t('  · without storing the address it erased',
+    q(`select entity_id, detail from audit_log where action='gdpr.erase' order by id desc limit 1`)
+      .every(r => !String(r.entity_id).includes('@') && !String(r.detail).includes('@')));
+  t('  · and the owner is emailed about it', mailSince(t0).some(m => /gdpr\.erase/i.test(m)));
+}
+
 console.log('\n── 7. Responsiveness ──');
 
 for (const [label, w, h] of [['mobile 375', 375, 812], ['tablet 768', 768, 1024], ['desktop 1440', 1440, 900]]) {
@@ -1056,7 +1241,12 @@ db.execute("delete from menu_items where name like 'E2E Dish %' or name like 'E2
 db.execute("delete from menu_categories where name like 'E2E Section %'")
 db.execute("delete from enquiries where email like 'e2e.%@zenryz-test.com'")
 db.execute("delete from users where email like 'e2e.%@zenryz-test.com'")
-db.execute("delete from bookings where guest_name like 'E2E Guest %'")
+db.execute("delete from bookings where guest_name like 'E2E Guest %' or guest_name like 'E2E Unpaid%' or guest_name like 'E2E Refund%' or reference='VB-E2ERAS'")
+db.execute("delete from vouchers where code='VG-E2ERAS' or recipient_name like 'E2E %'")
+db.execute("delete from enquiries where name like 'E2E Erase%'")
+# the erased one no longer carries its name, so bound it by this run's window
+db.execute("delete from enquiries where name like '%erased at the person%' and created_at > ${Math.floor(stamp / 1000) - 60}")
+db.execute("delete from audit_log where action in ('gdpr.erase','booking.refund')")
 db.execute("delete from audit_log where action like 'login.%' and entity_id like 'e2e.%'")
 db.execute("delete from audit_log where action in ('menu.category.create','enquiry.export') and detail like '%E2E%'")
 db.commit()

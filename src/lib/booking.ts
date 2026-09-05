@@ -695,3 +695,41 @@ ${branch?.addressLine ?? ""}, ${branch?.postcode ?? ""}`,
 
   return { sent: true };
 }
+
+/**
+ * A guest has come back from Stripe and we cannot read the payment result.
+ *
+ * Nobody used to be told. The page apologised, the guest went away, and if
+ * they had in fact been charged the first anyone knew was when they turned up
+ * to a table that had never been booked. This is the one failure in the whole
+ * flow where the restaurant, not the guest, has to act — so it goes to the
+ * restaurant with everything needed to look it up in Stripe by hand.
+ */
+export async function notifyVerificationFailed(
+  b: Booking, sessionId: string, detail: string,
+): Promise<void> {
+  const rules = bookingRules();
+  if (!rules.notifications.to.length) return;
+  const branch = branchFor(b);
+  await sendMail({
+    to: rules.notifications.to,
+    subject: `ACTION NEEDED — payment could not be verified — ${b.reference}`,
+    text:
+`A guest finished paying on Stripe and came back to the site, but the site
+could not read the payment result. They may well have been charged.
+
+${summary(b, branch)}
+
+Stripe session: ${sessionId}
+What went wrong: ${detail}
+
+WHAT TO DO
+  1. Open that session id in the Stripe dashboard and see whether it is paid.
+  2. If it is, the guest has paid and the table is not booked. Add the booking
+     by hand from Admin -> Reservations, and ring them.
+  3. If it is not, no money was taken and no table is held.
+
+The guest has been asked not to pay again and to ring with reference
+${b.reference}.`,
+  });
+}

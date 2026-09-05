@@ -6,6 +6,7 @@ import { prettyTime } from "@/lib/booking-config";
 import { formatPence } from "@/lib/money";
 import {
   bookingByReference, confirmPaidBooking, dateLabel, markPaymentFailed, notifyPaymentFailed,
+  notifyVerificationFailed,
 } from "@/lib/booking";
 import { retrieveSession, stripeSimulated } from "@/lib/stripe";
 import { PageHero } from "@/components/PageHero";
@@ -63,8 +64,24 @@ export default async function Confirmed({
           problem = "Your payment is still being processed. We'll email you the moment it clears — you don't need to do anything.";
         }
       } catch (err) {
-        console.error("[booking] could not verify the payment session:", err);
-        problem = "We couldn't verify your payment just now. If you were charged, your confirmation email will follow shortly.";
+        /* The guest has just come back from Stripe's own payment page, so the
+         * likeliest reading of an error here is that they HAVE been charged
+         * and we cannot see it. Three things follow from that, none of which
+         * used to happen:
+         *
+         *  - the restaurant is told, because otherwise nobody finds out until
+         *    the guest arrives at a table that was never booked;
+         *  - the reason is logged in full, since "could not verify" on its own
+         *    is not something anyone can act on at 10pm on a Saturday;
+         *  - the guest is not told to "try again", which on a card that has
+         *    already been charged is the worst advice available.
+         */
+        const detail = err instanceof Error ? err.message : String(err);
+        console.error(
+          `[booking] ${booking.reference}: could not verify Stripe session ${sessionId} — ${detail}`,
+        );
+        void notifyVerificationFailed(booking, sessionId, detail);
+        problem = "verify";
       }
     }
   }
@@ -74,24 +91,42 @@ export default async function Confirmed({
 
   /* ---------- payment didn't land ---------- */
   if (!paid) {
+    /* "We couldn't check" and "you weren't charged" are opposite situations
+       for the guest and used to share a page. Someone whose card has been
+       debited must not be shown a "Try again" button. */
+    const unverified = problem === "verify";
     return (
       <>
         <PageHero image={branch.heroImage} kicker="Reservations"
-          heading="Your booking isn't confirmed yet" />
+          heading={unverified ? "We're checking your payment" : "Your booking isn't confirmed yet"} />
         <section className="bg-ink">
           <div className="mx-auto max-w-[46rem] px-5 lg:px-10 py-14 sm:py-20">
-            <p className="border-l-2 border-gold bg-gold/10 px-4 py-3 text-sm">
-              {problem ?? "We haven't received your deposit, so no table is being held."}
+            <p role="alert" className="border-l-2 border-gold bg-gold/10 px-4 py-3 text-sm">
+              {unverified
+                ? "Your payment went to Stripe, but we couldn't read the result just now. If you were charged, the table is yours — we've alerted the restaurant and your confirmation will follow."
+                : problem ?? "We haven't received your deposit, so no table is being held."}
             </p>
+
+            {/* Something to quote down the telephone. Without it a guest ringing
+                about a payment has nothing to identify it by. */}
+            <dl className="mt-7 border border-[--line] bg-ink-2 px-5 py-4 text-sm grid gap-2 sm:grid-cols-2">
+              <div><dt className="text-pale/50">Reference</dt>
+                <dd className="tnum font-semibold">{current.reference}</dd></div>
+              <div><dt className="text-pale/50">Table requested</dt>
+                <dd>{dateLabel(current.date)} at {prettyTime(current.time)}, {current.partySize}{" "}
+                  {current.partySize === 1 ? "guest" : "guests"}</dd></div>
+            </dl>
+
             <p className="mt-6 text-pale/70">
-              Nothing further is needed from you if your payment is still processing. Otherwise, you&rsquo;re
-              welcome to try again, or call us and we&rsquo;ll book you in ourselves.
+              {unverified
+                ? "Please don't pay again. Ring us with the reference above and we'll confirm it in a moment."
+                : "Nothing further is needed from you if your payment is still processing. Otherwise, you're welcome to try again, or call us and we'll book you in ourselves."}
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
-              <Link href={`/${branch.slug}/book-online`} className="btn btn-ink">Try again</Link>
-              <a href={telHref(branch.phone)} className="btn btn-outline">
-                Call {branch.phone}
-              </a>
+              <a href={telHref(branch.phone)} className="btn btn-gold">Call {branch.phone}</a>
+              {!unverified && (
+                <Link href={`/${branch.slug}/book-online`} className="btn btn-outline">Try again</Link>
+              )}
             </div>
           </div>
         </section>

@@ -476,6 +476,73 @@ if (cxlBk) {
   }
 }
 
+console.log('\n── 3d. A booking that is actually paid for ──');
+
+{
+  /* The suite covered a payment that failed and a guest who cancelled, and
+     never once walked a booking through to a confirmed table. The most
+     important journey on the site — the one that takes the money — had no
+     test at all, which is how "it fails after paying" reaches the client
+     rather than the build. */
+  const payEmail = `e2e.paid.${stamp}@zenryz-test.com`;
+  const t0 = Date.now();
+  const when = new Date(Date.now() + 6 * 864e5).toISOString().slice(0, 10);
+
+  await page.goto(`${BASE}/birmingham/book-online?guests=2&date=${when}`, { waitUntil: 'networkidle' });
+  await page.locator('a[href*="&time="]').first().click();
+  await page.waitForLoadState('networkidle');
+  await page.fill('input[name="name"]', 'E2E Paid Guest');
+  await page.fill('input[name="email"]', payEmail);
+  await page.fill('input[name="phone"]', '07700900456');
+  for (const cb of await page.locator('input[type="checkbox"][required]').all()) await cb.check();
+  await page.locator('form button[type="submit"], form button:not([type])').last().click();
+
+  /* waitForURL, not networkidle: a server action's redirect is still in
+     flight when networkidle resolves, and the check then runs against the
+     page it was leaving. */
+  await page.waitForURL(/checkout-simulator|confirmed/, { timeout: 20000 }).catch(() => {});
+  t('Submitting the details sends the guest to pay', /checkout-simulator|checkout\.stripe/.test(page.url()),
+    page.url().replace(BASE, ''));
+
+  await page.locator('a,button', { hasText: /^Pay £/ }).first().click();
+  await page.waitForURL(/confirmed/, { timeout: 20000 }).catch(() => {});
+  t('Paying lands the guest on the confirmation page', page.url().includes('/confirmed'),
+    page.url().replace(BASE, ''));
+
+  const heading = await page.locator('h1').first().innerText();
+  t('  · and it says the table is confirmed', /table is confirmed/i.test(heading), heading);
+
+  const paid = q(`select reference, status, deposit_status, deposit_paid_at from bookings where email='${payEmail}'`);
+  t('The booking is confirmed in the database', paid.length === 1 && paid[0].status === 'confirmed',
+    JSON.stringify(paid[0] ?? {}));
+  t('  · the deposit is recorded as captured', paid[0]?.deposit_status === 'captured', paid[0]?.deposit_status);
+  t('  · with the time it was paid', Boolean(paid[0]?.deposit_paid_at));
+
+  const ref = paid[0]?.reference;
+  t('  · and the reference is on screen for the guest to quote',
+    (await page.locator('main').innerText()).includes(ref), ref);
+
+  /* Both sides, as with every other outcome. "No email" was the other half of
+     what the client reported, and nothing here was watching for it. */
+  await new Promise((r) => setTimeout(r, 1200));
+  const sent = mailSince(t0);
+  t('The guest is emailed their confirmation',
+    sent.some((m) => /is confirmed/i.test(m) && m.includes(payEmail)),
+    `${sent.length} message(s) since`);
+  t('The restaurant is told a table has been booked',
+    sent.some((m) => /New booking/i.test(m)));
+
+  /* Coming back to the same URL must not take a second deposit or send a
+     second email — a guest refreshing the page is not a second booking. */
+  const before = mailSince(t0).length;
+  await page.reload({ waitUntil: 'networkidle' });
+  await new Promise((r) => setTimeout(r, 800));
+  t('Refreshing the confirmation page changes nothing', mailSince(t0).length === before,
+    `${before} → ${mailSince(t0).length}`);
+  t('  · and the booking is still exactly one row',
+    q(`select id from bookings where email='${payEmail}'`).length === 1);
+}
+
 console.log('\n── 4. Admin: sign in ──');
 
 await page.goto(`${BASE}/admin/login`, { waitUntil: 'networkidle' });
@@ -1395,7 +1462,7 @@ db.execute("delete from menu_items where name like 'E2E Dish %' or name like 'E2
 db.execute("delete from menu_categories where name like 'E2E Section %'")
 db.execute("delete from enquiries where email like 'e2e.%@zenryz-test.com'")
 db.execute("delete from users where email like 'e2e.%@zenryz-test.com'")
-db.execute("delete from bookings where guest_name like 'E2E Guest %' or guest_name like 'E2E Unpaid%' or guest_name like 'E2E Refund%' or reference like 'VB-E2E%R'")
+db.execute("delete from bookings where guest_name like 'E2E Guest %' or guest_name like 'E2E Unpaid%' or guest_name like 'E2E Refund%' or guest_name like 'E2E Paid%' or reference like 'VB-E2E%R'")
 db.execute("delete from vouchers where code like 'VG-E2E%R' or recipient_name like 'E2E %'")
 db.execute("delete from enquiries where name like 'E2E Erase%'")
 # the erased one no longer carries its name, so bound it by this run's window

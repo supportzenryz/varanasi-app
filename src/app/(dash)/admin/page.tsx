@@ -1,24 +1,37 @@
 import Link from "next/link";
-import { and, eq, gte, inArray, sql } from "drizzle-orm";
+import { and, eq, gte, inArray, isNull, or, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { branches, enquiries, menuItems, menuCategories, privateRooms, vouchers, blockedDates, bookings } from "@/db/schema";
-import { requirePasswordChanged } from "@/lib/auth";
+import { enquiries, menuItems, menuCategories, privateRooms, vouchers, blockedDates, bookings } from "@/db/schema";
+import { requirePasswordChanged, visibleBranchIds, hasNoBranch } from "@/lib/auth";
 import { formatPence } from "@/lib/money";
 
 export const metadata = { title: "Overview" };
 
-export default async function AdminHome() {
+export default async function AdminHome({
+  searchParams,
+}: { searchParams: Promise<{ denied?: string }> }) {
+  const { denied } = await searchParams;
   const session = await requirePasswordChanged();
-  const scoped = session.role !== "owner" && session.branchId != null;
-  const branchIds = scoped
-    ? [session.branchId!]
-    : db.select({ id: branches.id }).from(branches).all().map((b) => b.id);
+  const branchIds = visibleBranchIds(session);
+  const scoped = session.role !== "owner";
+  const noBranch = hasNoBranch(session);
 
   const newEnquiries = db.select({ n: sql<number>`count(*)` }).from(enquiries)
     .where(and(eq(enquiries.status, "new"), inArray(enquiries.branchId, branchIds))).get()?.n ?? 0;
 
+  /* Scoped like every other tile beside it. This one was company-wide for
+     every role, so a Birmingham manager read the group's total voucher
+     liability from a grid where everything else was their own branch.
+     Vouchers valid at either restaurant count for both, which is what
+     `branchId is null` is. */
   const outstanding = db.select({ n: sql<number>`count(*)`, v: sql<number>`coalesce(sum(balance_pence),0)` })
-    .from(vouchers).where(inArray(vouchers.status, ["active"])).get();
+    .from(vouchers)
+    .where(and(
+      inArray(vouchers.status, ["active"]),
+      scoped
+        ? or(inArray(vouchers.branchId, branchIds), isNull(vouchers.branchId))
+        : sql`1 = 1`,
+    )).get();
 
   const countItems = (kinds: ("food" | "set" | "drinks")[]) =>
     db.select({ n: sql<number>`count(*)` }).from(menuItems)
@@ -66,8 +79,46 @@ export default async function AdminHome() {
       <p className="text-ink-3 mt-2 max-w-[52ch]">
         {session.role === "owner"
           ? "You're seeing both branches. Managers only see their own."
-          : "You're seeing your own branch."}
+          : noBranch
+            ? "Your account isn't attached to a restaurant yet."
+            : "You're seeing your own branch."}
       </p>
+
+      {/* A non-owner with no branch is a misconfigured account, not a
+          restricted one. It used to be invisible: the tiles read zero, every
+          list came back empty, and the page said "you're seeing your own
+          branch" — so the manager concluded the restaurant had no bookings
+          rather than that nobody had assigned them one. Say it plainly. */}
+      {/* requireAbility() sends people here when they open something their role
+          can't do. It has always appended ?denied=1 and nothing has ever read
+          it, so the screen a member of staff got after clicking "Staff" was the
+          overview, unchanged, with no explanation — indistinguishable from the
+          link being broken. */}
+      {denied && (
+        <section role="alert" className="mt-8 border-l-2 border-brick bg-brick/8 px-5 py-4">
+          <h2 className="text-lg">
+            {denied === "branch"
+              ? "That belongs to the other restaurant"
+              : "That screen isn\u2019t open to your account"}
+          </h2>
+          <p className="text-sm text-ink-3 mt-1.5 max-w-[62ch]">
+            {denied === "branch"
+              ? "Managers and staff only see their own restaurant\u2019s bookings, menus, rooms and vouchers. Nothing was changed."
+              : "You were brought back here because your role doesn\u2019t have access to the page you asked for. If you think it should, ask the owner to check your role on the Staff screen."}
+          </p>
+        </section>
+      )}
+
+      {noBranch && (
+        <section className="mt-8 border-l-2 border-clay bg-clay/8 px-5 py-4">
+          <h2 className="text-lg">This account has no restaurant assigned</h2>
+          <p className="text-sm text-ink-3 mt-1.5 max-w-[62ch]">
+            Nothing below will show any figures until an owner sets your branch to
+            Birmingham or Leicester on the Staff screen. The zeros here mean
+            &ldquo;not assigned&rdquo;, not &ldquo;nothing booked&rdquo;.
+          </p>
+        </section>
+      )}
 
       <div className="mt-9 grid gap-px bg-[--line] sm:grid-cols-2 lg:grid-cols-4 border border-[--line]">
         {stats.map((s) => {

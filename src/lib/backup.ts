@@ -60,6 +60,14 @@ export function listBackups(): BackupFile[] {
     .sort((a, b) => b.at.getTime() - a.at.getTime());
 }
 
+/** Whether the newest backup is old enough to be worth a warning on screen.
+ *  Lives here rather than in the page because reading the clock during render
+ *  is not something a server component may do. */
+export function backupsAreStale(hours = 36): boolean {
+  const [newest] = listBackups();
+  return !newest || Date.now() - newest.at.getTime() > hours * 3600_000;
+}
+
 export type BackupResult =
   | { ok: true; file: string; bytes: number; pruned: number }
   | { ok: false; error: string };
@@ -167,10 +175,21 @@ export function startBackupSchedule(): void {
       // Never let this take the timer down — the backup half must keep running.
       console.error("[scheduler] voucher pass failed:", err instanceof Error ? err.message : err);
     }
+
+    /* The daily summary of everything staff changed. Checked hourly, sent when
+     * the interval has elapsed and there is something to say, so a container
+     * that restarts during the night still produces one report a day rather
+     * than none or three. */
+    try {
+      const { sendAuditDigest } = await import("@/lib/audit");
+      await sendAuditDigest();
+    } catch (err) {
+      console.error("[scheduler] audit digest failed:", err instanceof Error ? err.message : err);
+    }
   };
 
   setTimeout(tick, 30_000).unref?.();      // let the server finish booting first
   setInterval(tick, 3600_000).unref?.();   // then every hour
   console.log(`[backup] daily backups on, keeping ${KEEP}, in ${backupDir()}`);
-  console.log("[scheduler] hourly: due gift vouchers, expiries");
+  console.log("[scheduler] hourly: due gift vouchers, expiries, owner activity summary");
 }

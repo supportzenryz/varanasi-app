@@ -7,6 +7,7 @@ import { requireAbility, can } from "@/lib/auth";
 import { formatPence } from "@/lib/money";
 import { prettyTime } from "@/lib/booking-config";
 import { expireStaleHolds } from "@/lib/booking";
+import { AdminNotice } from "@/components/AdminNotice";
 import { addBooking, updateBookingStatus } from "./actions";
 
 export const metadata = { title: "Reservations" };
@@ -33,9 +34,9 @@ function todayISO() {
 
 export default async function BookingsAdmin({
   searchParams,
-}: { searchParams: Promise<{ branch?: string; date?: string; view?: string }> }) {
+}: { searchParams: Promise<{ branch?: string; date?: string; view?: string; saved?: string; problem?: string }> }) {
   const session = await requireAbility("viewBookings");
-  const { branch: branchParam, date: dateParam, view } = await searchParams;
+  const { branch: branchParam, date: dateParam, view, saved, problem } = await searchParams;
   const showUpcoming = view === "upcoming";
 
   // Unpaid holds shouldn't sit in the list looking like real bookings.
@@ -64,6 +65,7 @@ export default async function BookingsAdmin({
 
   return (
     <>
+      <AdminNotice saved={saved} problem={problem} />
       <span className="accent text-xs text-gold-ink">Reservations</span>
       <h1 className="text-3xl sm:text-4xl mt-3">{active.city}&rsquo;s bookings</h1>
       <p className="text-ink-3 mt-2 max-w-[62ch]">

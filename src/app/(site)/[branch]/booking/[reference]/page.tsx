@@ -84,7 +84,7 @@ export default async function ManageBooking({
               <p className="mt-2 text-sm text-pale/70 max-w-[52ch]">
                 To move your booking, please call us on{" "}
                 <a href={telHref(branch.phone)} className="underline hover:text-gold">{branch.phone}</a>{" "}
-                with at least 24 hours' notice and we'll find you another time — your deposit moves with it.
+                with at least 24 hours&rsquo; notice and we&rsquo;ll find you another time — your deposit moves with it.
               </p>
               {/* Two steps, because one tap used to do it. Cancelling forfeits a
                   paid deposit and there is no undo, so an accidental touch on a

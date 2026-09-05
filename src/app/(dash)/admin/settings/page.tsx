@@ -6,6 +6,7 @@ import { bookingRules, prettyTime } from "@/lib/booking-config";
 import { stripeConfigured } from "@/lib/stripe";
 import { mailMode } from "@/lib/email";
 import { saveBookingRules } from "./actions";
+import { AdminNotice } from "@/components/AdminNotice";
 
 export const metadata = { title: "Settings" };
 
@@ -16,9 +17,9 @@ const pounds = (p: number) => (p / 100).toFixed(2).replace(/\.00$/, "");
 export default async function SettingsAdmin({
   searchParams,
 }: {
-  searchParams: Promise<{ saved?: string }>;
+  searchParams: Promise<{ saved?: string; problem?: string }>;
 }) {
-  const saved = (await searchParams).saved === "1";
+  const { saved, problem } = await searchParams;
   await requireAbility("editSettings");
   const rules = bookingRules();
   const all = db.select().from(branches).orderBy(asc(branches.sort)).all();
@@ -67,15 +68,7 @@ export default async function SettingsAdmin({
         </div>
       </div>
 
-      {saved && (
-
-        <p role="status" className="mb-6 border-l-2 border-gold bg-gold/10 px-4 py-3 text-sm">
-
-          Saved. Your changes are live on the website now.
-
-        </p>
-
-      )}
+      <AdminNotice saved={saved} problem={problem} />
 
       <form action={saveBookingRules} className="mt-10 grid gap-10">
         {/* deposits */}
@@ -231,7 +224,7 @@ export default async function SettingsAdmin({
               <input id="replyTo" name="replyTo" type="email"
                 defaultValue={rules.notifications.replyTo} className={field} />
               <span className="block text-xs text-ink-3 mt-1">
-                Where a guest's reply lands. Can be a normal mailbox.
+                Where a guest&rsquo;s reply lands. Can be a normal mailbox.
               </span>
             </div>
           </div>

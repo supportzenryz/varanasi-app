@@ -1,13 +1,14 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { settings, auditLog, branches } from "@/db/schema";
+import { settings, branches } from "@/db/schema";
+import { record } from "@/lib/audit";
 import { requireAbility } from "@/lib/auth";
 import { bookingRules, SETTINGS_KEY, type BookingRules } from "@/lib/booking-config";
 import { parsePounds } from "@/lib/money";
-import { checkEmail, checkPhone } from "@/lib/validate";
+import { checkEmail, checkPhone, checkTime } from "@/lib/validate";
+import { ok, problem } from "@/lib/admin-feedback";
 
 const num = (v: FormDataEntryValue | null, fallback: number) => {
   const n = Number(String(v ?? "").replace(/[^0-9]/g, ""));
@@ -50,18 +51,53 @@ function staffMobile(raw: FormDataEntryValue | null, fallback: string): string {
   return checked.ok && checked.e164 ? checked.value : fallback;
 }
 
+const BACK = "/admin/settings";
+
 export async function saveBookingRules(formData: FormData) {
   const session = await requireAbility("editSettings");
   const current = bookingRules();
 
+  /* Two of these fields can take the restaurant off sale, and both used to do
+     it in silence.
+
+     Service times: `allSlots()` walks from `first` to `last` in steps. Save
+     22:00 to 09:00 — a plausible typo for a late licence — and the loop
+     produces no times at all, so every date on the website reports "fully
+     booked". The page looks healthy. Nothing is bookable.
+
+     Notification addresses: `to: lines(formData.get("notifyTo"))` took the box
+     verbatim, so clearing it stopped every booking alert reaching the
+     restaurant. Bookings kept arriving; nobody was told about them. */
+  const first = String(formData.get("first") || current.slots.first);
+  const last = String(formData.get("last") || current.slots.last);
+  const t = checkTime(first);
+  const t2 = checkTime(last);
+  if (!t.ok) problem(BACK, `First sitting: ${t.error}`);
+  if (!t2.ok) problem(BACK, `Last sitting: ${t2.error}`);
+  if (t2.value <= t.value) {
+    problem(BACK, `The last sitting (${t2.value}) has to be after the first (${t.value}). ` +
+      `As entered, no time would be bookable on any date.`);
+  }
+
+  const notifyTo = lines(formData.get("notifyTo"));
+  if (!notifyTo.length) {
+    problem(BACK, "Someone has to receive the booking alerts. Leave at least one address here, " +
+      "or the restaurant is never told a table has been booked.");
+  }
+  for (const address of notifyTo) {
+    const checked = checkEmail(address);
+    if (!checked.ok) problem(BACK, `"${address}" isn't an email address we can send to.`);
+  }
+
+  const interval = num(formData.get("interval"), current.slots.intervalMinutes);
+  if (interval < 5 || interval > 240) {
+    problem(BACK, "The gap between sittings should be between 5 and 240 minutes.");
+  }
+
   const policy = String(formData.get("depositPolicy") ?? current.deposit.policy);
   const next: BookingRules = {
     ...current,
-    slots: {
-      first: String(formData.get("first") || current.slots.first),
-      last: String(formData.get("last") || current.slots.last),
-      intervalMinutes: num(formData.get("interval"), current.slots.intervalMinutes),
-    },
+    slots: { first: t.value, last: t2.value, intervalMinutes: interval },
     capacity: {
       ...current.capacity,
       maxPartyOnline: num(formData.get("maxParty"), current.capacity.maxPartyOnline),
@@ -87,7 +123,7 @@ export async function saveBookingRules(formData: FormData) {
     occasions: { options: lines(formData.get("occasions")).length ? lines(formData.get("occasions")) : current.occasions.options },
     notifications: {
       ...current.notifications,
-      to: lines(formData.get("notifyTo")),
+      to: notifyTo.map((a) => a.toLowerCase()),
       // Each falls back to what is already stored rather than to a blank, so
       // an empty box can never silently break sending.
       fromName: String(formData.get("fromName") ?? "").trim() || current.notifications.fromName,
@@ -104,13 +140,18 @@ export async function saveBookingRules(formData: FormData) {
   };
 
   save(next);
-  db.insert(auditLog).values({
-    userId: session.userId, action: "settings.booking", entity: "settings", entityId: SETTINGS_KEY,
-    detail: `deposit ${next.deposit.policy} @ ${next.deposit.perPersonPence}p pp`,
-  }).run();
+  record(session, {
+    action: "settings.booking", entity: "settings", entityId: SETTINGS_KEY,
+    detail: `deposit ${next.deposit.policy} @ ${next.deposit.perPersonPence}p pp, ` +
+      `service ${next.slots.first}–${next.slots.last}, notify ${next.notifications.to.join(", ") || "nobody"}`,
+  });
 
-  // Say so. Saving used to re-render the same page with nothing changed on
-  // screen, which is indistinguishable from a button that does not work —
-  // and the honest reading of a silent form is that it failed.
-  redirect("/admin/settings?saved=1");
+  // Say so, and say what actually landed. Saving used to re-render the same
+  // page with nothing changed on screen, which is indistinguishable from a
+  // button that does not work — and the honest reading of a silent form is
+  // that it failed.
+  ok(BACK, `Saved. Service ${t.value}–${t2.value} every ${interval} minutes; ` +
+    `deposit ${next.deposit.policy === "off" ? "off" : `${next.deposit.policy}, ` +
+      `${(next.deposit.perPersonPence / 100).toFixed(2)} per person`}; ` +
+    `alerts to ${notifyTo.join(", ")}.`);
 }

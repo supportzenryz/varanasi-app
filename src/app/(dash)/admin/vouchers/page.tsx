@@ -1,11 +1,17 @@
-import { asc, desc, sql } from "drizzle-orm";
+import { and, asc, desc, inArray, isNull, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { branches, vouchers, users } from "@/db/schema";
-import { requireAbility, can } from "@/lib/auth";
+import { requireAbility, can, visibleBranchIds } from "@/lib/auth";
+
+/** Small helper so the branch test reads the same way in both places. */
+function mineIncludes(session: { role: string; branchId: number | null }, branchId: number) {
+  return session.role === "owner" || session.branchId === branchId;
+}
 import { formatPence } from "@/lib/money";
 import { voucherRules } from "@/lib/booking-config";
 import { voucherByCode, redemptionsFor, expiryLabel, expireOldVouchers } from "@/lib/voucher";
 import { redeemVoucher, issueVoucher, cancelVoucher, releaseScheduled } from "./actions";
+import { ConfirmButton } from "@/components/ConfirmButton";
 
 export const metadata = { title: "Gift vouchers" };
 
@@ -32,22 +38,45 @@ export default async function VouchersAdmin({
   const rules = voucherRules();
   const all = db.select().from(branches).orderBy(asc(branches.sort)).all();
   const looked = code ? voucherByCode(code) : undefined;
+  /* A code from the other restaurant can still be checked — a guest may present
+     one at the wrong door and the till needs to say so — but the people on it
+     are none of this branch's business. */
+  const otherBranch = Boolean(
+    looked && looked.branchId && session.role !== "owner" && !mineIncludes(session, looked.branchId),
+  );
   const history = looked ? redemptionsFor(looked.id) : [];
   const staff = db.select({ id: users.id, name: users.name }).from(users).all();
   const staffName = new Map(staff.map((s) => [s.id, s.name]));
 
+  /* Everything on this screen is scoped to the restaurants this account may
+     see. None of it was: the money tiles were company-wide and the recent list
+     was every voucher from both branches, complete with recipient names — so
+     the lowest-privileged role read the other restaurant's customers and the
+     group's whole outstanding liability. A voucher valid at either restaurant
+     belongs to both, which is what `branch_id is null` means here. */
+  const mine = visibleBranchIds(session);
+  const ofMine = session.role === "owner"
+    ? sql`1 = 1`
+    : mine.length
+      ? or(inArray(vouchers.branchId, mine), isNull(vouchers.branchId))
+      : sql`0 = 1`;
+
   const outstanding = db.select({
     n: sql<number>`count(*)`, v: sql<number>`coalesce(sum(balance_pence),0)`,
-  }).from(vouchers).where(sql`status = 'active'`).get();
+  }).from(vouchers).where(and(sql`status = 'active'`, ofMine)).get();
 
   const soldThisMonth = db.select({
     n: sql<number>`count(*)`, v: sql<number>`coalesce(sum(value_pence),0)`,
-  }).from(vouchers).where(sql`origin = 'purchase' and status != 'pending' and issued_at >= strftime('%s', date('now','start of month'))`).get();
+  }).from(vouchers).where(and(
+    sql`origin = 'purchase' and status != 'pending' and issued_at >= strftime('%s', date('now','start of month'))`,
+    ofMine,
+  )).get();
 
   const scheduled = db.select({ n: sql<number>`count(*)` }).from(vouchers)
-    .where(sql`status = 'active' and delivered_at is null and deliver_on is not null`).get()?.n ?? 0;
+    .where(and(sql`status = 'active' and delivered_at is null and deliver_on is not null`, ofMine))
+    .get()?.n ?? 0;
 
-  const recent = db.select().from(vouchers)
+  const recent = db.select().from(vouchers).where(ofMine)
     .orderBy(desc(vouchers.createdAt)).limit(25).all();
 
   const canIssue = can(session, "issueVoucher");
@@ -121,8 +150,12 @@ export default async function VouchersAdmin({
 
             <dl className="mt-5 grid gap-x-8 gap-y-3 sm:grid-cols-2 text-sm">
               {[
-                ["For", `${looked.recipientName ?? "—"}${looked.recipientEmail ? ` (${looked.recipientEmail})` : ""}`],
-                ["From", looked.purchaserName ?? "—"],
+                ...(otherBranch
+                  ? [["For", "Hidden — this voucher belongs to the other restaurant"]]
+                  : [
+                      ["For", `${looked.recipientName ?? "—"}${looked.recipientEmail ? ` (${looked.recipientEmail})` : ""}`],
+                      ["From", looked.purchaserName ?? "—"],
+                    ]),
                 ["Valid at", looked.branchId ? `Varanasi ${all.find((b) => b.id === looked.branchId)?.city ?? ""}` : "Either restaurant"],
                 ["Expires", expiryLabel(looked)],
                 ["Type", looked.origin === "thank_you" ? "Complimentary (after dining)" : looked.origin === "manual" ? "Issued by staff" : "Bought online"],
@@ -177,9 +210,11 @@ export default async function VouchersAdmin({
             {canCancel && !["cancelled", "redeemed"].includes(looked.status) && (
               <form action={cancelVoucher} className="mt-5">
                 <input type="hidden" name="code" value={looked.code} />
-                <button className="text-xs text-brick border border-brick/40 px-3 py-1.5 hover:bg-clay/10">
+                <ConfirmButton
+                  ask={`Cancel voucher ${looked.code}? The customer is holding a claim on ${formatPence(looked.balancePence)} and this writes it off. It cannot be undone.`}
+                  className="text-xs text-brick border border-brick/40 px-3 py-1.5 hover:bg-clay/10">
                   Cancel this voucher
-                </button>
+                </ConfirmButton>
                 <span className="block text-xs text-ink-3 mt-1.5">
                   Owners only. This can&rsquo;t be undone — the balance is written off.
                 </span>

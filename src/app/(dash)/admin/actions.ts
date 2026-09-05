@@ -4,10 +4,14 @@ import { revalidatePath } from "next/cache";
 import bcrypt from "bcryptjs";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { users, auditLog } from "@/db/schema";
-import { destroySession, requireSession, refreshSessionAfterPasswordChange } from "@/lib/auth";
+import { users } from "@/db/schema";
+import { record } from "@/lib/audit";
+import { destroySession, getSession, requireSession, refreshSessionAfterPasswordChange } from "@/lib/auth";
 
 export async function logoutAction() {
+  // Read the session before it is destroyed, so the entry has a name on it.
+  const session = await getSession();
+  if (session) record(session, { action: "logout", entity: "user", entityId: String(session.userId) });
   await destroySession();
   redirect("/admin/login");
 }
@@ -29,9 +33,7 @@ export async function changePasswordAction(_prev: { error?: string; ok?: boolean
   db.update(users)
     .set({ passwordHash: bcrypt.hashSync(next, 10), mustChangePassword: false })
     .where(eq(users.id, session.userId)).run();
-  db.insert(auditLog).values({
-    userId: session.userId, action: "password.change", entity: "user", entityId: String(session.userId),
-  }).run();
+  record(session, { action: "password.change", entity: "user", entityId: String(session.userId) });
 
   // Re-issue from the row, not from the old session: the cookie is bound to a
   // fingerprint of the password hash, so reusing the previous session object

@@ -60,7 +60,7 @@ export default async function Unconfirmed({
       <section className="bg-ink">
         <div className="mx-auto max-w-[46rem] px-5 lg:px-10 py-14 sm:py-20">
           <p className="border-l-2 border-brick bg-clay/10 px-4 py-3 text-sm text-brick">
-            Nothing has been charged. The deposit confirms the table, so until it's paid the time stays
+            Nothing has been charged. The deposit confirms the table, so until it&rsquo;s paid the time stays
             available to other guests.
           </p>
 
@@ -89,7 +89,7 @@ export default async function Unconfirmed({
             {branch.bookingEmail
               ? <a href={`mailto:${branch.bookingEmail}`} className="underline hover:text-gold">email us</a>
               : "call us"}{" "}
-            with the time you tried and we'll check straight away.
+            with the time you tried and we&rsquo;ll check straight away.
           </p>
         </div>
       </section>

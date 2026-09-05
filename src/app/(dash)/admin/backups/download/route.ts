@@ -2,8 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { requireAbility } from "@/lib/auth";
 import { backupDir } from "@/lib/backup";
-import { db } from "@/db";
-import { auditLog } from "@/db/schema";
+import { record } from "@/lib/audit";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -28,10 +27,14 @@ export async function GET(request: Request) {
   }
   if (!fs.existsSync(target)) return new Response("Not found", { status: 404 });
 
-  db.insert(auditLog).values({
-    userId: session.userId, action: "backup.download", entity: "database", entityId: name,
+  /* Reported to the owner the moment it happens. This is the entire customer
+     database — names, phones, dietary notes, voucher balances — leaving in a
+     single file, so it is the one admin action where a delayed notice is no
+     notice at all. */
+  record(session, {
+    action: "backup.download", entity: "database", entityId: name,
     detail: `downloaded ${name}`,
-  }).run();
+  });
 
   return new Response(fs.readFileSync(target) as unknown as BodyInit, {
     headers: {

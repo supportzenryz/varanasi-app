@@ -6,7 +6,7 @@ import { SignJWT, jwtVerify } from "jose";
 import bcrypt from "bcryptjs";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { users } from "@/db/schema";
+import { users, branches } from "@/db/schema";
 
 const COOKIE = "varanasi_session";
 const secret = new TextEncoder().encode(process.env.SESSION_SECRET ?? "dev-only-insecure-secret-change-me");
@@ -40,16 +40,65 @@ export const CAN = {
   editSettings: ["owner"],
   viewAllBranches: ["owner"],
   manageBackups: ["owner"],
+  viewAuditLog: ["owner"],
 } as const satisfies Record<string, readonly Role[]>;
 
 export function can(session: Session, ability: keyof typeof CAN): boolean {
   return (CAN[ability] as readonly Role[]).includes(session.role);
 }
 
-/** Managers and staff are pinned to their own branch; owners may act on either. */
+/** Managers and staff are pinned to their own branch; owners may act on either.
+ *  A non-owner with no branch assigned matches nothing, deliberately — see
+ *  visibleBranchIds below for why that is the right answer and not a bug. */
+export function branchAllowed(session: Session, branchId: number): boolean {
+  if (session.role === "owner") return true;
+  return session.branchId != null && session.branchId === branchId;
+}
+
+/**
+ * The same check, for callers that have no sensible way to carry on.
+ *
+ * It used to `throw`, which in a server action means Next.js renders its own
+ * error page: a white screen reading "Internal Server Error", digest
+ * 3f9a1c… — indistinguishable from the software being broken. A Leicester
+ * manager who followed a Birmingham link concluded the admin had crashed and
+ * rang about it. A redirect to a page that says what happened is both truthful
+ * and recoverable.
+ */
 export function assertBranchAccess(session: Session, branchId: number): void {
-  if (session.role === "owner") return;
-  if (session.branchId !== branchId) throw new Error("Not permitted for this branch");
+  if (!branchAllowed(session, branchId)) redirect("/admin?denied=branch");
+}
+
+/**
+ * Which restaurants this account may see. The single answer to that question.
+ *
+ * Every screen used to work it out for itself, with the same shape each time:
+ *
+ *     const scoped = session.role !== "owner" && session.branchId != null;
+ *
+ * which reads as "scope non-owners" and behaves as "scope non-owners who have
+ * a branch". A manager or staff member with no branch set — an option the
+ * staff screen offered for every role — therefore fell through to *unscoped*
+ * and saw both restaurants: their overview showed the group's figures while
+ * the copy still said "you're seeing your own branch", and they could spend
+ * the other restaurant's gift vouchers, because the redeem guard also
+ * short-circuits on a null.
+ *
+ * An empty list is the honest answer for that account: no branch assigned
+ * means no data, not all data. Callers pass it to `inArray`, which matches
+ * nothing when empty.
+ */
+export function visibleBranchIds(session: Session): number[] {
+  if (session.role === "owner") {
+    return db.select({ id: branches.id }).from(branches).all().map((b) => b.id);
+  }
+  return session.branchId == null ? [] : [session.branchId];
+}
+
+/** True when the account is a non-owner with nothing assigned — a misconfigured
+ *  account rather than a restricted one, and worth saying so on screen. */
+export function hasNoBranch(session: Session): boolean {
+  return session.role !== "owner" && session.branchId == null;
 }
 
 /**

@@ -185,3 +185,68 @@ export function checkName(raw: string | null | undefined): Check {
   }
   return { ok: true, value };
 }
+
+/* ------------------------------------------------------- dates and times -- */
+
+/**
+ * A calendar date the admin will actually store, as "YYYY-MM-DD".
+ *
+ * The admin forms use <input type="date">, which gives that shape — but a form
+ * post is not a form: anything can be sent to a server action, and
+ * `date="banana"` was being written into the bookings table verbatim, where it
+ * silently belongs to no day at all. It never appears on a service sheet and
+ * the guest is never seated.
+ *
+ * The round-trip through Date is what catches 31 February, which passes any
+ * regular expression you care to write and does not exist.
+ */
+export function checkDate(raw: string | null | undefined): Check {
+  const v = String(raw ?? "").trim();
+  if (!v) return { ok: false, error: "Choose a date." };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return { ok: false, error: "Use the date picker — the date isn't in a form we can read." };
+  const d = new Date(`${v}T12:00:00Z`);
+  if (Number.isNaN(d.getTime())) return { ok: false, error: "That isn't a real date." };
+  if (d.toISOString().slice(0, 10) !== v) return { ok: false, error: `${v} isn't a real date.` };
+  const year = Number(v.slice(0, 4));
+  if (year < 2020 || year > 2100) return { ok: false, error: "That year looks wrong — check the date." };
+  return { ok: true, value: v };
+}
+
+/** "HH:MM" on a 24-hour clock. "99:99" was accepted and stored. */
+export function checkTime(raw: string | null | undefined): Check {
+  const v = String(raw ?? "").trim();
+  if (!v) return { ok: false, error: "Choose a time." };
+  const m = /^(\d{1,2}):(\d{2})$/.exec(v);
+  if (!m) return { ok: false, error: "Enter the time as HH:MM, like 19:30." };
+  const h = Number(m[1]), min = Number(m[2]);
+  if (h > 23 || min > 59) return { ok: false, error: "That isn't a time — hours go to 23, minutes to 59." };
+  return { ok: true, value: `${String(h).padStart(2, "0")}:${m[2]}` };
+}
+
+/** Today in London, as "YYYY-MM-DD". Bookings are a UK business; the server's
+ *  clock is UTC, and between midnight and 1am BST those are different days. */
+export function todayInLondon(): string {
+  return new Date().toLocaleDateString("en-CA", { timeZone: "Europe/London" });
+}
+
+export type NumberCheck = { ok: true; value: number } | { ok: false; error: string };
+
+/**
+ * A party size a restaurant could seat.
+ *
+ * `Number(formData.get("partySize"))` accepted -5, 100000 and 2.5. A negative
+ * party is meaningless; a hundred thousand covers is a typo that would sit at
+ * the top of the day's list looking like a catastrophe; a fractional one is a
+ * half a person. The upper bound is generous on purpose — the largest private
+ * room seats far fewer, but a provisional whole-restaurant buyout is a real
+ * thing a manager types in.
+ */
+export function checkPartySize(raw: FormDataEntryValue | string | null | undefined, max = 300): NumberCheck {
+  const s = String(raw ?? "").trim();
+  if (!s) return { ok: false, error: "Enter how many people are coming." };
+  if (!/^\d+$/.test(s)) return { ok: false, error: "Enter the number of guests as a whole number." };
+  const n = Number(s);
+  if (n < 1) return { ok: false, error: "A booking needs at least one guest." };
+  if (n > max) return { ok: false, error: `${n} guests is more than we can seat — check the number.` };
+  return { ok: true, value: n };
+}

@@ -1,5 +1,5 @@
 import { requireAbility } from "@/lib/auth";
-import { listBackups, backupDir } from "@/lib/backup";
+import { backupsAreStale, listBackups, backupDir } from "@/lib/backup";
 import { backupNow } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -18,7 +18,7 @@ export default async function BackupsAdmin({
   const sp = await searchParams;
   const files = listBackups();
   const newest = files[0];
-  const stale = !newest || Date.now() - newest.at.getTime() > 36 * 3600_000;
+  const stale = backupsAreStale();
 
   return (
     <>

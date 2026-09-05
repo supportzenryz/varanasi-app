@@ -3,7 +3,6 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { allBranches, branchBySlug, openingHours, telHref } from "@/lib/branches";
 import { branchMedia } from "@/lib/brand";
-import { bookingRules } from "@/lib/booking-config";
 import { pageHref } from "@/lib/nav";
 import { PageHero } from "@/components/PageHero";
 import { EnquiryForm } from "@/components/EnquiryForm";
@@ -48,7 +47,6 @@ export default async function Contact({
   /* The rejected submission, if there was one: the message and everything
      typed, from a short-lived cookie rather than the query string. */
   const recalled = error ? await recallSubmission(`/${branch.slug}/contact`) : null;
-  const rules = bookingRules();
   const others = allBranches().filter((b) => b.id !== branch.id);
   const hours = grouped(openingHours(branch));
 

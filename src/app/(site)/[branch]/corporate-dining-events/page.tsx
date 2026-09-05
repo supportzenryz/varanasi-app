@@ -6,7 +6,6 @@ import { db } from "@/db";
 import { privateRooms, branchStats } from "@/db/schema";
 import { branchBySlug } from "@/lib/branches";
 import { branchMedia } from "@/lib/brand";
-import { bookingRules } from "@/lib/booking-config";
 import { pageHref } from "@/lib/nav";
 import { PageHero } from "@/components/PageHero";
 import { EnquiryForm } from "@/components/EnquiryForm";
@@ -44,7 +43,6 @@ export default async function Corporate({
   /* The rejected submission, if there was one: the message and everything
      typed, from a short-lived cookie rather than the query string. */
   const recalled = error ? await recallSubmission(`/${branch.slug}/corporate-dining-events`) : null;
-  const rules = bookingRules();
 
   const rooms = db.select({ id: privateRooms.id, name: privateRooms.name })
     .from(privateRooms)

@@ -2,9 +2,11 @@
 import { revalidatePath } from "next/cache";
 import { and, asc, desc, eq, gt, lt } from "drizzle-orm";
 import { db } from "@/db";
-import { branches, privateRooms, auditLog } from "@/db/schema";
+import { branches, privateRooms } from "@/db/schema";
+import { record } from "@/lib/audit";
 import { requireAbility, assertBranchAccess, type Session } from "@/lib/auth";
 import { parsePounds } from "@/lib/money";
+import { ok, problem } from "@/lib/admin-feedback";
 
 /** Resolve the owning branch from the row itself, never from the submitted form. */
 function roomBranch(roomId: number): number {
@@ -23,10 +25,25 @@ function publish(branchId: number) {
   revalidatePath(`/${row.slug}/private-dining-experiences`);
 }
 
+function backTo(branchId: number): string {
+  const slug = db.select({ slug: branches.slug }).from(branches).where(eq(branches.id, branchId)).get()?.slug;
+  return "/admin/rooms" + (slug ? `?branch=${slug}` : "");
+}
+
+/** See the same helper in the menu actions: an unreadable price used to clear
+ *  the field rather than be refused, so a room quietly lost its deposit. */
+function priceOrRefuse(raw: FormDataEntryValue | null, field: string, back: string): number | null {
+  const typed = String(raw ?? "").trim();
+  if (!typed) return null;
+  const pence = parsePounds(typed);
+  if (pence == null) {
+    problem(back, `"${typed}" isn't a price we can read for ${field}. Use figures only, like 250 or 250.00.`);
+  }
+  return pence;
+}
+
 function log(session: Session, action: string, entityId: string, detail?: string) {
-  db.insert(auditLog).values({
-    userId: session.userId, action, entity: "room", entityId, detail: detail ?? null,
-  }).run();
+  record(session, { action, entity: "room", entityId, detail });
 }
 
 const clean = (v: FormDataEntryValue | null) => {
@@ -51,18 +68,30 @@ export async function saveRoom(formData: FormData) {
   const branchId = roomBranch(id);
   assertBranchAccess(session, branchId);
 
+  const back = backTo(branchId);
   const name = clean(formData.get("name"));
-  if (!name) return;
+  if (!name) problem(back, "A room needs a name.");
+
+  /* Capacities are shown to guests and used to size a booking. min above max
+     is not a room anyone can book, and was accepted without comment. */
+  const capMin = num(formData.get("capacityMin"));
+  const capMax = num(formData.get("capacityMax"));
+  if (capMin != null && capMax != null && capMin > capMax) {
+    problem(back, `The smallest party (${capMin}) can't be larger than the largest (${capMax}).`);
+  }
+  if (capMax != null && capMax > 500) {
+    problem(back, `${capMax} guests looks like a typo — check the largest party.`);
+  }
 
   db.update(privateRooms).set({
     name,
     headline: clean(formData.get("headline")),
     tagline: clean(formData.get("tagline")),
     description: clean(formData.get("description")),
-    capacityMin: num(formData.get("capacityMin")),
-    capacityMax: num(formData.get("capacityMax")),
-    depositPerPersonPence: parsePounds(String(formData.get("deposit") ?? "")),
-    hireChargePence: parsePounds(String(formData.get("hireCharge") ?? "")),
+    capacityMin: capMin,
+    capacityMax: capMax,
+    depositPerPersonPence: priceOrRefuse(formData.get("deposit"), "the deposit", back),
+    hireChargePence: priceOrRefuse(formData.get("hireCharge"), "the hire charge", back),
     exclusivityNote: clean(formData.get("exclusivityNote")),
     setMenuNote: clean(formData.get("setMenuNote")),
     idealFor: listJson(formData.get("idealFor")),
@@ -72,6 +101,9 @@ export async function saveRoom(formData: FormData) {
 
   log(session, "room.update", String(id), name);
   publish(branchId);
+  ok(back, formData.get("isPublished") === "on"
+    ? `${name} saved and showing on the website.`
+    : `${name} saved. It stays hidden from the website until you switch it on.`);
 }
 
 export async function addRoom(formData: FormData) {
@@ -79,14 +111,24 @@ export async function addRoom(formData: FormData) {
   const branchId = Number(formData.get("branchId"));
   assertBranchAccess(session, branchId);
 
+  const back = backTo(branchId);
   const name = clean(formData.get("name"));
-  if (!name) return;
+  if (!name) problem(back, "A room needs a name.");
+
+  /* The slug is the room's URL. Two rooms sharing one means the second is
+     unreachable from the website. */
+  const base = slugify(name);
+  if (!base) problem(back, "A room name needs at least one letter or number in it.");
+  const taken = new Set(db.select({ slug: privateRooms.slug }).from(privateRooms)
+    .where(eq(privateRooms.branchId, branchId)).all().map((r) => r.slug));
+  let slug = base;
+  for (let n = 2; taken.has(slug); n++) slug = `${base}-${n}`;
 
   const last = db.select({ sort: privateRooms.sort }).from(privateRooms)
     .where(eq(privateRooms.branchId, branchId)).orderBy(desc(privateRooms.sort)).get();
 
   const created = db.insert(privateRooms).values({
-    branchId, name, slug: slugify(name),
+    branchId, name, slug,
     capacityMax: num(formData.get("capacityMax")),
     tagline: clean(formData.get("tagline")),
     image: clean(formData.get("image")),
@@ -97,6 +139,7 @@ export async function addRoom(formData: FormData) {
 
   log(session, "room.create", String(created.id), name);
   publish(branchId);
+  ok(back, `${name} added. It's hidden from the website until you fill in the details and switch it on.`);
 }
 
 export async function toggleRoom(formData: FormData) {
@@ -109,6 +152,9 @@ export async function toggleRoom(formData: FormData) {
   db.update(privateRooms).set({ isPublished: !row?.p }).where(eq(privateRooms.id, id)).run();
   log(session, "room.toggle", String(id), row?.p ? "hidden" : "shown");
   publish(branchId);
+  ok(backTo(branchId), row?.p
+    ? "Hidden from the website. Enquiries already made are unaffected."
+    : "Showing on the website now.");
 }
 
 export async function deleteRoom(formData: FormData) {
@@ -116,9 +162,11 @@ export async function deleteRoom(formData: FormData) {
   const id = Number(formData.get("id"));
   const branchId = roomBranch(id);
   assertBranchAccess(session, branchId);
+  const gone = db.select({ name: privateRooms.name }).from(privateRooms).where(eq(privateRooms.id, id)).get();
   db.delete(privateRooms).where(eq(privateRooms.id, id)).run();
-  log(session, "room.delete", String(id));
+  log(session, "room.delete", String(id), gone?.name);
   publish(branchId);
+  ok(backTo(branchId), `${gone?.name ?? "The room"} deleted. To take one off the website without losing it, hide it instead.`);
 }
 
 export async function moveRoom(formData: FormData) {
@@ -128,19 +176,21 @@ export async function moveRoom(formData: FormData) {
   const branchId = roomBranch(id);
   assertBranchAccess(session, branchId);
 
+  const back = backTo(branchId);
   const me = db.select().from(privateRooms).where(eq(privateRooms.id, id)).get();
-  if (!me) return;
+  if (!me) problem(back, "That room has already been removed.");
 
   const neighbour = dir === "up"
     ? db.select().from(privateRooms)
-        .where(and(eq(privateRooms.branchId, branchId), lt(privateRooms.sort, me.sort)))
+        .where(and(eq(privateRooms.branchId, branchId), lt(privateRooms.sort, me!.sort)))
         .orderBy(desc(privateRooms.sort)).get()
     : db.select().from(privateRooms)
-        .where(and(eq(privateRooms.branchId, branchId), gt(privateRooms.sort, me.sort)))
+        .where(and(eq(privateRooms.branchId, branchId), gt(privateRooms.sort, me!.sort)))
         .orderBy(asc(privateRooms.sort)).get();
-  if (!neighbour) return;
+  if (!neighbour) problem(back, `${me!.name} is already ${dir === "up" ? "first" : "last"}.`);
 
-  db.update(privateRooms).set({ sort: neighbour.sort }).where(eq(privateRooms.id, me.id)).run();
-  db.update(privateRooms).set({ sort: me.sort }).where(eq(privateRooms.id, neighbour.id)).run();
+  db.update(privateRooms).set({ sort: neighbour!.sort }).where(eq(privateRooms.id, me!.id)).run();
+  db.update(privateRooms).set({ sort: me!.sort }).where(eq(privateRooms.id, neighbour!.id)).run();
   publish(branchId);
+  ok(back, `${me!.name} moved ${dir === "up" ? "up" : "down"}.`);
 }

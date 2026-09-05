@@ -5,6 +5,8 @@ import { asc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { branches, galleryImages, branchStats } from "@/db/schema";
 import { requireAbility } from "@/lib/auth";
+import { AdminNotice } from "@/components/AdminNotice";
+import { ConfirmButton } from "@/components/ConfirmButton";
 import {
   addImage, updateImage, deleteImage, moveImage, saveStat, addStat, deleteStat,
 } from "./actions";
@@ -16,9 +18,9 @@ const label = "block text-xs font-semibold text-ink-3 mb-1";
 
 export default async function GalleryAdmin({
   searchParams,
-}: { searchParams: Promise<{ branch?: string }> }) {
+}: { searchParams: Promise<{ branch?: string; saved?: string; problem?: string }> }) {
   const session = await requireAbility("editRooms");
-  const { branch: branchParam } = await searchParams;
+  const { branch: branchParam, saved, problem } = await searchParams;
 
   const all = db.select().from(branches).orderBy(asc(branches.sort)).all();
   const visible = session.role === "owner" ? all : all.filter((b) => b.id === session.branchId);
@@ -32,6 +34,7 @@ export default async function GalleryAdmin({
 
   return (
     <>
+      <AdminNotice saved={saved} problem={problem} />
       <span className="accent text-xs text-gold-ink">Gallery &amp; venue tiles</span>
       <h1 className="text-3xl sm:text-4xl mt-3">{active.city}&rsquo;s photographs</h1>
       <p className="text-ink-3 mt-2 max-w-[62ch]">
@@ -101,9 +104,10 @@ export default async function GalleryAdmin({
                   )}
                   <form action={deleteImage} className="ml-auto">
                     <input type="hidden" name="id" value={img.id} />
-                    <button className="text-[0.7rem] text-brick border border-brick/40 px-2 py-1 hover:bg-clay/10">
+                    <ConfirmButton ask="Remove this photograph from the gallery? This can't be undone."
+                      className="text-[0.7rem] text-brick border border-brick/40 px-2 py-1 hover:bg-clay/10">
                       Remove
-                    </button>
+                    </ConfirmButton>
                   </form>
                 </div>
               </div>
@@ -173,9 +177,10 @@ export default async function GalleryAdmin({
           {stats.map((s) => (
             <form key={`del${s.id}`} action={deleteStat} className="-mt-2">
               <input type="hidden" name="id" value={s.id} />
-              <button className="text-[0.7rem] text-brick underline hover:text-brick/70">
+              <ConfirmButton ask={`Remove the "${s.value} ${s.label}" tile from the home page?`}
+                className="text-[0.7rem] text-brick underline hover:text-brick/70">
                 Remove &ldquo;{s.value} {s.label}&rdquo;
-              </button>
+              </ConfirmButton>
             </form>
           ))}
         </div>

@@ -20,7 +20,8 @@ for (const f of ["whatsapp.ts", "validate.ts"]) {
   const src = fs.readFileSync(new URL(`../src/lib/${f}`, here), "utf8");
   fs.writeFileSync(path.join(dir, f), src.replace(/@\/lib\//g, "./").replace(/^import "server-only";\s*$/m, ""));
 }
-const { checkPhone, checkEmail, checkName } = await import(path.join(dir, "validate.ts"));
+const { checkPhone, checkEmail, checkName, checkDate, checkTime, checkPartySize } =
+  await import(path.join(dir, "validate.ts"));
 
 /* parsePounds lives in money.ts and has no imports to rewrite. It is here
    because it is the same class of problem: input a member of staff types. */
@@ -136,6 +137,55 @@ for (const [input, why] of [
   ["", "empty"],
 ] as [string, string][]) {
   t(`refuses ${JSON.stringify(input)} (${why})`, parsePounds(input) === null, String(parsePounds(input)));
+}
+
+/* Dates, times and party sizes typed into the admin.
+ *
+ * All three used to go into the database exactly as submitted. A booking with
+ * date "banana" belongs to no day, never appears on a service sheet, and the
+ * guest is never seated — and nothing on screen said anything had gone wrong.
+ */
+console.log("\n── Dates the admin will store ──");
+for (const good of ["2026-09-04", "2026-12-31", "2028-02-29"]) {
+  t(`accepts ${good}`, checkDate(good).ok, checkDate(good).ok ? "" : (checkDate(good) as any).error);
+}
+for (const [bad, why] of [
+  ["banana", "not a date at all — used to be stored verbatim"],
+  ["31/12/2026", "UK format, which the availability check never matches"],
+  ["2026-02-31", "31 February — passes any regex, does not exist"],
+  ["2026-13-01", "month 13"],
+  ["1026-01-01", "a mistyped year"],
+  ["", "empty"],
+] as [string, string][]) {
+  t(`rejects ${JSON.stringify(bad)} (${why})`, !checkDate(bad).ok);
+}
+
+console.log("\n── Times ──");
+t("accepts 19:30", checkTime("19:30").ok);
+t("accepts 09:00", checkTime("09:00").ok);
+t("pads 9:00 to 09:00", (checkTime("9:00") as any).value === "09:00");
+for (const [bad, why] of [
+  ["99:99", "used to be stored as a booking time"],
+  ["24:00", "hours stop at 23"],
+  ["19:75", "minutes stop at 59"],
+  ["7pm", "not a 24-hour clock"],
+  ["", "empty"],
+] as [string, string][]) {
+  t(`rejects ${JSON.stringify(bad)} (${why})`, !checkTime(bad).ok);
+}
+
+console.log("\n── Party sizes ──");
+t("accepts 2", (checkPartySize("2") as any).value === 2);
+t("accepts 120 (a buyout)", checkPartySize("120").ok);
+for (const [bad, why] of [
+  ["-5", "a negative party — used to be accepted"],
+  ["0", "nobody is coming"],
+  ["100000", "a typo that would head the day's list"],
+  ["2.5", "half a person"],
+  ["four", "words"],
+  ["", "empty"],
+] as [string, string][]) {
+  t(`rejects ${JSON.stringify(bad)} (${why})`, !checkPartySize(bad).ok);
 }
 
 console.log(`\n${"─".repeat(60)}\n${pass}/${pass + fail} checks passed\n`);

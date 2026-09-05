@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import Script from "next/script";
 
 const KEY = "varanasi_cookie_consent";
@@ -23,24 +23,44 @@ export function Analytics({ measurementId, consentRequired }: {
   measurementId: string;
   consentRequired: boolean;
 }) {
-  const [choice, setChoice] = useState<"unknown" | "yes" | "no">("unknown");
+  /**
+   * The stored answer, read after mount.
+   *
+   * It cannot be read during render: localStorage does not exist on the server,
+   * so a state initialiser that touched it would make the first server render
+   * and the first browser render disagree and produce a hydration error. React
+   * has one sanctioned way to read a browser-only store — useSyncExternalStore,
+   * with a server snapshot — and this is it. The subscribe callback also means
+   * a second tab that accepts or declines updates this one.
+   */
+  const stored = useSyncExternalStore(
+    (onChange) => {
+      window.addEventListener("storage", onChange);
+      return () => window.removeEventListener("storage", onChange);
+    },
+    () => {
+      try {
+        return localStorage.getItem(KEY);
+      } catch {
+        // private browsing, or storage blocked entirely. We cannot remember an
+        // answer, so we must not keep asking for one: treat it as a decline.
+        return "no";
+      }
+    },
+    () => null,                       // server: nothing decided yet
+  );
 
-  useEffect(() => {
-    if (!measurementId) return;
-    if (!consentRequired) { setChoice("yes"); return; }
-    try {
-      const saved = localStorage.getItem(KEY);
-      setChoice(saved === "yes" ? "yes" : saved === "no" ? "no" : "unknown");
-    } catch {
-      // private browsing, or cookies blocked entirely — treat as undecided but
-      // don't keep asking, since we can't remember the answer anyway
-      setChoice("no");
-    }
-  }, [measurementId, consentRequired]);
+  // A local override so pressing Accept takes effect immediately, rather than
+  // waiting for a storage event this tab will never receive from itself.
+  const [picked, setPicked] = useState<"yes" | "no" | null>(null);
+
+  const choice: "unknown" | "yes" | "no" = !consentRequired
+    ? "yes"
+    : (picked ?? (stored === "yes" ? "yes" : stored === "no" ? "no" : "unknown"));
 
   const decide = (value: "yes" | "no") => {
     try { localStorage.setItem(KEY, value); } catch { /* nothing we can do */ }
-    setChoice(value);
+    setPicked(value);
   };
 
   if (!measurementId) return null;

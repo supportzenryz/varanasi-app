@@ -13,6 +13,16 @@ export type EnquiryField =
  * writing to one table — so nothing can be lost and every page's form behaves
  * identically.
  */
+/* Declared here rather than inside the component. They are only spans, but a
+   component defined during render is a new component type on every render, so
+   React unmounts and remounts it — which is how a field loses what the guest
+   has typed. Nothing here held state, so nothing was lost; the rule is right
+   about the shape all the same. */
+const Req = () => <span aria-hidden="true" className="text-gold/70 ml-0.5">*</span>;
+const Opt = () => (
+  <span className="text-pale/40 font-normal normal-case tracking-normal ml-1.5">(optional)</span>
+);
+
 export function EnquiryForm({
   type, branchSlug, returnTo, fields = [], rooms = [], occasions = [], heading, intro,
   submitLabel = "Send enquiry",
@@ -46,8 +56,6 @@ export function EnquiryForm({
   /* Marked rather than left to guesswork. The asterisk is aria-hidden and
      paired with the real `required` attribute, so a screen reader hears the
      field's own requiredness rather than a stray star. */
-  const Req = () => <span aria-hidden="true" className="text-gold/70 ml-0.5">*</span>;
-  const Opt = () => <span className="text-pale/40 font-normal normal-case tracking-normal ml-1.5">(optional)</span>;
 
   return (
     <form action={submitEnquiryAction} className="grid gap-6">

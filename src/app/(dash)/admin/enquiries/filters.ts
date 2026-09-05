@@ -1,7 +1,7 @@
 import { and, desc, eq, gte, inArray, like, or, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import { branches, enquiries } from "@/db/schema";
-import type { Session } from "@/lib/auth";
+import { visibleBranchIds, type Session } from "@/lib/auth";
 import type { EnquiryType } from "@/lib/enquiry";
 
 /**
@@ -11,6 +11,8 @@ import type { EnquiryType } from "@/lib/enquiry";
  */
 
 export type EnquiryQuery = {
+  /** 1-based; the list is paged rather than silently truncated */
+  page?: string;
   status?: string;
   type?: string;
   branch?: string;
@@ -18,6 +20,8 @@ export type EnquiryQuery = {
   range?: string;
   /** free text, matched against name, email and phone */
   q?: string;
+  saved?: string;
+  problem?: string;
 };
 
 export const RANGES = [
@@ -64,8 +68,9 @@ function digits(s: string): string {
 
 export function buildEnquiryWhere(session: Session, params: EnquiryQuery): SQL {
   const all = db.select().from(branches).all();
-  const visible = session.role === "owner" ? all : all.filter((b) => b.id === session.branchId);
-  const branchIds = visible.map((b) => b.id);
+  // One definition of what this account may see, shared with every other
+  // screen — see lib/auth. A non-owner with no branch assigned matches nothing.
+  const branchIds = visibleBranchIds(session);
 
   const status = params.status ?? "open";
   const clauses: (SQL | undefined)[] = [
@@ -120,12 +125,13 @@ export function buildEnquiryWhere(session: Session, params: EnquiryQuery): SQL {
   return and(...clauses) as SQL;
 }
 
-export function selectEnquiries(session: Session, params: EnquiryQuery, limit = 200) {
+export function selectEnquiries(session: Session, params: EnquiryQuery, limit = 200, offset = 0) {
   return db
     .select()
     .from(enquiries)
     .where(buildEnquiryWhere(session, params))
     .orderBy(desc(enquiries.createdAt))
     .limit(limit)
+    .offset(offset)
     .all();
 }

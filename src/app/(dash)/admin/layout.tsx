@@ -21,6 +21,7 @@ const NAV = [
   { href: "/admin/gallery", label: "Gallery & tiles", ability: "editRooms", ready: true },
   { href: "/admin/staff", label: "Staff access", ability: "manageStaff", ready: true },
   { href: "/admin/settings", label: "Settings", ability: "editSettings", ready: true },
+  { href: "/admin/logs", label: "Activity log", ability: "viewAuditLog", ready: true },
   { href: "/admin/backups", label: "Backups", ability: "manageBackups", ready: true },
 ] as const;
 
@@ -37,7 +38,12 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   return (
     <div className="dash min-h-dvh lg:grid lg:grid-cols-[15rem_1fr] bg-pale text-ink">
-      <aside className="bg-ink text-pale lg:min-h-dvh flex lg:flex-col gap-6 lg:gap-0 items-center lg:items-stretch px-5 py-4 lg:py-7 lg:px-0 overflow-x-auto">
+      {/* The rail scrolls sideways on a phone. It used to scroll as a whole,
+          which put "Sign out" 1,466px to the right of a 375px screen — present
+          in the markup, unreachable in practice, and the one control every
+          member of staff needs on a shared iPad at the pass. Only the list of
+          links scrolls now; the account block stays put. */}
+      <aside className="bg-ink text-pale lg:min-h-dvh flex lg:flex-col gap-4 lg:gap-0 items-center lg:items-stretch px-5 py-4 lg:py-7 lg:px-0">
         {/* The sidebar is ink, so the white mark is the right variant here.
             Narrow screens collapse the rail to a scrolling strip, where the
             mark shrinks and the "Admin" caption is dropped. */}
@@ -47,7 +53,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           <span className="accent text-gold/70 hidden lg:inline">Admin</span>
         </Link>
 
-        <nav className="flex lg:flex-col gap-1 lg:gap-0 flex-1">
+        <nav className="flex lg:flex-col gap-1 lg:gap-0 flex-1 min-w-0 overflow-x-auto lg:overflow-visible">
           {NAV.filter((i) => !i.ability || can(session, i.ability)).map((item) =>
             item.ready ? (
               <Link key={item.href} href={item.href}
@@ -64,11 +70,13 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           )}
         </nav>
 
-        <div className="lg:px-6 lg:pt-6 lg:border-t border-white/10 shrink-0">
-          <p className="text-sm font-semibold leading-tight">{session.name}</p>
-          <p className="text-xs text-pale/50 mt-0.5 capitalize">{session.role} · {branchLabel(session)}</p>
+        <div className="lg:px-6 lg:pt-6 lg:border-t border-white/10 shrink-0 lg:ml-0">
+          <p className="text-sm font-semibold leading-tight hidden lg:block">{session.name}</p>
+          <p className="text-xs text-pale/50 mt-0.5 capitalize hidden lg:block">{session.role} · {branchLabel(session)}</p>
           <form action={logoutAction}>
-            <button className="mt-3 text-xs text-gold hover:underline">Sign out</button>
+            <button className="lg:mt-3 whitespace-nowrap text-xs text-gold hover:underline border border-gold/30 lg:border-0 px-3 py-1.5 lg:p-0">
+              Sign out
+            </button>
           </form>
         </div>
       </aside>
@@ -76,7 +84,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       <main className="p-6 sm:p-10 max-w-6xl w-full">
         {session.mustChangePassword && (
           <div className="mb-8 border-l-2 border-gold bg-gold/10 px-4 py-3 text-sm">
-            You're still using the password you were given.{" "}
+            You&rsquo;re still using the password you were given.{" "}
             <Link href="/admin/password" className="font-semibold underline">Change it now</Link>.
           </div>
         )}

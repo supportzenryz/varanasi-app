@@ -7,6 +7,8 @@ import { branches, privateRooms } from "@/db/schema";
 import { requireAbility } from "@/lib/auth";
 import { formatPence } from "@/lib/money";
 import { saveRoom, addRoom, toggleRoom, deleteRoom, moveRoom } from "./actions";
+import { AdminNotice } from "@/components/AdminNotice";
+import { ConfirmButton } from "@/components/ConfirmButton";
 
 export const metadata = { title: "Private dining" };
 
@@ -24,9 +26,9 @@ function idealForText(json: string | null): string {
   }
 }
 
-export default async function RoomsAdmin({ searchParams }: { searchParams: Promise<{ branch?: string }> }) {
+export default async function RoomsAdmin({ searchParams }: { searchParams: Promise<{ branch?: string; saved?: string; problem?: string }> }) {
   const session = await requireAbility("editRooms");
-  const { branch: branchParam } = await searchParams;
+  const { branch: branchParam, saved, problem } = await searchParams;
 
   const all = db.select().from(branches).orderBy(asc(branches.sort)).all();
   const visible = session.role === "owner" ? all : all.filter((b) => b.id === session.branchId);
@@ -38,6 +40,7 @@ export default async function RoomsAdmin({ searchParams }: { searchParams: Promi
 
   return (
     <>
+      <AdminNotice saved={saved} problem={problem} />
       <span className="accent text-xs text-gold-ink">Private dining</span>
       <h1 className="text-3xl sm:text-4xl mt-3">{active.city}&rsquo;s private rooms</h1>
       <p className="text-ink-3 mt-2 max-w-[62ch]">
@@ -152,8 +155,10 @@ export default async function RoomsAdmin({ searchParams }: { searchParams: Promi
                       <button className="text-xs border border-[--line] px-3 py-1.5 hover:bg-pale">Move down</button></form>
                   )}
                   <form action={deleteRoom} className="ml-auto"><input type="hidden" name="id" value={room.id} />
-                    <button className="text-xs text-brick border border-brick/40 px-3 py-1.5 hover:bg-clay/10">
-                      Delete this room</button></form>
+                    <ConfirmButton
+                      ask={`Delete "${room.name}"? This can't be undone. To take it off the website and keep it, hide it instead.`}
+                      className="text-xs text-brick border border-brick/40 px-3 py-1.5 hover:bg-clay/10">
+                      Delete this room</ConfirmButton></form>
                 </div>
               </div>
             </details>

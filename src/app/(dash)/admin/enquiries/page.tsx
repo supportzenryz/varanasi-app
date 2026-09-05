@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { branches, enquiries, privateRooms, users } from "@/db/schema";
 import { requireAbility, can } from "@/lib/auth";
 import { TYPE_LABEL, type EnquiryType } from "@/lib/enquiry";
+import { AdminNotice } from "@/components/AdminNotice";
 import { setEnquiryStatus, saveEnquiryNote } from "./actions";
 import { buildEnquiryWhere, selectEnquiries, RANGES, type EnquiryQuery } from "./filters";
 
@@ -18,7 +19,7 @@ const STATUS_COLOUR: Record<string, string> = {
   closed: "bg-ink/5 text-ink-3",
 };
 
-const LIMIT = 200;
+const PER_PAGE = 50;
 
 export default async function EnquiriesAdmin({
   searchParams,
@@ -33,7 +34,13 @@ export default async function EnquiriesAdmin({
   const visible = session.role === "owner" ? all : all.filter((b) => b.id === session.branchId);
   const cityOf = new Map(all.map((b) => [b.id, b.city]));
 
-  const rows = selectEnquiries(session, params, LIMIT);
+  /* Paged rather than capped. It used to fetch the 200 most recent and say so
+     in small print, which meant everything older than the two hundredth
+     enquiry was unreachable from this screen — no way to page back, and the
+     only route to it was the CSV export. */
+  const page = Math.max(1, Number(sp.page ?? 1) || 1);
+  const { saved, problem } = sp;
+  const rows = selectEnquiries(session, params, PER_PAGE, (page - 1) * PER_PAGE);
 
   // The counts on the status tabs have to respect the other filters, or the
   // tab says 14 and the list shows 3.
@@ -55,7 +62,7 @@ export default async function EnquiriesAdmin({
   /** Builds a link that keeps every filter except the ones being changed. */
   const href = (o: Partial<EnquiryQuery>, base = "/admin/enquiries") => {
     const p = new URLSearchParams();
-    const merged = { status, type: sp.type, branch: sp.branch, range, q: sp.q, ...o };
+    const merged = { status, type: sp.type, branch: sp.branch, range, q: sp.q, page: sp.page, ...o };
     for (const [k, v] of Object.entries(merged)) {
       if (v && !(k === "range" && v === "all") && !(k === "status" && v === "open")) p.set(k, String(v));
     }
@@ -67,6 +74,7 @@ export default async function EnquiriesAdmin({
 
   return (
     <>
+      <AdminNotice saved={saved} problem={problem} />
       <span className="accent text-gold-ink">Enquiries</span>
       <h1 className="text-3xl sm:text-4xl mt-3">Enquiries</h1>
       <p className="text-ink-3 mt-2 max-w-[62ch]">
@@ -121,7 +129,7 @@ export default async function EnquiriesAdmin({
       <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
         <p className="text-sm text-ink-3">
           {matching === 0 ? "No matches" : `${matching} enquir${matching === 1 ? "y" : "ies"} match`}
-          {matching > LIMIT && ` — showing the ${LIMIT} most recent`}
+          {matching > PER_PAGE && ` — page ${page} of ${Math.ceil(matching / PER_PAGE)}`}
         </p>
         {/* A plain link, so the browser handles the download and the export
             inherits whatever is filtered right now. Hidden for the staff role:
@@ -264,6 +272,18 @@ export default async function EnquiriesAdmin({
           </p>
         )}
       </div>
+
+      {matching > PER_PAGE && (
+        <div className="mt-6 flex items-center gap-5 text-sm">
+          {page > 1 && (
+            <Link className="underline" href={href({ page: String(page - 1) })}>Newer</Link>
+          )}
+          <span className="text-ink-3">Page {page} of {Math.ceil(matching / PER_PAGE)}</span>
+          {page < Math.ceil(matching / PER_PAGE) && (
+            <Link className="underline" href={href({ page: String(page + 1) })}>Older</Link>
+          )}
+        </div>
+      )}
     </>
   );
 }

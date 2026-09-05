@@ -123,7 +123,7 @@ export default async function BookOnline({
                 <a href={telHref(branch.phone)} className="underline hover:text-gold">
                   Call us on {branch.phone}
                 </a>{" "}
-                and we'll arrange it personally.
+                and we&rsquo;ll arrange it personally.
               </p>
             </div>
 
@@ -302,7 +302,7 @@ export default async function BookOnline({
             <p>
               <span className="accent text-[0.6rem] text-gold block mb-1.5">Deposits</span>
               {formatPence(rules.deposit.perPersonPence)} per person, deducted from your bill. Non-refundable, but
-              move your booking with 24 hours' notice.
+              move your booking with 24 hours&rsquo; notice.
             </p>
             <p>
               <span className="accent text-[0.6rem] text-gold block mb-1.5">Large parties</span>

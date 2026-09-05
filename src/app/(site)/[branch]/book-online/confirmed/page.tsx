@@ -84,8 +84,8 @@ export default async function Confirmed({
               {problem ?? "We haven't received your deposit, so no table is being held."}
             </p>
             <p className="mt-6 text-pale/70">
-              Nothing further is needed from you if your payment is still processing. Otherwise, you're
-              welcome to try again, or call us and we'll book you in ourselves.
+              Nothing further is needed from you if your payment is still processing. Otherwise, you&rsquo;re
+              welcome to try again, or call us and we&rsquo;ll book you in ourselves.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link href={`/${branch.slug}/book-online`} className="btn btn-ink">Try again</Link>
@@ -140,7 +140,7 @@ export default async function Confirmed({
                 <a href={telHref(branch.phone)} className="underline hover:text-gold">{branch.phone}</a>
               </p>
               <p className="mt-2">
-                Need to change or cancel? Please give us at least 24 hours' notice —{" "}
+                Need to change or cancel? Please give us at least 24 hours&rsquo; notice —{" "}
                 <Link href={manageHref} className="underline hover:text-gold">manage your booking</Link>.
               </p>
             </div>

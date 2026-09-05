@@ -1,6 +1,6 @@
-import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { auditLog, branches, privateRooms, users } from "@/db/schema";
+import { branches, privateRooms, users } from "@/db/schema";
+import { record } from "@/lib/audit";
 import { requireAbility } from "@/lib/auth";
 import { TYPE_LABEL, type EnquiryType } from "@/lib/enquiry";
 import { selectEnquiries, type EnquiryQuery } from "../filters";
@@ -100,13 +100,12 @@ export async function GET(request: Request) {
     params.q ? `search="${params.q}"` : null,
   ].filter(Boolean).join(" ");
 
-  db.insert(auditLog).values({
-    userId: session.userId,
+  record(session, {
     action: "enquiry.export",
     entity: "enquiry",
     entityId: "-",
     detail: `${rows.length} row(s)${describe ? ` — ${describe}` : ""}`,
-  }).run();
+  });
 
   const today = new Date().toISOString().slice(0, 10);
   const scope = params.branch ? `-${params.branch}` : "";

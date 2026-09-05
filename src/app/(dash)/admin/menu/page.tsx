@@ -6,6 +6,8 @@ import { branches, menuCategories, menuItems } from "@/db/schema";
 import { requireAbility } from "@/lib/auth";
 import { formatPence } from "@/lib/money";
 import { saveItem, addItem, deleteItem, toggleItem, moveItem, saveCategory, addCategory } from "./actions";
+import { AdminNotice } from "@/components/AdminNotice";
+import { ConfirmButton } from "@/components/ConfirmButton";
 
 export const metadata = { title: "Menus" };
 
@@ -23,9 +25,9 @@ type Kind = (typeof KINDS)[number]["key"];
 
 export default async function MenuAdmin({
   searchParams,
-}: { searchParams: Promise<{ branch?: string; kind?: string }> }) {
+}: { searchParams: Promise<{ branch?: string; kind?: string; saved?: string; problem?: string }> }) {
   const session = await requireAbility("editMenu");
-  const { branch: branchParam, kind: kindParam } = await searchParams;
+  const { branch: branchParam, kind: kindParam, saved, problem } = await searchParams;
 
   const all = db.select().from(branches).orderBy(asc(branches.sort)).all();
   const visible = session.role === "owner" ? all : all.filter((b) => b.id === session.branchId);
@@ -55,6 +57,7 @@ export default async function MenuAdmin({
 
   return (
     <>
+      <AdminNotice saved={saved} problem={problem} />
       <span className="accent text-xs text-gold-ink">Menus</span>
       <h1 className="text-3xl sm:text-4xl mt-3">{active.city}&rsquo;s menus</h1>
       <p className="text-ink-3 mt-2 max-w-[62ch]">
@@ -90,7 +93,7 @@ export default async function MenuAdmin({
         <summary className="px-5 py-4 cursor-pointer text-gold-ink font-semibold hover:bg-white">
           ＋ Add new {kind === "drinks" ? "drinks section" : kind === "set" ? "set menu" : "section"}
         </summary>
-        <form action={addCategory} className="px-5 pb-5 pt-1 grid gap-4 sm:grid-cols-[1fr_auto] items-end bg-white">
+        <form action={addCategory} className="px-5 pb-5 pt-1 grid gap-4 sm:grid-cols-[1fr_auto] items-end bg-white"><input type="hidden" name="kind" value={kind} />
           <input type="hidden" name="branchId" value={active.id} />
           <input type="hidden" name="kind" value={kind} />
           <div>
@@ -116,7 +119,7 @@ export default async function MenuAdmin({
                 {!cat.isPublished && <span className="text-xs accent text-clay">Hidden</span>}
                 <details className="ml-auto">
                   <summary className="text-xs underline cursor-pointer text-ink-3">Rename section</summary>
-                  <form action={saveCategory} className="mt-3 grid gap-3 sm:grid-cols-[1fr_1fr_auto] items-end w-full">
+                  <form action={saveCategory} className="mt-3 grid gap-3 sm:grid-cols-[1fr_1fr_auto] items-end w-full"><input type="hidden" name="kind" value={kind} />
                     <input type="hidden" name="id" value={cat.id} />
                     <div><label className={label} htmlFor={`cn${cat.id}`}>Section name</label>
                       <input id={`cn${cat.id}`} name="name" defaultValue={cat.name} className={field} /></div>
@@ -154,7 +157,7 @@ export default async function MenuAdmin({
                       </summary>
 
                       <div className="px-5 pb-5 pt-1 bg-white">
-                        <form action={saveItem} className="grid gap-4 sm:grid-cols-[2fr_1fr]">
+                        <form action={saveItem} className="grid gap-4 sm:grid-cols-[2fr_1fr]"><input type="hidden" name="kind" value={kind} />
                           <input type="hidden" name="id" value={item.id} />
                           <div><label className={label} htmlFor={`n${item.id}`}>{isDrinks ? "Drink" : "Dish"} name</label>
                             <input id={`n${item.id}`} name="name" defaultValue={item.name} className={field} required /></div>
@@ -202,22 +205,24 @@ export default async function MenuAdmin({
                         </form>
 
                         <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-[--line]">
-                          <form action={toggleItem}><input type="hidden" name="id" value={item.id} />
+                          <form action={toggleItem}><input type="hidden" name="kind" value={kind} /><input type="hidden" name="id" value={item.id} />
                             <button className="text-xs border border-[--line] px-3 py-1.5 hover:bg-pale">
                               {item.isPublished ? "Hide from website" : "Show on website"}</button></form>
                           {idx > 0 && (
-                            <form action={moveItem}><input type="hidden" name="id" value={item.id} />
+                            <form action={moveItem}><input type="hidden" name="kind" value={kind} /><input type="hidden" name="id" value={item.id} />
                               <input type="hidden" name="dir" value="up" />
                               <button className="text-xs border border-[--line] px-3 py-1.5 hover:bg-pale">Move up</button></form>
                           )}
                           {idx < list.length - 1 && (
-                            <form action={moveItem}><input type="hidden" name="id" value={item.id} />
+                            <form action={moveItem}><input type="hidden" name="kind" value={kind} /><input type="hidden" name="id" value={item.id} />
                               <input type="hidden" name="dir" value="down" />
                               <button className="text-xs border border-[--line] px-3 py-1.5 hover:bg-pale">Move down</button></form>
                           )}
-                          <form action={deleteItem} className="ml-auto"><input type="hidden" name="id" value={item.id} />
-                            <button className="text-xs text-brick border border-brick/40 px-3 py-1.5 hover:bg-clay/10">
-                              Delete this {isDrinks ? "drink" : "dish"}</button></form>
+                          <form action={deleteItem} className="ml-auto"><input type="hidden" name="kind" value={kind} /><input type="hidden" name="id" value={item.id} />
+                            <ConfirmButton
+                              ask={`Delete "${item.name}"? This can't be undone. To take it off the website and keep it, use Hide instead.`}
+                              className="text-xs text-brick border border-brick/40 px-3 py-1.5 hover:bg-clay/10">
+                              Delete this {isDrinks ? "drink" : "dish"}</ConfirmButton></form>
                         </div>
                       </div>
                     </details>
@@ -229,7 +234,7 @@ export default async function MenuAdmin({
                 <summary className="px-5 py-3 text-sm cursor-pointer text-gold-ink font-semibold hover:bg-white">
                   Add to {cat.name}
                 </summary>
-                <form action={addItem} className="px-5 pb-5 pt-1 grid gap-4 sm:grid-cols-[2fr_1fr] bg-white">
+                <form action={addItem} className="px-5 pb-5 pt-1 grid gap-4 sm:grid-cols-[2fr_1fr] bg-white"><input type="hidden" name="kind" value={kind} />
                   <input type="hidden" name="categoryId" value={cat.id} />
                   <div><label className={label} htmlFor={`an${cat.id}`}>{isDrinks ? "Drink" : "Dish"} name</label>
                     <input id={`an${cat.id}`} name="name" className={field} required /></div>

@@ -696,6 +696,326 @@ print(json.dumps({
   }
 }
 
+console.log('\n── 6b. Branch isolation: a Leicester manager cannot see Birmingham ──');
+
+/* The explicit requirement: "Leicester manager won't be able to see the
+   Birmingham and vice versa." Every screen used to work its own scoping out
+   with `session.role !== "owner" && session.branchId != null`, which reads as
+   "scope non-owners" and behaves as "scope non-owners who have a branch" — so
+   an account with no branch fell through to unscoped and saw both. These
+   checks sign in as real accounts rather than asserting on the source. */
+
+const MGR_PW = 'MgrPass!2026x';
+execFileSync('python3', ['-c', `
+import sqlite3, bcrypt
+db = sqlite3.connect('data/varanasi.db')
+h = bcrypt.hashpw(b'${MGR_PW}', bcrypt.gensalt(10)).decode()
+b = db.execute("select id from branches where slug='birmingham'").fetchone()[0]
+l = db.execute("select id from branches where slug='leicester'").fetchone()[0]
+for email, name, branch in [('e2e.leic@zenryz-test.com','E2E Leicester Manager', l),
+                            ('e2e.brum@zenryz-test.com','E2E Birmingham Manager', b),
+                            ('e2e.nobranch@zenryz-test.com','E2E Unassigned Manager', None)]:
+    db.execute("delete from users where email=?", (email,))
+    db.execute("insert into users (email,name,role,branch_id,password_hash,is_active,must_change_password)"
+               " values (?,?,'manager',?,?,1,0)", (email, name, branch, h))
+db.commit()
+`]);
+
+/** A signed-in browser context for one account, isolated from the owner's. */
+const signInAs = async (email) => {
+  const c = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const p = await c.newPage();
+  await p.goto(`${BASE}/admin/login`, { waitUntil: 'networkidle' });
+  await p.fill('input[name="email"]', email);
+  await p.fill('input[name="password"]', MGR_PW);
+  await p.click('button[type="submit"]');
+  await p.waitForURL(u => !u.pathname.startsWith('/admin/login'), { timeout: 10000 }).catch(() => {});
+  return { c, p };
+};
+
+/* A dish that exists at one branch and nowhere else. Picking "the first dish
+   at Birmingham" is no test at all: both restaurants sell poppadoms, so the
+   name appears on either menu and the check passes or fails for the wrong
+   reason. These are planted with unique names instead. */
+const brumDish = `E2E Brum Only ${stamp}`;
+const leicDish = `E2E Leic Only ${stamp}`;
+execFileSync('python3', ['-c', `
+import sqlite3
+db = sqlite3.connect('data/varanasi.db')
+for slug, name in [('birmingham', '${brumDish}'), ('leicester', '${leicDish}')]:
+    cat = db.execute("select mc.id from menu_categories mc join branches b on b.id=mc.branch_id"
+                     " where b.slug=? and mc.kind='food' limit 1", (slug,)).fetchone()[0]
+    db.execute("insert into menu_items (category_id,name,price_pence,sort,is_published)"
+               " values (?,?,1234,999,1)", (cat, name))
+db.commit()
+`]);
+
+const { c: leicCtx, p: leic } = await signInAs('e2e.leic@zenryz-test.com');
+t('A branch manager can sign in', !leic.url().includes('/admin/login'), leic.url());
+
+await leic.goto(`${BASE}/admin`, { waitUntil: 'networkidle' });
+const leicHome = await leic.locator('main').innerText();
+t('Manager overview says they are seeing their own branch',
+  /seeing your own branch/i.test(leicHome));
+t('Manager overview does not claim both branches', !/seeing both branches/i.test(leicHome));
+
+// Menus
+await leic.goto(`${BASE}/admin/menu?branch=birmingham&kind=food`, { waitUntil: 'networkidle' });
+const leicMenu = await leic.locator('main').innerText();
+t('Asking for Birmingham menus by URL lands on Leicester instead',
+  /Leicester/i.test(leicMenu) && !/href="\/admin\/menu\?branch=birmingham/.test(await leic.content()));
+t('No Birmingham dish is listed for a Leicester manager', !leicMenu.includes(brumDish), brumDish);
+
+// Bookings
+await leic.goto(`${BASE}/admin/bookings?branch=birmingham`, { waitUntil: 'networkidle' });
+t('Asking for Birmingham bookings by URL lands on Leicester instead',
+  /Leicester/i.test(await leic.locator('h1').innerText()), await leic.locator('h1').innerText());
+
+// Enquiries — the Birmingham one this run created must not be visible.
+await leic.goto(`${BASE}/admin/enquiries?status=all&q=${encodeURIComponent(testEmail)}`, { waitUntil: 'networkidle' });
+t('A Birmingham enquiry is invisible to a Leicester manager',
+  await leic.locator('article').count() === 0, `${await leic.locator('article').count()} card(s)`);
+
+// Screens their role has no business on
+for (const [path, label] of [['/admin/staff', 'Staff access'], ['/admin/settings', 'Settings'],
+                             ['/admin/backups', 'Backups'], ['/admin/logs', 'Activity log']]) {
+  await leic.goto(`${BASE}${path}`, { waitUntil: 'networkidle' });
+  const landed = new URL(leic.url()).pathname;
+  t(`${label} is closed to a manager`, landed === '/admin', landed);
+}
+const deniedText = await leic.locator('main').innerText();
+t('And being turned away says so on screen, rather than looking like a dead link',
+  /isn.t open to your account/i.test(deniedText));
+
+// The sidebar should not offer what it cannot open.
+const leicNav = await leic.locator('aside nav a').allTextContents();
+t('Owner-only screens are absent from a manager sidebar',
+  !leicNav.some(l => /staff access|settings|backups|activity log/i.test(l)), leicNav.join(', '));
+
+// Vouchers: money tiles must be this branch's, and another branch's customer
+// must not be named.
+const brumVoucher = q(`select v.code, v.recipient_name from vouchers v
+  join branches b on b.id = v.branch_id where b.slug = 'birmingham' limit 1`)[0];
+if (brumVoucher) {
+  await leic.goto(`${BASE}/admin/vouchers?code=${encodeURIComponent(brumVoucher.code)}`, { waitUntil: 'networkidle' });
+  const vText = await leic.locator('main').innerText();
+  t('A Birmingham voucher can still be checked at a Leicester till', vText.includes(brumVoucher.code));
+  if (brumVoucher.recipient_name) {
+    t('  · but the other branch\'s customer is not named',
+      !vText.includes(brumVoucher.recipient_name), brumVoucher.recipient_name);
+  }
+}
+
+await leicCtx.close();
+
+// And the reverse direction, which is the half that usually goes untested.
+const { c: brumCtx, p: brum } = await signInAs('e2e.brum@zenryz-test.com');
+await brum.goto(`${BASE}/admin/menu?branch=leicester&kind=food`, { waitUntil: 'networkidle' });
+const brumMenu = await brum.locator('main').innerText();
+t('And a Birmingham manager cannot see Leicester either', /Birmingham/i.test(brumMenu));
+t('  · no Leicester dish is listed', !brumMenu.includes(leicDish), leicDish);
+
+await brumCtx.close();
+
+// An account with no branch: nothing, and it says why.
+const { c: noneCtx, p: none } = await signInAs('e2e.nobranch@zenryz-test.com');
+await none.goto(`${BASE}/admin`, { waitUntil: 'networkidle' });
+const noneText = await none.locator('main').innerText();
+t('An unassigned manager is told their account has no restaurant',
+  /no restaurant assigned/i.test(noneText));
+t('  · and is not shown the group figures', !/seeing both branches/i.test(noneText));
+await noneCtx.close();
+
+console.log('\n── 6c. Sign-in is validated, throttled and recorded ──');
+
+{
+  const c = await browser.newContext();
+  const p = await c.newPage();
+  const before = q(`select count(*) as n from audit_log where action like 'login.%'`)[0].n;
+
+  /* Read every role="alert" on the page rather than the first. Next.js adds
+     its own empty one — the route announcer — and which of the two comes first
+     depends on how the page was reached. */
+  const alertText = async () => (await p.locator('[role="alert"]').allTextContents()).join(' ').trim();
+
+  /* The email box is type="email", so the browser refuses to post "not-an-address"
+     at all. That is the first line of two — the server also checks it, which is
+     what tests/validate.mts covers, because reaching that path from a browser
+     means defeating the browser's own validation first. */
+  await p.goto(`${BASE}/admin/login`, { waitUntil: 'networkidle' });
+  await p.fill('input[name="email"]', 'not-an-address');
+  await p.fill('input[name="password"]', 'whatever');
+  await p.click('button[type="submit"]');
+  await p.waitForTimeout(800);
+  t('The browser will not even post a malformed email address',
+    await p.evaluate(() => !document.querySelector('input[name="email"]').checkValidity()));
+
+  /* The same answer whether the address exists or not — a different one for a
+     real account turns this form into a list of who works here. Checked before
+     the lockout loop below, because that loop trips the per-address counter and
+     the lock message would then answer for both. */
+  for (const [address, label] of [['owner@varanasi.uk', 'a real account'],
+                                  [`e2e.ghost.${stamp}@zenryz-test.com`, 'one that does not exist']]) {
+    await p.goto(`${BASE}/admin/login`, { waitUntil: 'networkidle' });
+    await p.fill('input[name="email"]', address);
+    await p.fill('input[name="password"]', 'definitely-not-it');
+    await p.click('button[type="submit"]');
+    await p.waitForTimeout(900);
+    t(`The refusal for ${label} gives nothing away`,
+      /don.t match an active account/i.test(await alertText()), await alertText());
+  }
+
+  // Six wrong passwords against one address. The fifth trips the lock.
+  const victim = `e2e.lockout.${stamp}@zenryz-test.com`;
+  let lockMsg = '';
+  for (let i = 0; i < 6; i++) {
+    await p.goto(`${BASE}/admin/login`, { waitUntil: 'networkidle' });
+    await p.fill('input[name="email"]', victim);
+    await p.fill('input[name="password"]', `wrong-${i}`);
+    await p.click('button[type="submit"]');
+    await p.waitForTimeout(900);
+    lockMsg = await alertText();
+  }
+  t('Repeated wrong passwords lock the address out', /too many attempts/i.test(lockMsg), lockMsg);
+  t('  · and the lock says how long to wait', /minute/i.test(lockMsg), lockMsg);
+
+  const after = q(`select count(*) as n from audit_log where action like 'login.%'`)[0].n;
+  t('Failed sign-ins are written to the audit log', after > before, `${before} → ${after}`);
+  t('  · including the lockout itself',
+    q(`select id from audit_log where action='login.locked'`).length > 0);
+
+  await c.close();
+}
+
+/* Server actions here end in a redirect carrying the message. waitForLoadState
+   ('networkidle') resolves part-way through that navigation, so reading the
+   page straight after it returns the render from *before* the redirect — the
+   screen without the banner. Wait for the URL the action redirects to. */
+const settled = async (p = page) => {
+  await p.waitForURL(u => /[?&](saved|problem)=/.test(u.search), { timeout: 10000 })
+    .catch(() => {});
+  await p.waitForLoadState('domcontentloaded');
+};
+
+console.log('\n── 6d. The activity log and what reaches the owner ──');
+
+await page.goto(`${BASE}/admin/logs`, { waitUntil: 'networkidle' });
+t('The owner has an activity log to read', page.url().includes('/admin/logs'));
+const logText = await page.locator('main').innerText();
+t('  · it lists entries', /entr(y|ies)/i.test(logText));
+t('  · and says where the reports are sent', /emailed to|Set OUTBOX|OWNER_EMAIL|written to/i.test(logText));
+
+await page.goto(`${BASE}/admin/logs?area=access`, { waitUntil: 'networkidle' });
+t('  · filtering by area works', /login|password/i.test(await page.locator('main').innerText()));
+
+await page.goto(`${BASE}/admin/logs?q=zzz-nothing-matches-zzz`, { waitUntil: 'networkidle' });
+t('  · a search with no matches says so', /nothing matches/i.test(await page.locator('main').innerText()));
+
+{
+  // A change an owner makes must produce an email to the owner address. With no
+  // provider configured these land in data/outbox as readable files.
+  const t0 = Date.now();
+  await page.goto(`${BASE}/admin/staff`, { waitUntil: 'networkidle' });
+  await page.locator('summary', { hasText: /Add someone/i }).first().click();
+  await page.fill('#an', `E2E Audit ${stamp}`);
+  await page.fill('#ae', `e2e.audit.${stamp}@zenryz-test.com`);
+  await page.selectOption('#ar', 'staff');
+  await page.selectOption('#ab', { index: 1 });
+  await page.locator('button', { hasText: /^Add account$/ }).click();
+  await settled();
+
+  const banner = await page.locator('main').innerText();
+  t('Adding a member of staff says what happened',
+    new RegExp(`E2E Audit ${stamp} added as staff`).test(banner),
+    banner.slice(0, 100).replace(/\n/g, ' | '));
+
+  await new Promise(r => setTimeout(r, 1500));
+  const mails = mailSince(t0);
+  t('Creating an account emails the owner straight away',
+    mails.some(m => /user\.create/.test(m)), `${mails.length} message(s) since`);
+}
+
+{
+  // A manager with no branch must be refused rather than silently created.
+  await page.goto(`${BASE}/admin/staff`, { waitUntil: 'networkidle' });
+  await page.locator('summary', { hasText: /Add someone/i }).first().click();
+  await page.fill('#an', `E2E NoBranch ${stamp}`);
+  await page.fill('#ae', `e2e.refused.mgr.${stamp}@zenryz-test.com`);
+  await page.selectOption('#ar', 'manager');
+  await page.selectOption('#ab', '');
+  await page.locator('button', { hasText: /^Add account$/ }).click();
+  await settled();
+  t('A manager cannot be saved without a restaurant',
+    /attached to Birmingham or Leicester/i.test(await page.locator('main').innerText()));
+  t('  · and no such account was created',
+    q(`select id from users where email = 'e2e.refused.mgr.${stamp}@zenryz-test.com'`).length === 0);
+}
+
+console.log('\n── 6e. Admin forms answer back ──');
+
+{
+  const openBookingForm = async () => {
+    await page.goto(`${BASE}/admin/bookings?branch=birmingham`, { waitUntil: 'networkidle' });
+    await page.locator('summary', { hasText: /Log a phone or walk-in booking/i }).first().click();
+    return page.locator('form:has(input[name="guestName"])').first();
+  };
+
+  const form = await openBookingForm();
+  if (await form.count()) {
+    await form.locator('input[name="guestName"]').fill(`E2E Guest ${stamp}`);
+    await form.locator('input[name="date"]').fill('2020-01-01');
+    await form.locator('input[name="time"]').fill('19:30');
+    await form.locator('input[name="partySize"]').fill('4');
+    await form.locator('button[type="submit"], button:not([type])').last().click();
+    await settled();
+    t('A booking in the past is refused, and says so',
+      /already passed/i.test(await page.locator('main').innerText()));
+
+    const f2 = await openBookingForm();
+    await f2.locator('input[name="guestName"]').fill(`E2E Guest ${stamp}`);
+    await f2.locator('input[name="date"]').fill(new Date(Date.now() + 864e5).toISOString().slice(0, 10));
+    await f2.locator('input[name="time"]').fill('19:30');
+    await f2.locator('input[name="partySize"]').fill('4');
+    await f2.locator('button[type="submit"], button:not([type])').last().click();
+    await settled();
+    const okText = await page.locator('main').innerText();
+    t('A good booking is confirmed on screen with its reference', /Reference V[BL]-/.test(okText),
+      okText.slice(0, 120));
+    t('  · and the booking exists',
+      q(`select id from bookings where guest_name = 'E2E Guest ${stamp}'`).length === 1);
+  } else {
+    t('Booking form present on the admin bookings screen', false, 'form not found');
+  }
+}
+
+{
+  // Service times that would take every date off sale.
+  await page.goto(`${BASE}/admin/settings`, { waitUntil: 'networkidle' });
+  const first = page.locator('input[name="first"]');
+  if (await first.count()) {
+    const keepFirst = await first.inputValue();
+    const keepLast = await page.locator('input[name="last"]').inputValue();
+    await first.fill('22:00');
+    await page.locator('input[name="last"]').fill('09:00');
+    await page.locator('button', { hasText: /Save reservation rules/i }).click();
+    await settled();
+    t('Service times that close the restaurant are refused',
+      /has to be after/i.test(await page.locator('main').innerText()));
+    t('  · and nothing was saved',
+      JSON.parse(q(`select value from settings where key='booking_rules'`)[0].value).slots.first === keepFirst,
+      keepFirst);
+
+    // Put it back the way it was, and prove a good save is acknowledged.
+    await page.goto(`${BASE}/admin/settings`, { waitUntil: 'networkidle' });
+    await page.locator('input[name="first"]').fill(keepFirst);
+    await page.locator('input[name="last"]').fill(keepLast);
+    await page.locator('button', { hasText: /Save reservation rules/i }).click();
+    await settled();
+    t('A good save is confirmed on screen',
+      /Saved\./i.test(await page.locator('main').innerText()));
+  }
+}
+
 console.log('\n── 7. Responsiveness ──');
 
 for (const [label, w, h] of [['mobile 375', 375, 812], ['tablet 768', 768, 1024], ['desktop 1440', 1440, 900]]) {
@@ -710,6 +1030,21 @@ for (const [label, w, h] of [['mobile 375', 375, 812], ['tablet 768', 768, 1024]
   await p.close();
 }
 
+{
+  /* Sign out has to be reachable on the device it is used from. The admin rail
+     scrolls sideways on a phone, and the whole rail used to scroll — putting
+     "Sign out" 1,466px to the right of a 375px screen. It was in the markup and
+     nobody could reach it, on a device shared at the pass. */
+  const phone = await ctx.newPage();
+  await phone.setViewportSize({ width: 375, height: 812 });
+  await phone.goto(`${BASE}/admin`, { waitUntil: 'networkidle' });
+  const box = await phone.locator('button', { hasText: /^Sign out$/ }).first().boundingBox();
+  t('Sign out is on screen on a phone',
+    !!box && box.x >= 0 && box.x + box.width <= 375 + 1,
+    box ? `x=${Math.round(box.x)} w=${Math.round(box.width)}` : 'not found');
+  await phone.close();
+}
+
 console.log('\n── 8. Console health ──');
 t('No uncaught JavaScript errors during the run', errors.length === 0, errors.slice(0, 3).join(' | '));
 
@@ -717,9 +1052,12 @@ t('No uncaught JavaScript errors during the run', errors.length === 0, errors.sl
 execFileSync('python3', ['-c', `
 import sqlite3
 db = sqlite3.connect('data/varanasi.db')
-db.execute("delete from menu_items where name like 'E2E Dish %'")
+db.execute("delete from menu_items where name like 'E2E Dish %' or name like 'E2E Brum Only %' or name like 'E2E Leic Only %'")
 db.execute("delete from menu_categories where name like 'E2E Section %'")
 db.execute("delete from enquiries where email like 'e2e.%@zenryz-test.com'")
+db.execute("delete from users where email like 'e2e.%@zenryz-test.com'")
+db.execute("delete from bookings where guest_name like 'E2E Guest %'")
+db.execute("delete from audit_log where action like 'login.%' and entity_id like 'e2e.%'")
 db.execute("delete from audit_log where action in ('menu.category.create','enquiry.export') and detail like '%E2E%'")
 db.commit()
 `]);

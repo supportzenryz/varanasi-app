@@ -1,8 +1,9 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { vouchers, auditLog } from "@/db/schema";
+import { vouchers } from "@/db/schema";
+import { record } from "@/lib/audit";
 import { requireAbility, type Session } from "@/lib/auth";
 import { branchBySlug } from "@/lib/branches";
 import { parsePounds, formatPence } from "@/lib/money";
@@ -11,9 +12,7 @@ import {
 } from "@/lib/voucher";
 
 function log(session: Session, action: string, entityId: string, detail?: string) {
-  db.insert(auditLog).values({
-    userId: session.userId, action, entity: "voucher", entityId, detail: detail ?? null,
-  }).run();
+  record(session, { action, entity: "voucher", entityId, detail });
 }
 
 /** Take an amount off a voucher at the till. */
@@ -111,8 +110,36 @@ export async function cancelVoucher(formData: FormData) {
   const v = voucherByCode(code);
   if (!v) redirectTo(`/admin/vouchers?error=${encodeURIComponent("No voucher found with that code.")}`);
 
-  db.update(vouchers).set({ status: "cancelled", balancePence: 0 }).where(eq(vouchers.id, v!.id)).run();
-  log(session, "voucher.cancel", v!.code, `was ${formatPence(v!.balancePence)}`);
+  /* Refuse the second press. The button was a plain form post to an action
+     that wrote unconditionally, so a double-click, a browser "resend" or the
+     back button re-ran it — each time recording another cancellation of a
+     voucher already worth nothing, and each time telling the owner about it.
+     The row's own status is the guard: cancelling twice is not a thing that
+     can happen. */
+  if (v!.status === "cancelled") {
+    redirectTo(`/admin/vouchers?code=${encodeURIComponent(v!.code)}&done=${encodeURIComponent(
+      `Voucher ${v!.code} was already cancelled — nothing further has changed.`)}`);
+  }
+  if (v!.status === "redeemed" || v!.balancePence === 0) {
+    redirectTo(`/admin/vouchers?code=${encodeURIComponent(v!.code)}&error=${encodeURIComponent(
+      "That voucher has already been used in full — there is nothing left to cancel.")}`);
+  }
+
+  const was = v!.balancePence;
+  db.update(vouchers)
+    .set({ status: "cancelled", balancePence: 0 })
+    // Optimistic: if another till spent from it between the read above and
+    // this write, the balance no longer matches and nothing is written.
+    .where(and(eq(vouchers.id, v!.id), eq(vouchers.balancePence, was)))
+    .run();
+
+  const after = voucherById(v!.id);
+  if (after?.status !== "cancelled") {
+    redirectTo(`/admin/vouchers?code=${encodeURIComponent(v!.code)}&error=${encodeURIComponent(
+      "That voucher changed while you were looking at it — check the balance and try again.")}`);
+  }
+
+  log(session, "voucher.cancel", v!.code, `was ${formatPence(was)}`);
   revalidatePath("/admin/vouchers");
   redirectTo(`/admin/vouchers?done=${encodeURIComponent(`Voucher ${v!.code} cancelled.`)}`);
 }

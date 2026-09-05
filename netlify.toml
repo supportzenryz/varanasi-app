@@ -2,7 +2,7 @@
 #
 # IMPORTANT: this alone is not enough to run the app. The database is a SQLite
 # file on disk and Netlify's functions have a read-only filesystem, so every
-# write is lost. Read the deployment section of HANDOVER.md and pick a hosted
+# write is lost. Read the deployment section of docs/HANDOVER.md and pick a hosted
 # database (Turso is the smallest change) before deploying for real.
 
 [build]

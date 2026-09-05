@@ -9,7 +9,7 @@ import { databasePath } from "@/db";
  *
  * There were none. A restaurant taking card deposits and selling gift
  * vouchers was running on one SQLite file on one volume, and the only thing
- * resembling a backup was an unticked checkbox in DEPLOYMENT.md. Vouchers are
+ * resembling a backup was an unticked checkbox in docs/DEPLOYMENT.md. Vouchers are
  * the sharp end of that: a guest pays £100, receives a code, and the sole
  * record that the debt exists is that file. Lose it and there are customers
  * holding valid claims that nothing can verify.
@@ -31,7 +31,7 @@ import { databasePath } from "@/db";
  *                database, so whatever destroys one destroys the other.
  *
  * Closing that gap needs a copy somewhere else, which is why the admin can
- * download one and why BACKUPS.md explains the offsite step. Automating it is
+ * download one and why docs/BACKUPS.md explains the offsite step. Automating it is
  * worth doing; pretending the local copies are already enough is not.
  */
 

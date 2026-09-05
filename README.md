@@ -101,7 +101,7 @@ npm run type-check   # Check types
 
 ## Deployment
 
-See [DEPLOYMENT.md](./DEPLOYMENT.md) for complete Netlify setup, including:
+See [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md) for complete Netlify setup, including:
 - Environment variable configuration
 - Stripe webhook setup
 - Email configuration
@@ -144,12 +144,12 @@ See [DEPLOYMENT.md](./DEPLOYMENT.md) for complete Netlify setup, including:
 - Check email domain verified
 - Review Resend dashboard
 
-See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed troubleshooting.
+See [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md) for detailed troubleshooting.
 
 ## Support
 
 For issues or questions:
-1. Check DEPLOYMENT.md troubleshooting
+1. Check docs/DEPLOYMENT.md troubleshooting
 2. Review admin audit log
 3. Check Netlify build logs
 4. Review browser console errors

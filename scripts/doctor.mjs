@@ -70,8 +70,42 @@ if (!fs.existsSync(resolved)) {
 } else {
   const stat = fs.statSync(resolved);
   say("size / last written", `${(stat.size / 1024).toFixed(0)}KB · ${stat.mtime.toLocaleString("en-GB")}`);
+
+  /* The write-ahead log, and why it gets its own line.
+   *
+   * In WAL mode a commit is written to `<db>-wal`, not to the database file,
+   * and only moves across at a checkpoint. So the database file's size and
+   * timestamp describe the last checkpoint, not the last booking — this script
+   * reported a file "last written 05:35" that had been taking bookings until
+   * midnight, and both readings were true of different files.
+   *
+   * A large WAL is therefore normal and not a fault. It is worth showing
+   * because it explains a stale-looking timestamp, and because a reader that
+   * cannot see the WAL is looking at the database as it was some time ago.
+   */
+  const wal = `${resolved}-wal`;
+  if (fs.existsSync(wal)) {
+    const w = fs.statSync(wal);
+    say("write-ahead log", `${(w.size / 1024).toFixed(0)}KB · ${w.mtime.toLocaleString("en-GB")}`
+      + dim("  (recent commits live here until a checkpoint)"));
+  }
+
   try {
-    db = new DatabaseSync(resolved, { readOnly: true });
+    /* Read-write, falling back to read-only.
+     *
+     * A read-only connection can read a write-ahead log, but only while the
+     * shared-memory file beside it exists — which is true while a server is
+     * running and not guaranteed once one has stopped badly. Opening read-write
+     * lets SQLite recover the log itself, which is what the application does,
+     * so the answer is the same one the application would get. Nothing here
+     * writes; opening for writing is not writing.
+     */
+    try {
+      db = new DatabaseSync(resolved);
+    } catch {
+      db = new DatabaseSync(resolved, { readOnly: true });
+      console.log(dim(`  ${" ".repeat(22)} opened read-only — anything in the write-ahead log may not be visible`));
+    }
     let failures = 0;
     const counts = ["branches", "menu_items", "bookings", "vouchers", "enquiries", "private_rooms"]
       .map((t) => {
@@ -102,66 +136,96 @@ if (!fs.existsSync(resolved)) {
 }
 
 /**
- * Every other copy of this database on the machine.
+ * Every other copy of this project on the machine, and which one is live.
  *
- * This started as a look at the folders beside this one, which was not nearly
- * enough: the copy that mattered turned out to be two levels down a different
- * branch of the tree. A booking reference that reached Stripe was necessarily
- * written to *some* file, so when it is not in this one the only useful next
- * question is which file — and answering it by hand means knowing where to
- * look, which is the thing nobody knew.
+ * Looking for the database file alone was not enough. What identifies the copy
+ * a server is actually running from is its `.env.local`: the running server had
+ * a STRIPE_WEBHOOK_SECRET — a webhook cannot verify a signature without one —
+ * while the folder being inspected had none. That single difference names the
+ * right folder immediately, where booking counts and timestamps only ever
+ * suggested one.
  *
- * So: walk the home directory, skip the places a database will never be and
- * that are expensive to walk, and report every one found with what it holds.
+ * OneDrive is searched, not skipped. Windows redirects Documents and Desktop
+ * into it by default, so skipping it as "not a place code lives" excludes the
+ * most likely place on a Windows machine — which is how the first version of
+ * this search missed what it was looking for.
  */
-function findDatabases(root, maxDepth = 6) {
+function findProjects(root, maxDepth = 7) {
   const skip = new Set([
     "node_modules", ".next", ".git", ".cache", "AppData", "Library",
     "Windows", "Program Files", "Program Files (x86)", "$Recycle.Bin",
-    "anaconda3", ".gradle", ".m2", "OneDrive", "venv", ".venv", "__pycache__",
+    "anaconda3", ".gradle", ".m2", "venv", ".venv", "__pycache__", ".vscode",
   ]);
   const found = [];
   const walk = (dir, depth) => {
-    if (depth > maxDepth || found.length > 40) return;
+    if (depth > maxDepth || found.length > 30) return;
     let entries;
     try {
       entries = fs.readdirSync(dir, { withFileTypes: true });
     } catch { return; }                       // unreadable folder: not our business
+    const names = new Set(entries.filter((e) => !e.isDirectory()).map((e) => e.name));
+    if (names.has("package.json")) {
+      try {
+        const pkg = JSON.parse(fs.readFileSync(path.join(dir, "package.json"), "utf8"));
+        if (pkg?.name === "varanasi-app") { found.push(dir); return; }   // don't walk into it
+      } catch { /* not ours */ }
+    }
     for (const e of entries) {
+      if (!e.isDirectory() || e.isSymbolicLink()) continue;
       if (e.name.startsWith("$") || skip.has(e.name)) continue;
-      const full = path.join(dir, e.name);
-      if (e.isFile() && e.name === "varanasi.db") found.push(full);
-      else if (e.isDirectory() && !e.isSymbolicLink()) walk(full, depth + 1);
+      walk(path.join(dir, e.name), depth + 1);
     }
   };
   walk(root, 0);
   return found;
 }
 
-const home = process.env.USERPROFILE ?? process.env.HOME ?? path.dirname(process.cwd());
-const elsewhere = findDatabases(home).filter((f) => path.resolve(f) !== resolved);
+/** Which settings a copy carries — names only, never values. */
+function envSummary(dir) {
+  const envFile = path.join(dir, ".env.local");
+  if (!fs.existsSync(envFile)) return red("no .env.local");
+  let text = "";
+  try { text = fs.readFileSync(envFile, "utf8"); } catch { return dim("(.env.local unreadable)"); }
+  const has = (k) => new RegExp(`^\\s*${k}\\s*=\\s*\\S`, "m").test(text);
+  const marks = [
+    has("STRIPE_SECRET_KEY") ? "stripe key" : null,
+    has("STRIPE_WEBHOOK_SECRET") ? green("webhook secret") : dim("no webhook secret"),
+    has("RESEND_API_KEY") ? "resend key" : null,
+  ].filter(Boolean);
+  return marks.join(" · ");
+}
 
-if (elsewhere.length) {
-  console.log(`\n${bold("Other copies of this database on the machine")}`);
-  for (const other of elsewhere) {
-    let detail = dim("(could not read it)");
+const roots = [process.env.USERPROFILE ?? process.env.HOME ?? path.dirname(process.cwd())];
+const copies = findProjects(roots[0]).filter((d) => path.resolve(d) !== process.cwd());
+
+if (copies.length) {
+  console.log(`\n${bold("Other copies of this project on the machine")}`);
+  for (const dir of copies) {
+    console.log(`  ${bold(dir)}`);
+    console.log(`    ${envSummary(dir)}`);
+    const theirDb = path.join(dir, "data", "varanasi.db");
+    if (!fs.existsSync(theirDb)) { console.log(`    ${dim("no database")}`); continue; }
+    let line = dim("(could not read its database)");
     try {
-      const conn = new DatabaseSync(other, { readOnly: true });
+      let conn;
+      try { conn = new DatabaseSync(theirDb); }
+      catch { conn = new DatabaseSync(theirDb, { readOnly: true }); }
       const n = conn.prepare("select count(*) as n from bookings").get().n;
+      const latest = conn.prepare("select reference from bookings order by id desc limit 1").get();
       let mark = "";
       if (wanted) {
         const hit = conn.prepare("select reference from bookings where upper(reference) = upper(?)").get(wanted.trim());
         mark = hit ? `  ${green(bold(`← ${wanted} IS HERE`))}` : "";
       }
       conn.close();
-      const when = fs.statSync(other).mtime.toLocaleString("en-GB");
-      detail = `${dim(`${n} bookings · last written ${when}`)}${mark}`;
+      const when = fs.statSync(theirDb).mtime.toLocaleString("en-GB");
+      line = dim(`${n} bookings${latest ? `, latest ${latest.reference}` : ""} · ${when}`) + mark;
     } catch { /* leave the placeholder */ }
-    console.log(`  ${other}\n    ${detail}`);
+    console.log(`    ${line}`);
   }
-  console.log(dim("\n  Whichever folder you start the server from is the one it writes to."));
+  console.log(dim("\n  The copy carrying a webhook secret is the one your dev server is running from."));
 } else {
-  console.log(`\n${dim("No other copy of the database found under " + home + ".")}`);
+  console.log(`\n${dim("No other copy of the project found under " + roots[0] + ".")}`);
 }
 
 /* ---------- a specific booking ---------- */

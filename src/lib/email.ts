@@ -35,7 +35,80 @@ export function mailMode(): MailResult["via"] {
   return "outbox";
 }
 
+/** The address every message is sent from, and why it is worth being careful. */
+export function mailFrom(): string {
+  return process.env.MAIL_FROM ?? "reservations@varanasi.uk";
+}
+
+/**
+ * What happened to the last message this process tried to send.
+ *
+ * Kept because a rejection is otherwise invisible from inside the product. The
+ * failure that prompted this ran for a day and a half: a provider key was added
+ * while the sending address was still on a domain nobody had verified, so every
+ * confirmation was refused with a 403 in a terminal log, the settings screen
+ * said "Sending live via resend", and the first anyone knew was a guest saying
+ * they had never received anything.
+ *
+ * Deliberately a fact and not an inference. Whether a domain is verified is
+ * knowable only by asking the provider, so rather than guess from the address,
+ * this records the answer the provider actually gave. It resets on restart,
+ * which the admin screen says, and `sendTestEmail` exists to produce one on
+ * demand rather than waiting for a real booking to find out.
+ */
+export type LastMail = { ok: boolean; via: MailResult["via"]; detail?: string; subject: string; at: number };
+let lastMail: LastMail | null = null;
+
+export function lastMailResult(): LastMail | null {
+  return lastMail;
+}
+
+/**
+ * A warning about a configuration that provably cannot deliver.
+ *
+ * Only the case we can be certain of without asking the provider: a key is set
+ * and the sending address has not been chosen at all, so it is the built-in
+ * default on a domain that belongs to the restaurant's future website rather
+ * than to anything verified today. Anything beyond that — is *this* domain
+ * verified? — is the provider's to answer, and `sendTestEmail` asks it.
+ */
+export function mailConfigWarning(from = mailFrom()): string | null {
+  if (mailMode() !== "resend") return null;
+  const domain = from.split("@")[1]?.toLowerCase() ?? "";
+  if (domain === "resend.dev") return null;         // Resend accepts its own sandbox sender
+  if (process.env.MAIL_FROM || from !== "reservations@varanasi.uk") return null;
+  return `Email is going out from ${from}, which is the built-in default — nobody has chosen it. `
+    + "Resend refuses any address on a domain that has not been verified against the account, "
+    + "so confirmations are being rejected. Verify the domain in Resend and set the sending "
+    + "address to one on it, or set it to onboarding@resend.dev to test today.";
+}
+
+/** Write the message to data/outbox. Returns the file, or null if it couldn't. */
+function writeToOutbox(mail: Mail, from: string, note?: string): string | null {
+  try {
+    fs.mkdirSync(OUTBOX, { recursive: true });
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const slug = mail.subject.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60);
+    const file = path.join(OUTBOX, `${stamp}--${note ? "UNDELIVERED--" : ""}${slug}.txt`);
+    fs.writeFileSync(file,
+      (note ? `X-Delivery-Failure: ${note}\n` : "") +
+      `From: ${from}\nTo: ${mail.to.join(", ")}\n` +
+      (mail.replyTo ? `Reply-To: ${mail.replyTo}\n` : "") +
+      `Subject: ${mail.subject}\nDate: ${new Date().toUTCString()}\n\n${mail.text}\n`);
+    return file;
+  } catch (err) {
+    console.error(`[email:outbox] could not write "${mail.subject}": ${err instanceof Error ? err.message : String(err)}`);
+    return null;
+  }
+}
+
 export async function sendMail(mail: Mail): Promise<MailResult> {
+  const result = await deliver(mail);
+  lastMail = { ok: result.ok, via: result.via, detail: result.detail, subject: mail.subject, at: Date.now() };
+  return result;
+}
+
+async function deliver(mail: Mail): Promise<MailResult> {
   const fromName = mail.fromName ?? "Varanasi Restaurant";
   const fromEmail = mail.fromEmail ?? process.env.MAIL_FROM ?? "reservations@varanasi.uk";
   const from = `${fromName} <${fromEmail}>`;
@@ -64,6 +137,15 @@ export async function sendMail(mail: Mail): Promise<MailResult> {
         // the website: the booking succeeds, the guest hears nothing.
         const body = await res.text();
         console.error(`[email:resend] REJECTED "${mail.subject}" -> ${mail.to.join(", ")}: HTTP ${res.status} ${body}`);
+        console.error(`[email:resend] from was "${from}" — the usual cause is a domain the provider has not verified.`);
+        // And keep the message. A rejection used to end here, so a
+        // misconfigured provider was strictly worse than no provider at all:
+        // with no key the message is written to data/outbox and can be read,
+        // forwarded or resent, and with a key that the provider refuses it
+        // simply ceased to exist. Writing it to the outbox anyway means the
+        // content is never lost, and the file is the evidence of what should
+        // have gone out.
+        writeToOutbox(mail, from, `REJECTED by resend: HTTP ${res.status} ${body}`);
         return { ok: false, via: "resend", detail: `HTTP ${res.status}: ${body}` };
       }
       console.log(`[email:resend] sent "${mail.subject}" -> ${mail.to.join(", ")}`);
@@ -79,6 +161,7 @@ export async function sendMail(mail: Mail): Promise<MailResult> {
       });
       if (!res.ok) {
         console.error(`[email:webhook] REJECTED "${mail.subject}": HTTP ${res.status}`);
+        writeToOutbox(mail, from, `REJECTED by webhook: HTTP ${res.status}`);
         return { ok: false, via: "webhook", detail: `HTTP ${res.status}` };
       }
       console.log(`[email:webhook] sent "${mail.subject}" -> ${mail.to.join(", ")}`);
@@ -86,16 +169,9 @@ export async function sendMail(mail: Mail): Promise<MailResult> {
     }
 
     // outbox
-    fs.mkdirSync(OUTBOX, { recursive: true });
-    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-    const slug = mail.subject.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60);
-    const file = path.join(OUTBOX, `${stamp}--${slug}.txt`);
-    fs.writeFileSync(file,
-      `From: ${from}\nTo: ${mail.to.join(", ")}\n` +
-      (mail.replyTo ? `Reply-To: ${mail.replyTo}\n` : "") +
-      `Subject: ${mail.subject}\nDate: ${new Date().toUTCString()}\n\n${mail.text}\n`);
-    console.log(`[email:outbox] ${mail.subject} -> ${mail.to.join(", ")} (${path.basename(file)})`);
-    return { ok: true, via: "outbox", detail: file };
+    const file = writeToOutbox(mail, from);
+    console.log(`[email:outbox] ${mail.subject} -> ${mail.to.join(", ")} (${file ? path.basename(file) : "failed"})`);
+    return { ok: Boolean(file), via: "outbox", detail: file ?? "could not write to data/outbox" };
   } catch (err) {
     // A booking must never fail because an email did. Log and carry on.
     const detail = err instanceof Error ? err.message : String(err);

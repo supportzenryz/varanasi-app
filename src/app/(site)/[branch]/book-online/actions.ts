@@ -1,6 +1,7 @@
 "use server";
 import { redirect } from "next/navigation";
 import { holdBooking, attachCheckoutSession, confirmPaidBooking, dateLabel } from "@/lib/booking";
+import { rememberSubmission } from "@/lib/form-recall";
 import { bookingRules, prettyTime } from "@/lib/booking-config";
 import { createDepositCheckout, stripeSimulated } from "@/lib/stripe";
 
@@ -15,19 +16,47 @@ function siteUrl(): string {
  * outstanding, and only the payment result (via the return page or Stripe's
  * webhook) can confirm it — so a guest who abandons the payment page never ends
  * up with a table, and never gets a confirmation email.
+ *
+ * WHEN IT IS REJECTED, THE GUEST GETS THEIR ANSWERS BACK
+ *
+ * What this replaces cost the restaurant bookings. A rejected submission
+ * redirected to `?error=<the message>`, which re-rendered the page from the URL
+ * alone — so every box below the party size came back empty. A guest who
+ * mistyped one character of their email retyped their name, their phone, their
+ * occasion, their allergies and whatever they had written in "anything else",
+ * on a phone, having already decided to spend money. And they retyped it at the
+ * top of a page whose form is some 1,600px further down, with nothing to say
+ * where to go, because the redirect had no fragment and the alert was above the
+ * calendar rather than beside the box that was wrong.
+ *
+ * The enquiry forms had all of this solved months ago — `rememberSubmission`
+ * puts the message and the values in a sixty-second server-set cookie — and the
+ * one form that takes money was the one form never moved onto it.
+ *
+ * The message also stops travelling in the URL, which mattered for a second
+ * reason: it was rendered verbatim inside the site's own alert box, so a
+ * crafted link was a ready-made phishing page wearing Varanasi's branding.
  */
 export async function startBooking(formData: FormData) {
   const branchSlug = String(formData.get("branch") ?? "");
   const date = String(formData.get("date") ?? "");
   const time = String(formData.get("time") ?? "");
   const guests = Number(formData.get("guests") ?? 0);
+  const here = `/${branchSlug}/book-online`;
 
-  const back = (error: string) =>
-    `/${branchSlug}/book-online?guests=${guests}&date=${date}&time=${time}&error=${encodeURIComponent(error)}`;
+  const back = async (error: string, field?: string): Promise<string> => {
+    await rememberSubmission(error, formData, here);
+    // `#your-details` lands them on the form, not the top of the page; `focus`
+    // then puts the cursor in the box that was actually wrong.
+    return `${here}?guests=${guests}&date=${date}&time=${time}&error=1`
+      + (field ? `&focus=${field}` : "") + "#your-details";
+  };
 
   // The consents are required in the markup; re-check server-side, since markup
   // is only a suggestion to anyone posting the form directly.
-  if (formData.get("terms") !== "on") redirect(back("Please accept the terms and conditions to continue."));
+  if (formData.get("terms") !== "on") {
+    redirect(await back("Please accept the terms and conditions to continue.", "terms"));
+  }
 
   const held = holdBooking({
     branchSlug, date, time, partySize: guests,
@@ -40,7 +69,7 @@ export async function startBooking(formData: FormData) {
     marketingConsent: formData.get("marketing") === "on",
   });
 
-  if (!held.ok) redirect(back(held.error));
+  if (!held.ok) redirect(await back(held.error, held.field));
 
   const { booking, depositPence, branch } = held;
 
@@ -87,9 +116,9 @@ export async function startBooking(formData: FormData) {
     url = session.url;
   } catch (err) {
     console.error("[booking] could not open a payment page:", err);
-    redirect(back("We couldn't open the payment page just then. Please try again, or call us and we'll book you in."));
+    redirect(await back("We couldn't open the payment page just then. Please try again, or call us and we'll book you in."));
   }
 
-  if (!url) redirect(back("We couldn't open the payment page just then. Please try again."));
+  if (!url) redirect(await back("We couldn't open the payment page just then. Please try again."));
   redirect(url);
 }

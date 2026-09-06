@@ -80,7 +80,14 @@ export default async function Confirmed({
         console.error(
           `[booking] ${booking.reference}: could not verify Stripe session ${sessionId} — ${detail}`,
         );
-        void notifyVerificationFailed(booking, sessionId, detail);
+        /* Awaited, not fired and forgotten. `void` here left a floating promise
+           in a server component: the response finishes, the render is done, and
+           whether the restaurant is ever told depends on whether the runtime
+           happens to keep the process alive long enough. On the one path where
+           a guest may have been charged for a table nobody knows about, "we
+           probably told them" is not good enough — and the wait is one HTTP
+           call on a page that has already made one. */
+        await notifyVerificationFailed(booking, sessionId, detail);
         problem = "verify";
       }
     }

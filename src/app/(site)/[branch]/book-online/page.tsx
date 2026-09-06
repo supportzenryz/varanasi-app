@@ -11,6 +11,7 @@ import { PageHero } from "@/components/PageHero";
 import { startBooking } from "./actions";
 import { SubmitButton } from "@/components/SubmitButton";
 import { BookingCalendar } from "@/components/BookingCalendar";
+import { recallSubmission, recalledList } from "@/lib/form-recall";
 
 export async function generateMetadata({ params }: { params: Promise<{ branch: string }> }): Promise<Metadata> {
   const { branch: slug } = await params;
@@ -32,7 +33,7 @@ export default async function BookOnline({
   params, searchParams,
 }: {
   params: Promise<{ branch: string }>;
-  searchParams: Promise<{ guests?: string; date?: string; time?: string; error?: string }>;
+  searchParams: Promise<{ guests?: string; date?: string; time?: string; error?: string; focus?: string }>;
 }) {
   const { branch: slug } = await params;
   const branch = branchBySlug(slug);
@@ -41,6 +42,19 @@ export default async function BookOnline({
   const rules = bookingRules();
 
   const sp = await searchParams;
+
+  /* What the guest typed last time, when the last time was a rejection.
+     Asked for only when the URL says a submission was just refused, because
+     the cookie is set for the whole site and lives for a minute. */
+  const recalled = sp.error ? await recallSubmission(`/${branch.slug}/book-online`) : null;
+  const was = (name: string) => recalled?.values[name] ?? "";
+  const wasChecked = (name: string, value: string) =>
+    recalled ? recalledList(recalled.values, name).includes(value) : false;
+  /* Which box to put the cursor in. `autoFocus` on a server-rendered input is
+     a real HTML attribute, so the browser scrolls to it and focuses it before
+     any JavaScript runs — which is the whole point on the slowest phone on the
+     worst connection, at the moment someone is trying to give us money. */
+  const focus = recalled ? sp.focus : undefined;
   const guests = sp.guests ? Number(sp.guests) : null;
   const date = sp.date || null;
   const chosenTime = sp.time || null;
@@ -125,9 +139,17 @@ export default async function BookOnline({
             })}
           </ol>
 
-          {sp.error && (
+          {/* The message used to be rendered here, above the calendar — which
+              on a phone is roughly 1,600px above the box that was actually
+              wrong, and the redirect carried no fragment, so the guest was
+              returned to the top of the page to hunt for a form they had
+              already filled in. It now sits inside the "Your details" panel,
+              directly above the fields it is about. This is the fallback for
+              the one case where that panel isn't rendered: the chosen time went
+              while they were typing, so there is no step 3 to attach it to. */}
+          {recalled && step < 3 && (
             <p role="alert" className="mt-8 border-l-2 border-brick bg-clay/10 px-4 py-3 text-sm text-brick">
-              {sp.error}
+              {recalled.message}
             </p>
           )}
 
@@ -242,6 +264,15 @@ export default async function BookOnline({
                   {dateLabel(effectiveDate)} at {prettyTime(chosenTime)} · {guests} {guests === 1 ? "guest" : "guests"}
                 </p>
 
+                {/* Beside the fields it is about, not at the top of the page.
+                    role="alert" so a screen reader announces it on arrival. */}
+                {recalled && (
+                  <p role="alert"
+                    className="mt-6 border-l-2 border-brick bg-clay/10 px-4 py-3 text-sm text-brick">
+                    {recalled.message}
+                  </p>
+                )}
+
                 <form action={startBooking} className="mt-7 grid gap-6">
                   <input type="hidden" name="branch" value={branch.slug} />
                   <input type="hidden" name="date" value={effectiveDate} />
@@ -251,20 +282,27 @@ export default async function BookOnline({
                   <div className="grid gap-6 sm:grid-cols-2">
                     <div>
                       <label className={label} htmlFor="name">Name</label>
-                      <input id="name" name="name" required autoComplete="name" className={field} />
+                      <input id="name" name="name" required autoComplete="name" className={field}
+                        defaultValue={was("name")} autoFocus={focus === "name"}
+                        aria-invalid={focus === "name" || undefined} />
                     </div>
                     <div>
                       <label className={label} htmlFor="phone">Phone</label>
-                      <input id="phone" name="phone" type="tel" required autoComplete="tel" className={field} />
+                      <input id="phone" name="phone" type="tel" required autoComplete="tel" className={field}
+                        defaultValue={was("phone")} autoFocus={focus === "phone"}
+                        aria-invalid={focus === "phone" || undefined} />
                     </div>
                     <div>
                       <label className={label} htmlFor="email">Email</label>
-                      <input id="email" name="email" type="email" required autoComplete="email" className={field} />
+                      <input id="email" name="email" type="email" required autoComplete="email" className={field}
+                        defaultValue={was("email")} autoFocus={focus === "email"}
+                        aria-invalid={focus === "email" || undefined} />
                       <span className="block text-xs text-pale/70 mt-1.5">Your confirmation goes here.</span>
                     </div>
                     <div>
                       <label className={label} htmlFor="occasion">Occasion</label>
-                      <select id="occasion" name="occasion" className={field} defaultValue={rules.occasions.options[0]}>
+                      <select id="occasion" name="occasion" className={field}
+                        defaultValue={was("occasion") || rules.occasions.options[0]}>
                         {rules.occasions.options.map((o) => <option key={o} value={o}>{o}</option>)}
                       </select>
                     </div>
@@ -275,7 +313,8 @@ export default async function BookOnline({
                     <div className="flex flex-wrap gap-x-5 gap-y-2.5">
                       {rules.allergens.options.map((a) => (
                         <label key={a} className="flex items-center gap-2 text-sm">
-                          <input type="checkbox" name="allergens" value={a} /> {a}
+                          <input type="checkbox" name="allergens" value={a}
+                            defaultChecked={wasChecked("allergens", a)} /> {a}
                         </label>
                       ))}
                     </div>
@@ -287,6 +326,7 @@ export default async function BookOnline({
                   <div>
                     <label className={label} htmlFor="notes">Anything else?</label>
                     <textarea id="notes" maxLength={2000} name="notes" rows={3} className={field}
+                      defaultValue={was("notes")}
                       placeholder="Seating preferences, a cake, a wheelchair space…" />
                   </div>
 
@@ -325,6 +365,11 @@ export default async function BookOnline({
                       </>
                     )}
                     <label className="flex gap-3 text-sm items-start">
+                      {/* Not carried back on an error, deliberately — see the
+                          SKIP list in form-recall. Every other answer returns,
+                          but a marketing consent that reappears already ticked
+                          without the guest touching it is a pre-ticked box, and
+                          consent has to be a thing they did. */}
                       <input type="checkbox" name="marketing" className="mt-1" />
                       <span>{rules.consents.marketing}</span>
                     </label>

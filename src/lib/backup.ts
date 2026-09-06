@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { databasePath } from "@/db";
+import { mailConfigWarning, mailFrom, mailMode } from "@/lib/email";
 
 /**
  * Daily backups of the trading data.
@@ -192,4 +193,14 @@ export function startBackupSchedule(): void {
   setInterval(tick, 3600_000).unref?.();   // then every hour
   console.log(`[backup] daily backups on, keeping ${KEEP}, in ${backupDir()}`);
   console.log("[scheduler] hourly: due gift vouchers, expiries, owner activity summary");
+
+  /* Said once, loudly, on the way up. A provider key with no verified sender
+     rejects every message, and the only symptom is guests who say they never
+     got their confirmation — days later, if anyone tells you at all. */
+  const mailWarning = mailConfigWarning();
+  if (mailWarning) {
+    console.warn(`\n[email] ⚠ NO EMAIL WILL BE DELIVERED. ${mailWarning}\n`);
+  } else {
+    console.log(`[email] sending via ${mailMode()} as ${mailFrom()}`);
+  }
 }

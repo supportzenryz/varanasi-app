@@ -32,12 +32,31 @@ export type Recalled = { message: string; values: Record<string, string>; path: 
 /** Fields never worth keeping, or never safe to. */
 const SKIP = new Set(["terms", "depositTerms", "depositRate", "marketing", "returnTo", "branch", "type"]);
 
+/**
+ * Repeated fields — a group of checkboxes — joined into one value.
+ *
+ * The unit separator, because it is the one character in the set that cannot
+ * be typed into a form. A comma would have been ambiguous the moment somebody
+ * named an allergen "nuts, seeds", and this list is allergies: a value silently
+ * split in half is a kitchen told the wrong thing.
+ */
+const MULTI = "";
+
+/** Read a repeated field back out. */
+export function recalledList(values: Record<string, string>, key: string): string[] {
+  const raw = values[key];
+  return raw ? raw.split(MULTI) : [];
+}
+
 export async function rememberSubmission(message: string, form: FormData, path: string): Promise<void> {
   const values: Record<string, string> = {};
   for (const [k, v] of form.entries()) {
     if (SKIP.has(k) || typeof v !== "string") continue;
     if (v.length > 4000) continue;              // don't push a huge cookie
-    if (v) values[k] = v;
+    if (!v) continue;
+    // A checkbox group arrives as the same name several times. Overwriting kept
+    // only the last one, so a guest who ticked three allergies got one back.
+    values[k] = k in values ? `${values[k]}${MULTI}${v}` : v;
   }
   const jar = await cookies();
   jar.set(COOKIE, JSON.stringify({ message, values, path }), {

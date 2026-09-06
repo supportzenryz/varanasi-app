@@ -9,6 +9,7 @@ import { bookingRules, SETTINGS_KEY, type BookingRules } from "@/lib/booking-con
 import { parsePounds } from "@/lib/money";
 import { checkEmail, checkPhone, checkTime } from "@/lib/validate";
 import { ok, problem } from "@/lib/admin-feedback";
+import { sendMail } from "@/lib/email";
 
 const num = (v: FormDataEntryValue | null, fallback: number) => {
   const n = Number(String(v ?? "").replace(/[^0-9]/g, ""));
@@ -154,4 +155,62 @@ export async function saveBookingRules(formData: FormData) {
     `deposit ${next.deposit.policy === "off" ? "off" : `${next.deposit.policy}, ` +
       `${(next.deposit.perPersonPence / 100).toFixed(2)} per person`}; ` +
     `alerts to ${notifyTo.join(", ")}.`);
+}
+
+/**
+ * Send one message to the signed-in owner, and report exactly what happened.
+ *
+ * This exists because of a failure that ran for a day and a half without
+ * anybody noticing. An email provider was connected while the sending address
+ * was still `reservations@varanasi.uk` — a domain nobody had verified with the
+ * provider yet — so every confirmation was refused, with a 403 in a terminal
+ * log and nothing at all on the website. Bookings were taken, deposits were
+ * charged, the guest was shown "your table is confirmed", and neither the
+ * guest nor the restaurant received a word. The settings screen said, in
+ * perfect good faith, "Sending live via resend".
+ *
+ * A provider's answer is available in about a second, so there is no reason to
+ * find out days later from a guest. This asks, and puts the provider's own
+ * words on screen — including the rejection, which is usually explicit about
+ * what is wrong ("The varanasi.uk domain is not verified").
+ */
+export async function sendTestEmail() {
+  const session = await requireAbility("editSettings");
+  const rules = bookingRules();
+
+  const result = await sendMail({
+    to: [session.email],
+    subject: "Varanasi — email delivery test",
+    fromName: rules.notifications.fromName,
+    fromEmail: rules.notifications.fromEmail,
+    replyTo: rules.notifications.replyTo,
+    text:
+`This is a test from the Varanasi admin, sent by ${session.name}.
+
+If you are reading this in your inbox, confirmations and booking alerts will
+reach guests and the restaurant.
+
+Sent from: ${rules.notifications.fromName} <${rules.notifications.fromEmail}>
+Replies to: ${rules.notifications.replyTo}
+`,
+  });
+
+  record(session, {
+    action: "settings.email.test",
+    entity: "settings",
+    entityId: "email",
+    detail: `${result.via}: ${result.ok ? "accepted" : result.detail ?? "rejected"}`,
+  });
+
+  if (result.ok && result.via === "outbox") {
+    ok(BACK, `No provider is connected, so the test was written to data/outbox instead of sent. `
+      + `That is the right behaviour for testing — add RESEND_API_KEY to send for real.`);
+  }
+  if (result.ok) {
+    ok(BACK, `Sent to ${session.email} via ${result.via}, from ${rules.notifications.fromEmail}. `
+      + `If it doesn't arrive within a minute or two, check the spam folder — and check the provider's own dashboard.`);
+  }
+  problem(BACK, `${result.via} refused it: ${result.detail ?? "no reason given"} — `
+    + `sent from ${rules.notifications.fromEmail}. A copy has been kept in data/outbox. `
+    + `The usual cause is a sending address on a domain the provider has not verified.`);
 }

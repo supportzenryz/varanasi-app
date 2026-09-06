@@ -6,6 +6,7 @@ import { brand } from "@/lib/brand";
 import { voucherRules } from "@/lib/booking-config";
 import { formatPence } from "@/lib/money";
 import { PageHero } from "@/components/PageHero";
+import { recallSubmission } from "@/lib/form-recall";
 import { buyVoucher } from "./actions";
 import { SubmitButton } from "@/components/SubmitButton";
 
@@ -32,12 +33,18 @@ export default async function GiftVouchers({
   params, searchParams,
 }: {
   params: Promise<{ branch: string }>;
-  searchParams: Promise<{ error?: string; value?: string }>;
+  searchParams: Promise<{ error?: string; value?: string; focus?: string }>;
 }) {
   const { branch: slug } = await params;
   const branch = branchBySlug(slug);
   if (!branch) notFound();
-  const { error, value: preselected } = await searchParams;
+  const { error, value: preselected, focus: focusParam } = await searchParams;
+
+  /* What the buyer typed last time, when the last time was a rejection. The
+     message they wrote for the recipient is the expensive thing to lose. */
+  const recalled = error ? await recallSubmission(`/${branch.slug}/gift-vouchers`) : null;
+  const was = (name: string) => recalled?.values[name] ?? "";
+  const focus = recalled ? focusParam : undefined;
 
   const rules = voucherRules();
   const branches = allBranches();
@@ -53,13 +60,13 @@ export default async function GiftVouchers({
 
       <section className="bg-ink">
         <div className="mx-auto max-w-[58rem] px-5 lg:px-10 py-14 sm:py-20">
-          {error && (
+          {recalled && (
             <p role="alert" className="mb-8 border-l-2 border-brick bg-clay/10 px-4 py-3 text-sm text-brick">
-              {error}
+              {recalled.message}
             </p>
           )}
 
-          <form action={buyVoucher} className="grid gap-10">
+          <form id="buy" action={buyVoucher} className="grid gap-10 scroll-mt-28">
             <input type="hidden" name="branch" value={branch.slug} />
 
             {/* amount */}
@@ -98,6 +105,7 @@ export default async function GiftVouchers({
                     Your own amount (£{(rules.minPence / 100).toFixed(0)}–£{(rules.maxPence / 100).toFixed(0)})
                   </label>
                   <input id="customValue" name="customValue" inputMode="decimal"
+                    defaultValue={was("customValue")} autoFocus={focus === "customValue"}
                     placeholder="e.g. 120" className={field} />
                   <span className="block text-xs text-pale/45 mt-1.5">
                     Typing here chooses &ldquo;Another amount&rdquo; for you.
@@ -142,25 +150,29 @@ export default async function GiftVouchers({
               <div className="mt-6 grid gap-6 sm:grid-cols-2">
                 <div>
                   <label className={label} htmlFor="toName">Their name</label>
-                  <input id="toName" name="toName" required className={field} />
+                  <input id="toName" name="toName" required className={field} defaultValue={was("toName")} />
                 </div>
                 <div>
                   <label className={label} htmlFor="toEmail">Their email</label>
-                  <input id="toEmail" name="toEmail" type="email" required className={field} />
+                  <input id="toEmail" name="toEmail" type="email" required className={field}
+                    defaultValue={was("toEmail")} autoFocus={focus === "toEmail"} />
                   <span className="block text-xs text-pale/45 mt-1.5">The voucher goes straight here.</span>
                 </div>
                 <div>
                   <label className={label} htmlFor="fromName">Your name</label>
-                  <input id="fromName" name="fromName" required autoComplete="name" className={field} />
+                  <input id="fromName" name="fromName" required autoComplete="name" className={field}
+                    defaultValue={was("fromName")} />
                 </div>
                 <div>
                   <label className={label} htmlFor="fromEmail">Your email</label>
-                  <input id="fromEmail" name="fromEmail" type="email" required autoComplete="email" className={field} />
+                  <input id="fromEmail" name="fromEmail" type="email" required autoComplete="email" className={field}
+                    defaultValue={was("fromEmail")} autoFocus={focus === "fromEmail"} />
                   <span className="block text-xs text-pale/45 mt-1.5">Your receipt comes here.</span>
                 </div>
                 <div className="sm:col-span-2">
                   <label className={label} htmlFor="message">Your message</label>
                   <textarea id="message" name="message" rows={3} maxLength={500} className={field}
+                    defaultValue={was("message")}
                     placeholder="Happy birthday — dinner is on us. Enjoy every course." />
                   <span className="block text-xs text-pale/45 mt-1.5">
                     Printed on the voucher exactly as you write it. Up to 500 characters.
@@ -168,7 +180,8 @@ export default async function GiftVouchers({
                 </div>
                 <div>
                   <label className={label} htmlFor="deliverOn">When should we send it?</label>
-                  <input id="deliverOn" name="deliverOn" type="date" min={todayISO()} className={field} />
+                  <input id="deliverOn" name="deliverOn" type="date" min={todayISO()} className={field}
+                    defaultValue={was("deliverOn")} />
                   <span className="block text-xs text-pale/45 mt-1.5">
                     Leave blank to send it as soon as you&rsquo;ve paid.
                   </span>

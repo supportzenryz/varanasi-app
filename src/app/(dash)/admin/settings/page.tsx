@@ -4,8 +4,8 @@ import { branches } from "@/db/schema";
 import { requireAbility } from "@/lib/auth";
 import { bookingRules, prettyTime } from "@/lib/booking-config";
 import { stripeConfigured } from "@/lib/stripe";
-import { mailMode } from "@/lib/email";
-import { saveBookingRules } from "./actions";
+import { mailMode, mailConfigWarning, lastMailResult } from "@/lib/email";
+import { saveBookingRules, sendTestEmail } from "./actions";
 import { AdminNotice } from "@/components/AdminNotice";
 
 export const metadata = { title: "Settings" };
@@ -26,6 +26,8 @@ export default async function SettingsAdmin({
 
   const stripeLive = stripeConfigured();
   const mail = mailMode();
+  const mailWarning = mailConfigWarning(rules.notifications.fromEmail);
+  const lastMail = lastMailResult();
 
   return (
     <>
@@ -52,7 +54,13 @@ export default async function SettingsAdmin({
             )}
           </p>
         </div>
-        <div className="bg-pale p-5">
+        {/* This tile used to read "Sending live via resend" whenever a key was
+            present, which was true of the connection and false of the outcome:
+            the provider was refusing every message because the sending address
+            was on an unverified domain, and nothing here or anywhere else on
+            the site said so. It now names the address it sends from, warns when
+            that combination cannot deliver, and offers to ask the provider. */}
+        <div className={`p-5 ${mailWarning ? "bg-clay/10" : "bg-pale"}`}>
           <span className="accent text-[0.58rem] text-gold-ink">Email</span>
           <p className="mt-2 text-sm">
             {mail === "outbox" ? (
@@ -61,10 +69,36 @@ export default async function SettingsAdmin({
                 <code className="text-xs">data/outbox</code> so you can read exactly what guests would
                 receive. Add <code className="text-xs">RESEND_API_KEY</code> to send for real.
               </>
+            ) : mailWarning ? (
+              <>
+                <strong className="text-brick">Nothing is being delivered.</strong> {mailWarning}
+              </>
             ) : (
-              <>Sending live via <strong>{mail}</strong>.</>
+              <>
+                Sending via <strong>{mail}</strong>, from{" "}
+                <code className="text-xs">{rules.notifications.fromEmail}</code>. That address must be on
+                a domain your provider has verified.
+              </>
             )}
           </p>
+          {/* Fact, not inference. Whether a domain is verified is the
+              provider's to answer, so this reports the answer it last gave
+              rather than guessing from the address. */}
+          {lastMail && (
+            <p className={`mt-2 text-xs ${lastMail.ok ? "text-ink-3" : "text-brick font-semibold"}`}>
+              Last message &ldquo;{lastMail.subject}&rdquo;:{" "}
+              {lastMail.ok ? `accepted by ${lastMail.via}` : `REFUSED — ${lastMail.detail ?? "no reason given"}`}
+            </p>
+          )}
+          <form action={sendTestEmail} className="mt-3">
+            <button className="border border-[--line] bg-white px-3 py-1.5 text-xs font-semibold hover:bg-pale">
+              Send me a test email
+            </button>
+            <span className="block text-xs text-ink-3 mt-1.5">
+              Asks your provider now, and shows you its answer. Worth doing after any change to
+              the sending address, and before handing the site to anyone.
+            </span>
+          </form>
         </div>
       </div>
 

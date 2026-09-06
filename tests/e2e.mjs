@@ -404,6 +404,90 @@ t('gmial.com is refused, not silently accepted',
 t('  · and the guest is told what to fix',
   /did you mean/i.test(await page.locator('main').innerText()));
 
+console.log('\n── 3e. A rejected booking keeps what the guest typed ──');
+
+{
+  /* The form that takes money was the only form on the site never moved onto
+     form-recall. A rejected submission redirected to `?error=<message>`, which
+     re-rendered the page from the URL alone: every box came back empty, the
+     message was rendered above the calendar, and the redirect had no fragment —
+     so a guest who mistyped one character retyped everything, from the top of a
+     5,000px page, on a phone, having already decided to spend money. */
+  const p = await ctx.newPage();
+  await p.setViewportSize({ width: 390, height: 844 });
+  await p.goto(`${BASE}/birmingham/book-online`, { waitUntil: 'networkidle' });
+  const day = await p.locator('a[href*="date="]').first().getAttribute('href');
+  await p.goto(BASE + day, { waitUntil: 'networkidle' });
+  const slot = await p.locator('a[href*="&time="]').first().getAttribute('href');
+  await p.goto(BASE + slot.split('#')[0], { waitUntil: 'networkidle' });
+
+  const notes = 'A window table if you have one, and a candle for the cake.';
+  await p.fill('#name', 'Recall Test');
+  await p.fill('#phone', '1');            // browsers don't validate tel; the server does
+  await p.fill('#email', `recall+${stamp}@example.com`);
+  await p.selectOption('#occasion', { index: 2 });
+  await p.fill('#notes', notes);
+  const boxes = p.locator('input[name="allergens"]');
+  await boxes.nth(0).check();
+  await boxes.nth(2).check();
+  for (const n of ['terms', 'depositTerms', 'depositRate']) {
+    const el = p.locator(`input[name="${n}"]`);
+    if (await el.count()) await el.check();
+  }
+  const picked = await boxes.nth(0).inputValue();
+  const picked2 = await boxes.nth(2).inputValue();
+
+  await p.locator('form:has(#email) button').last().click();
+  await p.waitForURL(/error=1/, { timeout: 20000 });
+  await p.waitForTimeout(800);
+
+  const after = await p.evaluate(() => {
+    const v = (s) => document.querySelector(s)?.value ?? null;
+    const alert = document.querySelector('[role="alert"]');
+    const details = document.querySelector('#your-details');
+    return {
+      name: v('#name'), phone: v('#phone'), email: v('#email'),
+      occasion: v('#occasion'), notes: v('#notes'),
+      allergens: [...document.querySelectorAll('input[name="allergens"]')]
+        .filter((e) => e.checked).map((e) => e.value),
+      message: alert?.textContent?.trim() ?? null,
+      alertTop: alert ? Math.round(alert.getBoundingClientRect().top + window.scrollY) : null,
+      detailsTop: details ? Math.round(details.offsetTop) : null,
+      focused: document.activeElement?.id ?? null,
+      scrollY: Math.round(window.scrollY),
+    };
+  });
+
+  t('The name comes back', after.name === 'Recall Test', String(after.name));
+  t('The email comes back', String(after.email).startsWith('recall+'), String(after.email));
+  t('The occasion comes back', after.occasion && after.occasion !== '', String(after.occasion));
+  t('The message they wrote comes back', after.notes === notes, String(after.notes).slice(0, 40));
+  /* Allergies are the expensive ones to lose: a guest who reported three and
+     is handed back one has told the kitchen something untrue. */
+  t('Every allergy they ticked comes back',
+    after.allergens.length === 2 && after.allergens.includes(picked) && after.allergens.includes(picked2),
+    after.allergens.join(', '));
+
+  t('The reason is on screen', /too short/i.test(after.message ?? ''), String(after.message));
+  /* The message belongs beside the boxes, not above the calendar. */
+  t('  · beside the form, not at the top of the page',
+    after.alertTop != null && after.detailsTop != null && after.alertTop > after.detailsTop,
+    `alert at ${after.alertTop}, form at ${after.detailsTop}`);
+  t('The cursor is in the box that was wrong', after.focused === 'phone', String(after.focused));
+  t('  · and the page is scrolled to it', after.scrollY > 500, `${after.scrollY}px`);
+
+  /* The message no longer travels in the URL, where it was rendered verbatim
+     inside the site's own alert box — a crafted link was a phishing page
+     wearing Varanasi's branding. */
+  await p.goto(`${BASE}/birmingham/book-online?error=${encodeURIComponent('Your card was declined, call 0800 123 4567')}`,
+    { waitUntil: 'networkidle' });
+  const injected = await p.locator('body').innerText();
+  t('A message in the URL is no longer rendered on the page',
+    !injected.includes('0800 123 4567'));
+
+  await p.close();
+}
+
 console.log('\n── 3c. Both sides are emailed, on every outcome ──');
 
 /* The outbox is where mail lands when no provider key is set, so it is also

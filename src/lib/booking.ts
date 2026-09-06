@@ -64,7 +64,9 @@ export type HoldInput = {
 
 export type HoldResult =
   | { ok: true; booking: Booking; depositPence: number; branch: Branch }
-  | { ok: false; error: string };
+  /** `field` names the input that caused it, so the page can put the guest's
+   *  cursor in the box they need to fix rather than at the top of the page. */
+  | { ok: false; error: string; field?: "name" | "email" | "phone" };
 
 /**
  * Take the table off the market and create the booking as `held`.
@@ -87,11 +89,11 @@ export function holdBooking(input: HoldInput): HoldResult {
   // restaurant cannot ring about a late arrival. See src/lib/validate.ts for
   // why these rules are deliberately permissive.
   const name = checkName(input.guestName);
-  if (!name.ok) return { ok: false, error: name.error };
+  if (!name.ok) return { ok: false, error: name.error, field: "name" };
   const email = checkEmail(input.email);
-  if (!email.ok) return { ok: false, error: email.error };
+  if (!email.ok) return { ok: false, error: email.error, field: "email" };
   const phone = checkPhone(input.phone, true);
-  if (!phone.ok) return { ok: false, error: phone.error };
+  if (!phone.ok) return { ok: false, error: phone.error, field: "phone" };
 
   // Re-check availability at the moment of booking, not just when the slots
   // were rendered — two guests can reach the last table at the same time.

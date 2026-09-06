@@ -1,6 +1,7 @@
 "use server";
 import { redirect } from "next/navigation";
 import { startPurchase, attachVoucherSession } from "@/lib/voucher";
+import { rememberSubmission } from "@/lib/form-recall";
 import { voucherRules } from "@/lib/booking-config";
 import { createVoucherCheckout, stripeSimulated } from "@/lib/stripe";
 import { parsePounds, formatPence } from "@/lib/money";
@@ -17,10 +18,18 @@ function siteUrl(): string {
 export async function buyVoucher(formData: FormData) {
   const branchSlug = String(formData.get("branch") ?? "");
   const validAt = String(formData.get("validAt") ?? "");   // "" = both branches
-  const back = (error: string) =>
-    `/${branchSlug}/gift-vouchers?error=${encodeURIComponent(error)}`;
+  const here = `/${branchSlug}/gift-vouchers`;
+  /* Same fix as the booking form, and for the same reason with more at stake:
+     a rejected voucher lost the buyer's own details, the recipient's, and the
+     message they had written to go with the gift — which nobody wants to
+     compose twice. The message also stops travelling in the URL, where it was
+     rendered verbatim inside the site's own alert box. */
+  const back = async (error: string, field?: string): Promise<string> => {
+    await rememberSubmission(error, formData, here);
+    return `${here}?error=1${field ? `&focus=${field}` : ""}#buy`;
+  };
 
-  if (formData.get("terms") !== "on") redirect(back("Please accept the terms and conditions to continue."));
+  if (formData.get("terms") !== "on") redirect(await back("Please accept the terms and conditions to continue."));
 
   // A preset button, or a custom amount
   const preset = String(formData.get("value") ?? "");
@@ -36,19 +45,19 @@ export async function buyVoucher(formData: FormData) {
   if (preset === "custom" || typed) {
     valuePence = parsePounds(typed);
     if (valuePence == null) {
-      redirect(back(typed
+      redirect(await back(typed
         ? "We couldn't read that amount — please write it as a number, like 120."
-        : "Please enter the amount you'd like to give."));
+        : "Please enter the amount you'd like to give.", "customValue"));
     }
   } else if (preset) {
     valuePence = Number(preset);
   }
 
   if (!valuePence || !Number.isFinite(valuePence)) {
-    redirect(back("Please choose an amount, or type your own."));
+    redirect(await back("Please choose an amount, or type your own."));
   }
   if (valuePence! < rules.minPence || valuePence! > rules.maxPence) {
-    redirect(back(
+    redirect(await back(
       `Please choose an amount between ${formatPence(rules.minPence)} and ${formatPence(rules.maxPence)}.`));
   }
 
@@ -63,7 +72,7 @@ export async function buyVoucher(formData: FormData) {
     deliverOn: String(formData.get("deliverOn") ?? "") || null,
   });
 
-  if (!started.ok) redirect(back(started.error));
+  if (!started.ok) redirect(await back(started.error));
   const { voucher } = started;
 
   const successUrl = `${siteUrl()}/${branchSlug}/gift-vouchers/confirmed?code=${encodeURIComponent(voucher.code)}&session_id={CHECKOUT_SESSION_ID}`;
@@ -91,10 +100,10 @@ export async function buyVoucher(formData: FormData) {
     url = session.url;
   } catch (err) {
     console.error("[voucher] could not open a payment page:", err);
-    redirect(back("We couldn't open the payment page just then. Please try again."));
+    redirect(await back("We couldn't open the payment page just then. Please try again."));
   }
 
-  if (!url) redirect(back("We couldn't open the payment page just then. Please try again."));
+  if (!url) redirect(await back("We couldn't open the payment page just then. Please try again."));
   redirect(url);
 }
 

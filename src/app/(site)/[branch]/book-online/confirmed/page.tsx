@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { branchBySlug, telHref } from "@/lib/branches";
 import { prettyTime } from "@/lib/booking-config";
@@ -119,6 +119,25 @@ export default async function Confirmed({
         problem = "verify";
       }
     }
+  }
+
+  /* The Stripe session id has done its job, so take it out of the address bar.
+   *
+   * It is there to prove the payment: a redirect on its own proves nothing, so
+   * the page carries the id back to Stripe and asks whether the money actually
+   * arrived. Once that has been answered and the booking is confirmed, the id
+   * is spent — and leaving it in the URL has three small costs. It is what the
+   * guest bookmarks, screenshots and forwards to the six people they are
+   * organising, so a Stripe object id travels with it. Every refresh of that
+   * page makes another API call to Stripe to re-answer a settled question. And
+   * the address the guest keeps is forty characters of noise around the only
+   * part that means anything, which is their reference.
+   *
+   * Only when it is confirmed. An unverified payment keeps the id, because
+   * that page's whole purpose is that a refresh can try the question again.
+   */
+  if (paid && sessionId) {
+    redirect(`/${branch.slug}/book-online/confirmed?ref=${encodeURIComponent(booking.reference)}`);
   }
 
   const current = bookingByReference(booking.reference)!;

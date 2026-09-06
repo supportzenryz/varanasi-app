@@ -75,12 +75,33 @@ export function lastMailResult(): LastMail | null {
 export function mailConfigWarning(from = mailFrom()): string | null {
   if (mailMode() !== "resend") return null;
   const domain = from.split("@")[1]?.toLowerCase() ?? "";
-  if (domain === "resend.dev") return null;         // Resend accepts its own sandbox sender
+
+  /* `onboarding@resend.dev` is not the safe testing choice it looks like, and
+     this warning previously treated it as one. Resend accepts the address, so
+     nothing is refused for being unverified — but it puts the account in
+     sandbox mode, where the only permitted RECIPIENT is the address that owns
+     the Resend account. A booking confirmation therefore fails on the guest,
+     not on the sender:
+
+       403 validation_error — "You can only send testing emails to your own
+       email address (…). To send emails to other recipients, please verify a
+       domain at resend.com/domains"
+
+     Which is worse than the unverified-domain case, because the sending
+     address now looks deliberately chosen. Say plainly that it reaches nobody
+     but the account owner. */
+  if (domain === "resend.dev") {
+    return `Email is going out from ${from}, which is Resend's sandbox address. `
+      + "Resend will only deliver it to the address that owns your Resend account — "
+      + "every guest confirmation and every booking alert to anyone else is refused. "
+      + "Verify a domain at resend.com/domains and set the sending address to one on it.";
+  }
+
   if (process.env.MAIL_FROM || from !== "reservations@varanasi.uk") return null;
   return `Email is going out from ${from}, which is the built-in default — nobody has chosen it. `
     + "Resend refuses any address on a domain that has not been verified against the account, "
-    + "so confirmations are being rejected. Verify the domain in Resend and set the sending "
-    + "address to one on it, or set it to onboarding@resend.dev to test today.";
+    + "so confirmations are being rejected. Verify a domain at resend.com/domains and set the "
+    + "sending address to one on it.";
 }
 
 /** Write the message to data/outbox. Returns the file, or null if it couldn't. */

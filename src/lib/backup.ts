@@ -191,6 +191,12 @@ export function startBackupSchedule(): void {
 
   setTimeout(tick, 30_000).unref?.();      // let the server finish booting first
   setInterval(tick, 3600_000).unref?.();   // then every hour
+  /* The absolute path, on every start, in dev as well as production. It is one
+     line, and its absence cost three rounds of fixing the wrong thing: a
+     booking was written by one server and looked for by another, because
+     DATABASE_URL is relative and the two had been started from different
+     folders. Nothing anywhere said which file was in use. */
+  console.log(`[db] ${path.resolve(databasePath())}`);
   console.log(`[backup] daily backups on, keeping ${KEEP}, in ${backupDir()}`);
   console.log("[scheduler] hourly: due gift vouchers, expiries, owner activity summary");
 

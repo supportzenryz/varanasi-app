@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "doctor": "node scripts/doctor.mjs",
     "build": "next build",
     "start": "node scripts/ensure-db.mjs && next start",
     "lint": "eslint",

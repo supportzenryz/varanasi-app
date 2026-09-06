@@ -9,6 +9,7 @@ import {
   notifyVerificationFailed,
 } from "@/lib/booking";
 import { retrieveSession, stripeSimulated } from "@/lib/stripe";
+import { databaseDiagnostics } from "@/db";
 import { PageHero } from "@/components/PageHero";
 
 export const metadata: Metadata = { title: "Booking confirmed", robots: { index: false } };
@@ -35,10 +36,33 @@ export default async function Confirmed({
 
   const { ref, session_id: sessionId } = await searchParams;
   const booking = ref ? bookingByReference(ref) : undefined;
-  if (!booking || booking.branchId !== branch.id) notFound();
+
+  /* A reference that reached Stripe but cannot be found here is not a guest
+     error, and 404 is the wrong thing to say about it: the row is written
+     before the payment page is created, so the reference existing at all means
+     it was written *somewhere*. When the two disagree the usual cause is two
+     servers on two databases — `DATABASE_URL` is a relative path, resolved
+     against whatever folder the server was started in. So say which file was
+     searched, in development, rather than sending a developer round the houses
+     for it. The guest-facing 404 is unchanged in production. */
+  if (!booking || booking.branchId !== branch.id) {
+    if (process.env.NODE_ENV !== "production") {
+      const where = databaseDiagnostics();
+      console.error(
+        `[booking] ${ref ?? "(no reference)"} is not in the database this server has open.\n`
+        + `          file: ${where.resolved}\n`
+        + `          holds: ${Object.entries(where.counts).map(([t, n]) => `${n} ${t}`).join(", ")}\n`
+        + `          If the booking reached Stripe, it was written somewhere else — check which\n`
+        + `          folder 'npm run dev' was started from, and see Settings → Storage.`,
+      );
+    }
+    notFound();
+  }
 
   let paid = booking.depositStatus === "captured" || booking.depositStatus === "none";
   let problem: string | null = null;
+  /** The real reason, kept for the development-only panel below. */
+  let detail: string | null = null;
 
   if (!paid && sessionId) {
     if (stripeSimulated() && sessionId.startsWith("sim_")) {
@@ -56,12 +80,16 @@ export default async function Confirmed({
           });
           paid = true;
         } else if (session.status === "expired") {
+          detail = `Stripe says the checkout session expired (status=${session.status}).`;
           markPaymentFailed(booking.id);
           await notifyPaymentFailed(booking);
           problem = "Your payment page expired before the payment completed, so the table wasn't held.";
         } else {
           // still processing (a delayed payment method) — the webhook will finish it
           problem = "Your payment is still being processed. We'll email you the moment it clears — you don't need to do anything.";
+          detail = `Stripe says payment_status=${session.payment_status}, status=${session.status}. `
+            + "That is a payment method that settles later (Bacs, Klarna and similar), or a "
+            + "checkout that was not completed. The webhook confirms it when the money lands.";
         }
       } catch (err) {
         /* The guest has just come back from Stripe's own payment page, so the
@@ -76,7 +104,7 @@ export default async function Confirmed({
          *  - the guest is not told to "try again", which on a card that has
          *    already been charged is the worst advice available.
          */
-        const detail = err instanceof Error ? err.message : String(err);
+        detail = err instanceof Error ? err.message : String(err);
         console.error(
           `[booking] ${booking.reference}: could not verify Stripe session ${sessionId} — ${detail}`,
         );
@@ -113,6 +141,16 @@ export default async function Confirmed({
                 ? "Your payment went to Stripe, but we couldn't read the result just now. If you were charged, the table is yours — we've alerted the restaurant and your confirmation will follow."
                 : problem ?? "We haven't received your deposit, so no table is being held."}
             </p>
+
+            {/* The guest is told something kind and useless; whoever is building
+                the site needs the actual reason, and hunting it out of a
+                terminal has cost several rounds of guessing. Development only —
+                a guest must never see a Stripe error message. */}
+            {process.env.NODE_ENV !== "production" && detail && (
+              <pre className="mt-4 overflow-x-auto border border-brick/40 bg-brick/10 px-4 py-3 text-xs whitespace-pre-wrap">
+                <strong>Development only.</strong> {detail}
+              </pre>
+            )}
 
             {/* Something to quote down the telephone. Without it a guest ringing
                 about a payment has nothing to identify it by. */}

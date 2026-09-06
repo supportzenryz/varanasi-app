@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { sql as sqlRaw } from "drizzle-orm";
 import { BaseSQLiteDatabase, SQLiteSyncDialect } from "drizzle-orm/sqlite-core";
 import { BetterSQLiteSession } from "drizzle-orm/better-sqlite3/session";
 import { createTableRelationsHelpers, extractTablesRelationalConfig } from "drizzle-orm/relations";
@@ -72,3 +73,60 @@ export const db: Db = new Proxy({} as Db, {
 });
 
 export { schema };
+
+/**
+ * Which file the running server has actually opened, and what is in it.
+ *
+ * This exists because of a question that took three rounds of guessing to
+ * answer and still was not settled: a guest's booking reference reached Stripe
+ * — which cannot happen unless the row was written — and then could not be
+ * found afterwards. Everything about that is consistent with the server reading
+ * and writing a different file from the one being inspected, and `DATABASE_URL`
+ * here is `./data/varanasi.db`: a *relative* path, resolved against whatever
+ * directory `npm run dev` happened to be started from. Two terminals opened at
+ * different places are two databases, and nothing on any screen said which one
+ * was in use.
+ *
+ * So the server is asked directly rather than inferred from the outside. The
+ * absolute path is the point; the counts are what make a wrong answer obvious
+ * at a glance.
+ */
+export function databaseDiagnostics(): {
+  configured: string;
+  resolved: string;
+  exists: boolean;
+  sizeBytes: number | null;
+  modified: string | null;
+  counts: Record<string, number>;
+  error?: string;
+} {
+  const configured = process.env.DATABASE_URL ?? "(unset — defaulting to ./data/varanasi.db)";
+  const file = databasePath();
+  const resolved = path.resolve(file);
+
+  let sizeBytes: number | null = null;
+  let modified: string | null = null;
+  let exists = false;
+  try {
+    const stat = fs.statSync(resolved);
+    exists = true;
+    sizeBytes = stat.size;
+    modified = stat.mtime.toISOString();
+  } catch { /* reported as exists: false */ }
+
+  const counts: Record<string, number> = {};
+  let error: string | undefined;
+  try {
+    /* The table names are a fixed list in this file, never anything a caller
+       supplies, so interpolating them is safe — and `sql.raw` is the only way
+       to put an identifier into a Drizzle fragment. */
+    for (const table of ["bookings", "vouchers", "enquiries", "branches", "menu_items"]) {
+      const row = db.get<{ n: number }>(sqlRaw`select count(*) as n from ${sqlRaw.raw(table)}`);
+      counts[table] = Number(row?.n ?? 0);
+    }
+  } catch (err) {
+    error = err instanceof Error ? err.message : String(err);
+  }
+
+  return { configured, resolved, exists, sizeBytes, modified, counts, error };
+}

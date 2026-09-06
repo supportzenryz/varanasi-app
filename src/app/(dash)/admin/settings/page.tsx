@@ -1,5 +1,5 @@
 import { asc } from "drizzle-orm";
-import { db } from "@/db";
+import { db, databaseDiagnostics } from "@/db";
 import { branches } from "@/db/schema";
 import { requireAbility } from "@/lib/auth";
 import { bookingRules, prettyTime } from "@/lib/booking-config";
@@ -28,6 +28,7 @@ export default async function SettingsAdmin({
   const mail = mailMode();
   const mailWarning = mailConfigWarning(rules.notifications.fromEmail);
   const lastMail = lastMailResult();
+  const storage = databaseDiagnostics();
 
   return (
     <>
@@ -101,6 +102,37 @@ export default async function SettingsAdmin({
           </form>
         </div>
       </div>
+
+      {/* Which file this server is actually using. `DATABASE_URL` is a relative
+          path, resolved against wherever the server was started, so two
+          terminals opened in different folders are two different databases —
+          and a booking written by one is invisible to the other. Nothing said
+          which was in use, which is a long way to travel to find out. */}
+      <section className="mt-6 border border-[--line] bg-pale p-5">
+        <span className="accent text-[0.58rem] text-gold-ink">Storage</span>
+        <p className="mt-2 text-sm">
+          Reading and writing{" "}
+          <code className="text-xs break-all">{storage.resolved}</code>
+          {storage.exists ? (
+            <> — {(storage.sizeBytes! / 1024).toFixed(0)}KB, last written{" "}
+              {new Date(storage.modified!).toLocaleString("en-GB")}.</>
+          ) : (
+            <strong className="text-brick"> — that file does not exist.</strong>
+          )}
+        </p>
+        <p className="mt-1.5 text-xs text-ink-3">
+          {storage.error
+            ? <span className="text-brick">Could not read it: {storage.error}</span>
+            : Object.entries(storage.counts).map(([t, n]) => `${n} ${t.replace("_", " ")}`).join(" · ")}
+        </p>
+        {storage.configured.startsWith("./") && (
+          <p className="mt-1.5 text-xs text-ink-3">
+            <code className="text-xs">DATABASE_URL</code> is{" "}
+            <code className="text-xs">{storage.configured}</code>, which is relative — start the
+            server from a different folder and it will use a different database.
+          </p>
+        )}
+      </section>
 
       <AdminNotice saved={saved} problem={problem} />
 

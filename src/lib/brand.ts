@@ -16,6 +16,14 @@ type BranchMedia = {
   drinksHero: string;
   privateDiningHero: string;
   menuBanners: string[];
+  /* The short films. Optional on purpose: Leicester has the food reel but not
+     the restaurant film, and a branch with neither must still render. */
+  /** A portrait reel of the food — phone-shaped, so it is shown at its own size. */
+  filmVideo?: string;
+  filmPoster?: string;
+  /** The long cinematic film of the room, for the private dining banner. */
+  roomFilmVideo?: string;
+  roomFilmPoster?: string;
 };
 
 const file = path.join(process.cwd(), "data", "site.json");

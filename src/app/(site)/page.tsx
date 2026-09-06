@@ -3,6 +3,7 @@ import Image from "next/image";
 import type { Metadata } from "next";
 import { allBranches } from "@/lib/branches";
 import { brand } from "@/lib/brand";
+import { OrnamentDivider } from "@/components/Ornament";
 
 export const metadata: Metadata = {
   // absolute, or the root layout's "%s | Varanasi" template appends a
@@ -17,22 +18,35 @@ export const metadata: Metadata = {
 /**
  * The front door.
  *
- * The photograph behind this already carries the Buddha and the wordmark, so
- * the logo asset that used to sit on top of it was the same mark printed
- * twice. It has been dropped in favour of the name set in gold, which leaves
- * the photograph legible and the page quieter.
+ * It carries the drawn wordmark rather than the name set in a typeface. They
+ * are not the same thing: the wordmark has the restaurant's own letterforms —
+ * the flared serifs, the tight A — and setting "Varanasi" in the site's
+ * display face is an approximation of it that lands a few pixels off in a
+ * dozen places. On the page where the brand is the entire content, the
+ * approximation is the wrong choice.
+ *
+ * Two lines came off this page: "Indian fine dining" and "Please choose a
+ * location". The first is now carried in the wordmark's alternative text and
+ * the metadata, where the search engines that wanted it can still read it,
+ * without a subtitle sitting under a logo that already says it. The second was
+ * an instruction for something the page makes obvious — two cities, side by
+ * side, nothing else on the screen — and reading like an interface prompt is
+ * the opposite of what this screen is for.
+ *
+ * What replaced them is decoration with a job: a lotus divider and one line of
+ * italic. It marks the two restaurants as the thing to look at, and it sounds
+ * like the front of house rather than a form.
  *
  * The two restaurants sit side by side rather than stacked: they are a choice
  * between equals, and a column implies a first and a second. Each carries its
- * street address, which was previously screen-reader-only — a visitor deciding
- * between Birmingham and Leicester is usually deciding on geography, so the
- * address is the useful part and should be visible.
+ * street address, because a visitor deciding between Birmingham and Leicester
+ * is usually deciding on geography.
  */
 export default function ChooseBranch() {
   const branches = allBranches();
 
   return (
-    <main className="relative isolate min-h-svh flex items-center justify-center overflow-hidden bg-ink">
+    <main className="relative isolate flex min-h-svh items-center justify-center overflow-hidden bg-ink">
       <Image
         src="/brand/home-hero.png"
         alt=""
@@ -44,21 +58,30 @@ export default function ChooseBranch() {
       <div className="absolute inset-0 -z-10 bg-black/[0.72]" aria-hidden="true" />
 
       <div className="relative w-full px-5 py-16 text-center">
-        <p className="display text-gold leading-none text-[3.2rem] sm:text-[4.5rem] lg:text-[5rem]">
-          Varanasi
-        </p>
-        <p className="accent text-[0.6rem] sm:text-[0.66rem] text-pale/55 mt-5">
-          Indian fine dining
-        </p>
-
-        <h1 className="display mt-14 sm:mt-16 text-pale/80 text-base sm:text-lg leading-snug">
-          Please choose a location
+        {/* The wordmark is the heading. Its alt text is the accessible name of
+            the h1, so a screen reader hears the restaurant and what it does —
+            which is why the words dropped from the screen are not lost. */}
+        <h1 className="mx-auto w-[min(78vw,26rem)]">
+          <Image
+            src={brand.wordmark}
+            alt="Varanasi — Indian fine dining"
+            width={341}
+            height={49}
+            priority
+            quality={95}
+            className="h-auto w-full"
+          />
         </h1>
+
+        <OrnamentDivider className="mx-auto mt-14 w-[min(64vw,20rem)] opacity-80 sm:mt-16" />
+        <p className="display mt-6 text-lg italic text-gold/90 sm:text-xl">
+          Where shall we seat you?
+        </p>
 
         {/* Two abreast from 640px up. The divider is a border rather than a
             separate element so it never appears above the first card when the
             row collapses to a column on a phone. */}
-        <ul className="mt-10 sm:mt-12 mx-auto grid max-w-3xl gap-10 sm:grid-cols-2 sm:gap-0">
+        <ul className="mt-11 sm:mt-12 mx-auto grid max-w-3xl gap-10 sm:grid-cols-2 sm:gap-0">
           {branches.map((b, i) => (
             <li
               key={b.id}

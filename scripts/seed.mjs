@@ -1,6 +1,7 @@
 import { DatabaseSync } from "node:sqlite";
 import bcrypt from "bcryptjs";
 import fs from "node:fs";
+import { imageSize } from "./image-size.mjs";
 
 /** Hosts hand DATABASE_URL over as `file:/data/x.db`; SQLite wants a path. */
 const rawUrl = (process.env.DATABASE_URL ?? "").trim();
@@ -67,6 +68,7 @@ db.exec(`
   delete from blocked_dates;
   delete from menu_items;
   delete from menu_categories;
+  delete from room_images;
   delete from private_rooms;
   delete from gallery_images;
   delete from branch_stats;
@@ -116,12 +118,27 @@ const branchIds = { birmingham: bhamId, leicester: leicId };
 
 /* venue stat tiles and gallery, straight from the captured pages */
 const insStat = db.prepare("insert into branch_stats (branch_id,value,label,image,href,sort) values (?,?,?,?,?,?)");
-const insGallery = db.prepare("insert into gallery_images (branch_id,src,alt,is_featured,sort,is_published) values (?,?,?,?,?,1)");
+const insGallery = db.prepare(
+  "insert into gallery_images (branch_id,src,alt,width,height,is_featured,sort,is_published) values (?,?,?,?,?,?,?,1)");
+/* Read once from the file on disk. The gallery hands out slots four times the
+   size of an ordinary tile, and a picture's position in the list says nothing
+   about whether it can fill one — see src/lib/mosaic.ts. */
+const measure = (src) => imageSize(`./public${src}`) ?? { width: null, height: null };
+let tooSmall = 0;
 let galleryCount = 0;
 for (const [bslug, bid] of Object.entries(branchIds)) {
   const c = site.branches[bslug];
   c.stats.forEach((st, i) => insStat.run(bid, st.value, st.label, st.image ?? null, st.href ?? null, i));
-  c.gallery.forEach((src, i) => { insGallery.run(bid, src, `Varanasi ${bslug === "birmingham" ? "Birmingham" : "Leicester"}`, i === 0 ? 1 : 0, i); galleryCount++; });
+  c.gallery.forEach((src, i) => {
+    const { width, height } = measure(src);
+    insGallery.run(bid, src, `Varanasi ${bslug === "birmingham" ? "Birmingham" : "Leicester"}`,
+      width, height, i === 0 ? 1 : 0, i);
+    galleryCount++;
+    if (width != null && width < 1200) {
+      tooSmall++;
+      console.log(`  small: ${src} is ${width}x${height} — too small for a feature tile`);
+    }
+  });
 }
 
 /* ---------- staff ---------- */
@@ -194,7 +211,18 @@ const insRoom = db.prepare(`insert into private_rooms
    image,image_blurred,sort,is_published)
   values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1)`);
 
-let roomCount = 0;
+/* Each room's own page shows a gallery and, when one has been shot, a 360°
+   panorama — both from room_images. The client's media library has exactly one
+   photograph per room today, so this seeds that one and nothing else: the room
+   pages then show a banner and no grid, which is honest, rather than the same
+   picture three times pretending to be three angles. `views` and `panorama` in
+   rooms.json are read when they appear, so adding the photography later is a
+   data change and not a code change. */
+const insRoomImage = db.prepare(
+  "insert into room_images (room_id,src,alt,kind,heading_deg,sort) values (?,?,?,?,?,?)",
+);
+
+let roomCount = 0, roomImageCount = 0;
 for (const [bslug, bid] of Object.entries(branchIds)) {
   (roomData[bslug] ?? []).forEach((r, i) => {
     insRoom.run(bid, r.name, slug(r.name), r.headline ?? null, r.description ?? null, r.tagline ?? null,
@@ -204,6 +232,21 @@ for (const [bslug, bid] of Object.entries(branchIds)) {
       r.idealFor ? JSON.stringify(r.idealFor) : null,
       r.image ?? null, r.imageBlurred ?? null, i);
     roomCount++;
+
+    const roomId = db.prepare("select id from private_rooms where branch_id = ? and slug = ?")
+      .get(bid, slug(r.name))?.id;
+    if (!roomId) return;
+
+    const views = [r.image, ...(Array.isArray(r.views) ? r.views : [])].filter(Boolean);
+    views.forEach((src, vi) => {
+      insRoomImage.run(roomId, src, r.name, "photo", 0, vi);
+      roomImageCount++;
+    });
+    if (r.panorama) {
+      insRoomImage.run(roomId, r.panorama, `${r.name}, seen from the centre of the room`,
+        "panorama", r.panoramaHeadingDeg ?? 0, 0);
+      roomImageCount++;
+    }
   });
 }
 
@@ -243,4 +286,5 @@ const insSetting = db.prepare("insert into settings (key,value) values (?,?)");
 ]).forEach(([k, v]) => insSetting.run(k, v));
 
 console.log(`branches 2 | staff 3 | food categories ${catCount} | food items ${itemCount}`);
-console.log(`drinks categories ${drinkCats} | drinks ${drinkItems} | rooms ${roomCount} | gallery ${galleryCount}`);
+if (tooSmall) console.log(`${tooSmall} gallery image(s) are under 1200px wide and will only be used at tile size.`);
+console.log(`drinks categories ${drinkCats} | drinks ${drinkItems} | rooms ${roomCount} (${roomImageCount} views) | gallery ${galleryCount}`);

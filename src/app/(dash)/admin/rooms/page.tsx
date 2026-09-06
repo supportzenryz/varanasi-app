@@ -1,12 +1,12 @@
 import Link from "next/link";
 import Image from "next/image";
 import { notFound } from "next/navigation";
-import { asc, eq } from "drizzle-orm";
+import { asc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
-import { branches, privateRooms } from "@/db/schema";
+import { branches, privateRooms, roomImages } from "@/db/schema";
 import { requireAbility } from "@/lib/auth";
 import { formatPence } from "@/lib/money";
-import { saveRoom, addRoom, toggleRoom, deleteRoom, moveRoom } from "./actions";
+import { saveRoom, addRoom, toggleRoom, deleteRoom, moveRoom, addRoomImage, removeRoomImage } from "./actions";
 import { AdminNotice } from "@/components/AdminNotice";
 import { ConfirmButton } from "@/components/ConfirmButton";
 
@@ -37,6 +37,21 @@ export default async function RoomsAdmin({ searchParams }: { searchParams: Promi
 
   const rooms = db.select().from(privateRooms)
     .where(eq(privateRooms.branchId, active.id)).orderBy(asc(privateRooms.sort)).all();
+
+  /* One query for every room's pictures rather than one per room: eight rooms
+     open on this screen at once, and a query inside the map is eight queries
+     that all say the same thing. */
+  const allMedia = rooms.length
+    ? db.select().from(roomImages)
+        .where(inArray(roomImages.roomId, rooms.map((r) => r.id)))
+        .orderBy(asc(roomImages.sort)).all()
+    : [];
+  const mediaByRoom = new Map<number, typeof allMedia>();
+  for (const m of allMedia) {
+    const list = mediaByRoom.get(m.roomId);
+    if (list) list.push(m); else mediaByRoom.set(m.roomId, [m]);
+  }
+  const mediaFor = (roomId: number) => mediaByRoom.get(roomId) ?? [];
 
   return (
     <>
@@ -139,6 +154,72 @@ export default async function RoomsAdmin({ searchParams }: { searchParams: Promi
                     Save changes
                   </button>
                 </form>
+
+                {/* The room's own page: its other angles, and the 360° view.
+                    Separate from the form above because these are rows, not
+                    fields — adding one should not mean re-saving the room. */}
+                <section className="mt-5 border-t border-[--line] pt-5">
+                  <h3 className="text-sm font-semibold">
+                    Pictures on the room&rsquo;s own page
+                    <Link href={`/${active.slug}/private-dining-experiences/${room.slug}`}
+                      target="_blank" rel="noopener noreferrer"
+                      className="ml-3 text-xs font-normal underline text-ink-3 hover:text-gold-ink">
+                      View the page
+                    </Link>
+                  </h3>
+                  <p className="text-xs text-ink-3 mt-1 max-w-[70ch]">
+                    The photograph above is the room&rsquo;s banner. Anything added here appears
+                    below it as a gallery. A 360° view has to be an <strong>equirectangular</strong>{" "}
+                    picture — twice as wide as it is tall — which is what a 360 camera or the Google
+                    Street View app produces. An ordinary wide photograph will look badly stretched.
+                  </p>
+
+                  {mediaFor(room.id).length > 0 && (
+                    <ul className="mt-4 grid gap-2">
+                      {mediaFor(room.id).map((m) => (
+                        <li key={m.id} className="flex items-center gap-3 border border-[--line] bg-white px-3 py-2">
+                          <span className="relative h-10 w-16 shrink-0 overflow-hidden bg-ink/10">
+                            <Image src={m.src} alt="" fill sizes="64px" className="object-cover" />
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-xs">{m.src}</span>
+                            {m.kind === "panorama" && (
+                              <span className="accent text-[0.55rem] text-gold-ink">
+                                360° view · opens facing {m.headingDeg}°
+                              </span>
+                            )}
+                          </span>
+                          <form action={removeRoomImage}>
+                            <input type="hidden" name="id" value={m.id} />
+                            <button className="border border-[--line] px-3 py-1.5 text-xs hover:bg-pale">Remove</button>
+                          </form>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+
+                  <form action={addRoomImage} className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto_auto_auto] sm:items-end">
+                    <input type="hidden" name="roomId" value={room.id} />
+                    <div>
+                      <label className={label} htmlFor={`ris${room.id}`}>Path to the picture</label>
+                      <input id={`ris${room.id}`} name="src" className={field}
+                        placeholder={`/media/lib/${active.slug}/2026/01/${room.slug}-2.jpg`} />
+                    </div>
+                    <div>
+                      <label className={label} htmlFor={`rik${room.id}`}>Kind</label>
+                      <select id={`rik${room.id}`} name="kind" className={field} defaultValue="photo">
+                        <option value="photo">Photograph</option>
+                        <option value="panorama">360° view</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className={label} htmlFor={`rih${room.id}`}>Opens facing</label>
+                      <input id={`rih${room.id}`} name="headingDeg" inputMode="numeric" defaultValue="0"
+                        className={`${field} w-24`} />
+                    </div>
+                    <button className="bg-ink px-5 py-2.5 text-sm font-semibold text-pale">Add</button>
+                  </form>
+                </section>
 
                 <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-[--line]">
                   <form action={toggleRoom}><input type="hidden" name="id" value={room.id} />

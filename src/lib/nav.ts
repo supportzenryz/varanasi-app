@@ -29,6 +29,19 @@ export function pageHref(branchSlug: string, slug = ""): string {
 }
 export const isRebuilt = (slug: string) => REBUILT.has(slug.replace(/^\/|\/$/g, ""));
 
+/**
+ * A single private room's own page.
+ *
+ * Not built from `pageHref`: that decides between the rebuilt route and the
+ * archived copy by looking the whole path up in REBUILT, and a room's path has
+ * a slug in it that cannot be listed in advance. These pages are new — the old
+ * site had one long scroll for all of them and no per-room URL at all — so
+ * there is no archived version to fall back to and nothing to look up.
+ */
+export function roomHref(branchSlug: string, roomSlug: string): string {
+  return `/${branchSlug}/private-dining-experiences/${roomSlug}`;
+}
+
 /** The header's main navigation, in the live site's order.
  *
  *  Catering sits here rather than only in the footer. The page existed and the

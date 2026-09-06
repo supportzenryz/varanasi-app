@@ -7,11 +7,12 @@ import { db } from "@/db";
 import { galleryImages, menuCategories, menuItems, privateRooms } from "@/db/schema";
 import { branchBySlug, openingHours, telHref } from "@/lib/branches";
 import { formatPence } from "@/lib/money";
-import { pageHref } from "@/lib/nav";
+import { pageHref, roomHref } from "@/lib/nav";
 import { brand, branchMedia } from "@/lib/brand";
 import { HomeHero } from "@/components/HomeHero";
 import { BranchBand } from "@/components/BranchBand";
 import { MenuStacks } from "@/components/MenuStacks";
+import { VerticalFilm } from "@/components/VerticalFilm";
 import { GiftVoucherBand } from "@/components/GiftVoucherBand";
 import { OrnamentDivider, JaliBand } from "@/components/Ornament";
 
@@ -92,6 +93,24 @@ export default async function BranchHome({ params }: { params: Promise<{ branch:
       </section>
 
 
+      {/* The food film. It sits between the menus and the kitchen copy because
+          that is the join it bridges: the panels above say what is served, the
+          section below says how it is cooked, and thirty seconds of a table
+          being laid is the argument neither of them can make in words. */}
+      {media.filmVideo && (
+        <VerticalFilm
+          src={media.filmVideo}
+          poster={media.filmPoster}
+          kicker="At the table"
+          heading="Thirty seconds in the dining room"
+          body="Small plates, open flames and a room lit for the evening. This is a
+                service at Varanasi as it actually looks — no styling, no stand-ins."
+        >
+          <Link href={pageHref(branch.slug, "menu")} className="btn btn-gold">See the menu</Link>
+          <Link href={pageHref(branch.slug, "gallery")} className="btn btn-ink">More photographs</Link>
+        </VerticalFilm>
+      )}
+
       {/* the about section — heading, copy, and the photo collage the live site runs */}
       <section className="reveal mx-auto max-w-[84rem] px-5 lg:px-10 py-20 sm:py-28">
         <div className="grid gap-14 lg:grid-cols-2 lg:gap-20 lg:items-center">
@@ -158,30 +177,37 @@ export default async function BranchHome({ params }: { params: Promise<{ branch:
 
             <ul className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {rooms.slice(0, 6).map((r) => (
-                <li key={r.id} className="bg-ink-2 group border border-white/10">
-                  {/* The photograph is lazy-loaded, so give the box a faint
-                      gradient rather than flat ink — a card caught mid-load
-                      then reads as a card, not a broken image. */}
-                  <div className="relative h-56 sm:h-60 overflow-hidden hover-zoom warm
-                                  bg-gradient-to-br from-white/[0.06] to-transparent">
-                    {r.image ? (
-                      <Image src={r.image} alt={r.name} fill quality={88}
-                        sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
-                        className="object-cover" />
-                    ) : (
-                      /* An empty dark box reads as a broken image. Say what it is. */
-                      <div className="absolute inset-0 grid place-items-center border-b border-white/10">
-                        <span className="accent text-gold/50">Photograph to follow</span>
-                      </div>
-                    )}
-                  </div>
-                  <div className="p-6">
-                    <h3 className="text-xl">{r.name}</h3>
-                    {r.capacityMax && (
-                      <p className="accent text-gold mt-2.5">Up to {r.capacityMax} guests</p>
-                    )}
-                    {r.tagline && <p className="text-sm text-pale/70 mt-3 leading-relaxed">{r.tagline}</p>}
-                  </div>
+                <li key={r.id} className="group border border-white/10 bg-ink-2">
+                  {/* The whole card is the link. A photograph of a room that
+                      does nothing when you click it is the single most common
+                      thing a visitor tries on this section. */}
+                  <Link href={roomHref(branch.slug, r.slug)} className="block">
+                    {/* The photograph is lazy-loaded, so give the box a faint
+                        gradient rather than flat ink — a card caught mid-load
+                        then reads as a card, not a broken image. */}
+                    <span className="hover-zoom warm relative block h-56 overflow-hidden
+                                     bg-gradient-to-br from-white/[0.06] to-transparent sm:h-60">
+                      {r.image ? (
+                        <Image src={r.image} alt={r.name} fill quality={88}
+                          sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
+                          className="object-cover" />
+                      ) : (
+                        /* An empty dark box reads as a broken image. Say what it is. */
+                        <span className="absolute inset-0 grid place-items-center border-b border-white/10">
+                          <span className="accent text-gold/50">Photograph to follow</span>
+                        </span>
+                      )}
+                    </span>
+                    <span className="block p-6">
+                      <h3 className="text-xl transition-colors group-hover:text-gold">{r.name}</h3>
+                      {r.capacityMax && (
+                        <span className="accent mt-2.5 block text-gold">Up to {r.capacityMax} guests</span>
+                      )}
+                      {r.tagline && (
+                        <span className="mt-3 block text-sm leading-relaxed text-pale/70">{r.tagline}</span>
+                      )}
+                    </span>
+                  </Link>
                 </li>
               ))}
             </ul>

@@ -48,6 +48,14 @@ export const galleryImages = sqliteTable("gallery_images", {
   branchId: integer("branch_id").notNull().references(() => branches.id, { onDelete: "cascade" }),
   src: text("src").notNull(),
   alt: text("alt"),
+  /* The file's real pixel size, recorded when it is imported. The gallery gives
+     some tiles four times the area of the others and one tile the full width of
+     the page, and without this it was handing those slots out by position — so
+     a 201px thumbnail could end up stretched across fourteen hundred pixels.
+     Null means unknown, which the layout treats as "safe to enlarge", the
+     behaviour it had before any of this was recorded. */
+  width: integer("width"),
+  height: integer("height"),
   isFeatured: integer("is_featured", { mode: "boolean" }).notNull().default(false),
   sort: integer("sort").notNull().default(0),
   isPublished: integer("is_published", { mode: "boolean" }).notNull().default(true),
@@ -124,6 +132,33 @@ export const privateRooms = sqliteTable("private_rooms", {
   sort: integer("sort").notNull().default(0),
   isPublished: integer("is_published", { mode: "boolean" }).notNull().default(true),
 }, (t) => ({ branchIdx: index("private_rooms_branch_idx").on(t.branchId) }));
+
+/**
+ * The pictures on a room's own page.
+ *
+ * `private_rooms.image` stays as the one photograph the cards and the listing
+ * use, so nothing that already reads it has to change. This table is the rest:
+ * the other angles of the same room, and the 360° panorama if one has been
+ * shot.
+ *
+ * `kind` distinguishes them because they are not interchangeable. A `photo` is
+ * a normal picture and goes in the grid. A `panorama` is an equirectangular
+ * frame — a single very wide image, 2:1, that means nothing on its own and is
+ * only correct inside the viewer that wraps it round a sphere. Putting one in
+ * the grid by mistake shows a smeared, unreadable strip, so the two are kept
+ * apart in the data rather than guessed at from the file name.
+ */
+export const roomImages = sqliteTable("room_images", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  roomId: integer("room_id").notNull().references(() => privateRooms.id, { onDelete: "cascade" }),
+  src: text("src").notNull(),
+  alt: text("alt"),
+  kind: text("kind", { enum: ["photo", "panorama"] }).notNull().default("photo"),
+  /** What the viewer is looking at when a panorama opens, in degrees. Lets the
+   *  room face its best wall instead of wherever the camera happened to point. */
+  headingDeg: integer("heading_deg").notNull().default(0),
+  sort: integer("sort").notNull().default(0),
+}, (t) => ({ roomIdx: index("room_images_room_idx").on(t.roomId) }));
 
 /* ---------- availability control ---------- */
 export const blockedDates = sqliteTable("blocked_dates", {

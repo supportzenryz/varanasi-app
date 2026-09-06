@@ -7,7 +7,7 @@ import { db } from "@/db";
 import { privateRooms } from "@/db/schema";
 import { branchBySlug } from "@/lib/branches";
 import { formatPence } from "@/lib/money";
-import { pageHref } from "@/lib/nav";
+import { pageHref, roomHref } from "@/lib/nav";
 import { branchMedia } from "@/lib/brand";
 import { PageHero } from "@/components/PageHero";
 import { GiftVoucherBand } from "@/components/GiftVoucherBand";
@@ -56,9 +56,15 @@ export default async function PrivateDiningPage({ params }: { params: Promise<{ 
 
   return (
     <>
+      {/* The cinematic film of the restaurant runs here rather than on the home
+          page, where it would have been the second video on one screen. This is
+          the page where someone is imagining their own party in the room, and a
+          minute of the room lit for service answers that better than a still.
+          The still stays as the poster, so the banner is never blank. */}
       <PageHero
         align="center"
-        image={media.privateDiningHero}
+        image={media.roomFilmPoster ?? media.privateDiningHero}
+        video={media.roomFilmVideo}
         kicker={`Varanasi ${branch.city}`}
         heading="Private Dining"
         intro="Creating luxurious, intimate and memorable events."
@@ -145,16 +151,29 @@ export default async function PrivateDiningPage({ params }: { params: Promise<{ 
               return (
                 <article key={room.id} id={room.slug}
                   className="grid gap-8 lg:grid-cols-2 lg:gap-14 lg:items-center scroll-mt-28">
-                  <div className={`relative h-72 sm:h-96 overflow-hidden hover-zoom ${i % 2 ? "lg:order-2" : ""}`}>
+                  {/* The photograph is the thing people click, so it is the
+                      link. It used to be inert, which on a page of eight rooms
+                      meant every attempt to "open" a room did nothing at all. */}
+                  <Link
+                    href={roomHref(branch.slug, room.slug)}
+                    aria-label={`${room.name} — see the room`}
+                    className={`group relative block h-72 sm:h-96 overflow-hidden hover-zoom ${i % 2 ? "lg:order-2" : ""}`}
+                  >
                     {room.image ? (
                       <Image src={room.image} alt={room.name} fill sizes="(min-width: 1024px) 50vw, 100vw"
                         className="object-cover" />
                     ) : (
-                      <div className="absolute inset-0 bg-ink/10 flex items-center justify-center">
+                      <span className="absolute inset-0 flex items-center justify-center bg-ink/10">
                         <span className="accent text-[0.6rem] text-pale/70">Photograph to follow</span>
-                      </div>
+                      </span>
                     )}
-                  </div>
+                    <span className="absolute inset-x-0 bottom-0 flex justify-end bg-gradient-to-t from-ink/85 to-transparent p-5">
+                      <span className="accent border border-white/25 bg-ink/60 px-3 py-1.5 text-[0.52rem]
+                                       text-pale transition-colors group-hover:border-gold group-hover:text-gold">
+                        See the room
+                      </span>
+                    </span>
+                  </Link>
 
                   <div>
                     <h3 className="text-2xl sm:text-[2rem] leading-tight">{room.name}</h3>
@@ -189,10 +208,12 @@ export default async function PrivateDiningPage({ params }: { params: Promise<{ 
                     )}
 
                     <div className="mt-8 flex flex-wrap gap-3">
-                      <Link href={pageHref(branch.slug, "book-a-private-room")} className="btn btn-gold">
-                        Book this room
+                      <Link href={roomHref(branch.slug, room.slug)} className="btn btn-gold">
+                        See this room
                       </Link>
-                      <Link href={pageHref(branch.slug, "menu")} className="btn btn-ink">View set menus</Link>
+                      <Link href={pageHref(branch.slug, "book-a-private-room")} className="btn btn-ink">
+                        Enquire
+                      </Link>
                     </div>
                   </div>
                 </article>

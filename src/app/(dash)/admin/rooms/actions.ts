@@ -2,7 +2,7 @@
 import { revalidatePath } from "next/cache";
 import { and, asc, desc, eq, gt, lt } from "drizzle-orm";
 import { db } from "@/db";
-import { branches, privateRooms } from "@/db/schema";
+import { branches, privateRooms, roomImages } from "@/db/schema";
 import { record } from "@/lib/audit";
 import { requireAbility, assertBranchAccess, type Session } from "@/lib/auth";
 import { parsePounds } from "@/lib/money";
@@ -23,6 +23,15 @@ function publish(branchId: number) {
   if (!row) return;
   revalidatePath(`/${row.slug}`);
   revalidatePath(`/${row.slug}/private-dining-experiences`);
+}
+
+/** A room's own page is prerendered too, so its pictures have to invalidate it
+ *  as well as the listing every other action touches. */
+function publishRoom(branchId: number, roomId: number) {
+  publish(branchId);
+  const branchSlug = db.select({ slug: branches.slug }).from(branches).where(eq(branches.id, branchId)).get()?.slug;
+  const roomSlug = db.select({ slug: privateRooms.slug }).from(privateRooms).where(eq(privateRooms.id, roomId)).get()?.slug;
+  if (branchSlug && roomSlug) revalidatePath(`/${branchSlug}/private-dining-experiences/${roomSlug}`);
 }
 
 function backTo(branchId: number): string {
@@ -193,4 +202,78 @@ export async function moveRoom(formData: FormData) {
   db.update(privateRooms).set({ sort: me!.sort }).where(eq(privateRooms.id, neighbour!.id)).run();
   publish(branchId);
   ok(back, `${me!.name} moved ${dir === "up" ? "up" : "down"}.`);
+}
+
+/* ---------- the pictures on a room's own page ---------- */
+
+/**
+ * A room's extra views, and its 360° panorama.
+ *
+ * Both arrive as a path into the media library rather than an upload, which is
+ * the same bargain the rest of this screen strikes: the photography is dropped
+ * into `public/media` in one go and referenced here, so a manager cannot fill
+ * the disk from a form and a wrong path is a visibly missing picture rather
+ * than a lost file.
+ *
+ * The one check worth making is on the panorama. An equirectangular frame is
+ * always twice as wide as it is tall, and the failure when it is not is silent
+ * and horrible — the room appears stretched, the ceiling smears, and nothing
+ * says why. We cannot measure the image from here, so we say plainly what the
+ * viewer needs and record which kind was added.
+ */
+export async function addRoomImage(formData: FormData) {
+  const session = await requireAbility("editRooms");
+  const roomId = Number(formData.get("roomId"));
+  const branchId = roomBranch(roomId);
+  assertBranchAccess(session, branchId);
+
+  const back = backTo(branchId);
+  const src = clean(formData.get("src"));
+  if (!src) problem(back, "Paste the path to the picture first, e.g. /media/lib/birmingham/2024/07/room-2.jpg");
+  if (!src!.startsWith("/") && !src!.startsWith("https://")) {
+    problem(back, `"${src}" isn't a path we can use. It should start with /media/ or with https://`);
+  }
+
+  const kind = formData.get("kind") === "panorama" ? "panorama" : "photo";
+  const heading = Math.max(0, Math.min(359, num(formData.get("headingDeg")) ?? 0));
+
+  // One panorama per room: a second would be a different room, not a second
+  // view of this one, and the page has nowhere to put it.
+  if (kind === "panorama") {
+    const existing = db.select({ id: roomImages.id }).from(roomImages)
+      .where(and(eq(roomImages.roomId, roomId), eq(roomImages.kind, "panorama"))).get();
+    if (existing) db.delete(roomImages).where(eq(roomImages.id, existing.id)).run();
+  }
+
+  const last = db.select({ sort: roomImages.sort }).from(roomImages)
+    .where(eq(roomImages.roomId, roomId)).orderBy(desc(roomImages.sort)).get();
+
+  db.insert(roomImages).values({
+    roomId,
+    src: src!,
+    alt: clean(formData.get("alt")),
+    kind,
+    headingDeg: heading,
+    sort: (last?.sort ?? -1) + 1,
+  }).run();
+
+  log(session, "room.image.add", String(roomId), `${kind}: ${src}`);
+  publishRoom(branchId, roomId);
+  ok(back, kind === "panorama"
+    ? "360° view added. Open the room page to check it — if the ceiling looks stretched, the file isn't a 2:1 equirectangular frame."
+    : "Picture added to the room's page.");
+}
+
+export async function removeRoomImage(formData: FormData) {
+  const session = await requireAbility("editRooms");
+  const id = Number(formData.get("id"));
+  const row = db.select().from(roomImages).where(eq(roomImages.id, id)).get();
+  if (!row) problem("/admin/rooms", "That picture has already been removed.");
+  const branchId = roomBranch(row!.roomId);
+  assertBranchAccess(session, branchId);
+
+  db.delete(roomImages).where(eq(roomImages.id, id)).run();
+  log(session, "room.image.remove", String(row!.roomId), `${row!.kind}: ${row!.src}`);
+  publishRoom(branchId, row!.roomId);
+  ok(backTo(branchId), row!.kind === "panorama" ? "360° view removed." : "Picture removed.");
 }

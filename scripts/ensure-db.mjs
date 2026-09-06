@@ -22,6 +22,7 @@ import { DatabaseSync } from "node:sqlite";
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { imageSize } from "./image-size.mjs";
 
 /** Hosts hand this over as a connection string; SQLite wants a path. */
 function databasePath(raw = process.env.DATABASE_URL) {
@@ -72,6 +73,53 @@ if (fresh) {
   run("seed", "scripts/seed.mjs");
 } else {
   console.log("[ensure-db] existing data found — skipping seed (it would erase live edits).");
+  backfillGalleryDimensions();
 }
 
 console.log("[ensure-db] ready.");
+
+/**
+ * Fill in the pixel sizes of gallery photographs added before the columns for
+ * them existed.
+ *
+ * A migration can add a column but it cannot know what belongs in it, and the
+ * seed — which does know, because it reads the files — is precisely what must
+ * not run against a database the client has been using. Between those two the
+ * live gallery would have kept every row's size null, and the layout treats
+ * null as "large enough to enlarge", which is the behaviour that put a 201px
+ * thumbnail across the full width of the page. So the one gap gets closed here,
+ * on the way up.
+ *
+ * Only rows with nothing recorded are touched, and a file that cannot be read —
+ * a photograph on a CDN rather than in `public`, or one an editor has since
+ * removed — is left as it was. Running this again does nothing.
+ */
+function backfillGalleryDimensions() {
+  const db = new DatabaseSync(file);
+  try {
+    const has = db.prepare(
+      "select count(*) as n from pragma_table_info('gallery_images') where name = 'width'",
+    ).get();
+    if (!Number(has.n)) return;
+
+    const rows = db.prepare(
+      "select id, src from gallery_images where width is null and src like '/%'",
+    ).all();
+    if (!rows.length) return;
+
+    const update = db.prepare("update gallery_images set width = ?, height = ? where id = ?");
+    let filled = 0;
+    for (const row of rows) {
+      const size = imageSize(path.join("public", row.src));
+      if (!size) continue;
+      update.run(size.width, size.height, row.id);
+      filled++;
+    }
+    if (filled) console.log(`[ensure-db] measured ${filled} gallery photograph(s).`);
+  } catch (err) {
+    // Never block a boot over a layout nicety.
+    console.warn(`[ensure-db] could not measure gallery photographs: ${err.message}`);
+  } finally {
+    db.close();
+  }
+}

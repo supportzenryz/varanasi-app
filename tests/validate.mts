@@ -196,5 +196,64 @@ for (const [bad, why] of [
   t(`rejects ${JSON.stringify(bad)} (${why})`, !checkPartySize(bad).ok);
 }
 
+
+/* ---------- the gallery mosaic ----------
+ *
+ * The failure this guards against is not a crash: it is a rectangle with a
+ * corner missing, which nothing except a person looking at the page would ever
+ * notice. So the assertions are the geometry itself — total cells divide by
+ * both column counts, no double tile is stranded near the end or close enough
+ * to another to leave an unfillable notch, and the picture that gets stretched
+ * across the page is one that can stand it.
+ */
+fs.writeFileSync(path.join(dir, "mosaic.ts"),
+  fs.readFileSync(new URL("../src/lib/mosaic.ts", here), "utf8"));
+const { mosaic } = await import(path.join(dir, "mosaic.ts"));
+
+console.log("\n── gallery mosaic ──");
+
+/** Cells consumed once the doubles and the stretched tail are counted. */
+function cells(m: ReturnType<typeof mosaic>, cols: number): number {
+  const n = m.order.length;
+  const span = cols === 2 ? m.lastSpanSm : m.lastSpanLg;
+  return n + m.wide.size * 3 + (m.wide.has(n - 1) ? 0 : span - 1);
+}
+
+for (let n = 0; n <= 60; n++) {
+  const all = mosaic(Array(n).fill(true));
+  t(`${n} photographs: rows fill on a desktop`, n === 0 || cells(all, 4) % 4 === 0);
+  t(`${n} photographs: rows fill on a phone`, n === 0 || cells(all, 2) % 2 === 0);
+
+  const wides = [...all.wide].sort((a, b) => a - b);
+  t(`${n} photographs: no double is stranded at the end`,
+    wides.every((w) => w + 4 < n));
+  t(`${n} photographs: doubles leave room for their fillers`,
+    wides.every((w, i) => i === 0 || w - wides[i - 1] >= 5));
+}
+
+/* The two real galleries, which are what found the original bug. */
+t("Birmingham's fifteen tiles need no stretch at all",
+  mosaic(Array(15).fill(true)).lastSpanLg === 1);
+t("Leicester's eleven close the row with a full-width finale",
+  mosaic(Array(11).fill(true)).lastSpanLg === 4);
+
+/* Leicester's list ends on a 201px thumbnail. Stretching that across the page
+   was the eyesore that replaced the hole. */
+{
+  const large = Array(11).fill(true);
+  large[10] = false;                       // the thumbnail, last in the client's order
+  const m = mosaic(large);
+  t("a thumbnail is never the one stretched across the page", large[m.order[10]]);
+  t("swapping it in keeps every photograph on the page", new Set(m.order).size === 11);
+}
+{
+  // Nothing is big enough: the layout must still be a rectangle, not a crash.
+  const m = mosaic(Array(11).fill(false));
+  t("with no large photographs, no doubles are used", m.wide.size === 0);
+  t("with no large photographs, the rows still fill", cells(m, 4) % 4 === 0);
+}
+t("one photograph fills the row on its own", mosaic([true]).lastSpanLg === 4);
+t("no photographs is not a crash", mosaic([]).order.length === 0);
+
 console.log(`\n${"─".repeat(60)}\n${pass}/${pass + fail} checks passed\n`);
 process.exit(fail ? 1 : 0);

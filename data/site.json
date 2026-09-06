@@ -4,7 +4,7 @@
     "logo": "/media/lib/birmingham/2024/07/logo.png",
     "logoDark": "/media/lib/birmingham/2024/07/logo_dark.png",
     "logoIcon": "/media/lib/birmingham/2024/07/logo_icon.svg",
-    "wordmark": "/media/lib/birmingham/2026/01/varanasi_logo_text.png",
+    "wordmark": "/brand/wordmark.webp",
     "favicon": "/media/lib/birmingham/2024/08/favicon-varanasi.svg",
     "appleTouchIcon": "/media/lib/birmingham/2024/08/apple-touch-icon-varanasi.png",
     "socialImage": "/media/lib/birmingham/2024/09/Varanasi_Social_Image.jpg",
@@ -80,7 +80,11 @@
         "/media/lib/birmingham/2024/08/dishes-category-dinner-images5.webp",
         "/media/lib/birmingham/2024/08/dishes-category-dinner-images6.webp"
       ],
-      "drinksHero": "/media/lib/birmingham/2024/08/varanasi_bottles.webp"
+      "drinksHero": "/media/lib/birmingham/2024/08/varanasi_bottles.webp",
+      "filmVideo": "/media/lib/birmingham/2024/08/food.mp4",
+      "filmPoster": "/media/lib/birmingham/2024/08/food-poster.jpg",
+      "roomFilmVideo": "/media/lib/birmingham/2024/10/varanasi-restaurant-film.mp4",
+      "roomFilmPoster": "/media/lib/birmingham/2024/10/varanasi-restaurant-film-poster.jpg"
     },
     "leicester": {
       "heroKicker": "Artistry in Every Bite",
@@ -144,7 +148,9 @@
         "/media/lib/leicester/2024/08/dishes-category-dinner-images5.webp",
         "/media/lib/leicester/2024/08/dishes-category-dinner-images6.webp"
       ],
-      "drinksHero": "/media/lib/leicester/2025/03/Varanasi-Leicester-Drinks.jpg"
+      "drinksHero": "/media/lib/leicester/2025/03/Varanasi-Leicester-Drinks.jpg",
+      "filmVideo": "/media/lib/leicester/2025/03/Varanasi_Food_Video_2.mp4",
+      "filmPoster": "/media/lib/leicester/2025/03/Varanasi_Food_Video_2-poster.jpg"
     }
   }
 }

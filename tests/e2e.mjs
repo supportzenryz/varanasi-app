@@ -43,7 +43,14 @@ db.execute('update users set password_hash=?, must_change_password=1 where email
 db.commit()
 `]);
 
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
+/* The browser Playwright would pick is not always the one installed here — a
+   container may ship a build that does not match the npm package's expected
+   revision, and the failure is a wall of "Executable doesn't exist". Naming it
+   through the environment lets a machine say where its browser is; with nothing
+   set, Playwright resolves it as usual. */
+const browser = await chromium.launch(
+  process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {},
+);
 const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
 const page = await ctx.newPage();
 const errors = [];
@@ -176,6 +183,40 @@ console.log('\n── 1b. The home page opens on one line, and shows the page be
 
   t('The hero carries no buttons any more',
     await page.locator('section').first().locator('a.btn').count() === 0);
+
+  /* One line is the whole point of the headline, and `whitespace-nowrap` makes
+     a wrap impossible — so a sizing regression shows up as the text running out
+     of the frame instead. Measure both: the line count, and whether it overflows
+     the page sideways. 320px is the narrowest handset still in use. */
+  for (const w of [320, 390, 768, 1440, 2560]) {
+    const probe = await ctx.newPage();
+    await probe.setViewportSize({ width: w, height: 780 });
+    await probe.goto(`${BASE}/birmingham`, { waitUntil: 'domcontentloaded' });
+    await probe.evaluate(() => document.fonts.ready);
+    const m = await probe.evaluate(() => {
+      const h1 = document.querySelector('h1');
+      const r = h1.getBoundingClientRect();
+      return {
+        lines: Math.round(r.height / parseFloat(getComputedStyle(h1).lineHeight)),
+        share: r.width / document.documentElement.clientWidth,
+        sideways: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      };
+    });
+    t(`  · at ${w}px the headline is one line and inside the frame`,
+      m.lines === 1 && m.sideways === 0 && m.share < 0.94,
+      `${m.lines} line(s), ${(m.share * 100).toFixed(0)}% of the width, ${m.sideways}px sideways`);
+    await probe.close();
+  }
+
+  /* The words sit at the foot of the film now: centred, they covered the table
+     in the middle of the shot. If this slips back the photograph loses again. */
+  const foot = await page.evaluate(() => {
+    const hero = document.querySelector('section');
+    const h1 = document.querySelector('h1');
+    return (h1.getBoundingClientRect().top - hero.getBoundingClientRect().top)
+      / hero.getBoundingClientRect().height;
+  });
+  t('The headline sits in the lower half of the hero', foot > 0.55, `${(foot * 100).toFixed(0)}% down`);
 
   // The four menus, as panels.
   const stacks = page.locator('a:has(span:text-is("A La Carte"))');
@@ -1420,6 +1461,80 @@ db.commit()
     q(`select entity_id, detail from audit_log where action='gdpr.erase' order by id desc limit 1`)
       .every(r => !String(r.entity_id).includes('@') && !String(r.detail).includes('@')));
   t('  · and the owner is emailed about it', mailSince(t0).some(m => /gdpr\.erase/i.test(m)));
+}
+
+console.log('\n── 6i. The gallery fills its rows ──');
+
+{
+  /* The bug: every seventh tile ran double-size, Birmingham's fifteenth tile
+     was a multiple of seven, and the page ended on a double block alone in a
+     four-column row — half a row wide and two rows tall of flat black. It reads
+     as a page that failed to load. The assertion is the geometry, because that
+     is the only thing that would have caught it. */
+  for (const branch of ['birmingham', 'leicester']) {
+    for (const [w, cols] of [[1440, 4], [390, 2]]) {
+      const probe = await ctx.newPage();
+      await probe.setViewportSize({ width: w, height: 900 });
+      await probe.goto(`${BASE}/${branch}/gallery`, { waitUntil: 'networkidle' });
+      const geom = await probe.evaluate(() => {
+        const ul = document.querySelector('main ul.grid') ?? document.querySelector('ul.grid');
+        const box = ul.getBoundingClientRect();
+        const kids = [...ul.children].map((li) => li.getBoundingClientRect());
+        const foot = Math.max(...kids.map((k) => k.bottom));
+        const onLastRow = kids.filter((k) => Math.abs(k.bottom - foot) < 2);
+        const gap = parseFloat(getComputedStyle(ul).columnGap) || 0;
+        const covered = onLastRow.reduce((s, k) => s + k.width, 0) + gap * (onLastRow.length - 1);
+        return { tiles: kids.length, width: Math.round(box.width), covered: Math.round(covered) };
+      });
+      t(`  · ${branch} at ${cols} columns leaves no hole in the last row`,
+        Math.abs(geom.covered - geom.width) <= 2,
+        `${geom.tiles} tiles, last row covers ${geom.covered} of ${geom.width}`);
+      await probe.close();
+    }
+  }
+}
+
+console.log('\n── 6j. Every private room has its own page ──');
+
+{
+  /* The old site had one long scroll for all eight rooms and no URL for any of
+     them, so nobody could send "here's the room" to the people they were
+     organising. The photograph is also the thing people click, and it used to
+     be inert. */
+  await page.goto(`${BASE}/birmingham/private-dining-experiences`, { waitUntil: 'networkidle' });
+  const firstCard = page.locator('#rooms article a[href*="/private-dining-experiences/"]').first();
+  t('A room photograph is a link', await firstCard.count() === 1);
+
+  const href = await firstCard.getAttribute('href');
+  await page.goto(BASE + href, { waitUntil: 'networkidle' });
+  const heading = (await page.locator('h1').first().innerText()).trim();
+  t('It opens that room\'s own page', heading.length > 0 && !/Private Dining$/.test(heading), heading);
+
+  const rows = await page.locator('dt').allTextContents();
+  t('  · with the figures a host needs', rows.some((r) => /Capacity/i.test(r)), rows.join(', '));
+  t('  · and a way to ask about it',
+    await page.locator('a.btn:has-text("Enquire about this room")').count() > 0);
+  t('  · and the other rooms to compare it with',
+    await page.locator('a[href*="/private-dining-experiences/"]').count() > 1);
+
+  /* No panorama has been shot yet. The section must be absent rather than an
+     empty frame — and must appear the moment one is added. */
+  const rooms = q("select r.slug, (select count(*) from room_images i where i.room_id = r.id and i.kind = 'panorama') as panos from private_rooms r join branches b on b.id = r.branch_id where b.slug = 'birmingham'");
+  const withPano = rooms.filter((r) => r.panos > 0).length;
+  const shown = await page.locator('#look-around').count();
+  const thisRoom = rooms.find((r) => href.endsWith(r.slug));
+  t('The 360 section appears exactly when there is a 360 to show',
+    shown === (thisRoom && thisRoom.panos > 0 ? 1 : 0),
+    `${withPano} of ${rooms.length} rooms have one`);
+
+  /* A room that does not exist must be a 404, not a page about nothing. The
+     browser logs that as a console error, which is the suite's own alarm for
+     something genuinely broken — so silence it for this one request only. */
+  expect404s = true;
+  const missing = await page.goto(`${BASE}/birmingham/private-dining-experiences/not-a-room`,
+    { waitUntil: 'domcontentloaded' });
+  t('An unknown room is a 404', missing.status() === 404, String(missing.status()));
+  expect404s = false;
 }
 
 console.log('\n── 7. Responsiveness ──');

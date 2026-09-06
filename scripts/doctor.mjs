@@ -42,6 +42,8 @@ const dim = (s) => `[2m${s}[0m`;
 loadEnv();
 
 const problems = [];
+/** A booking reference to look for, if one was given. */
+const wanted = process.argv[2];
 const say = (label, value) => console.log(`  ${label.padEnd(22)} ${value}`);
 
 console.log(`\n${bold("Varanasi — what this setup is actually doing")}`);
@@ -99,37 +101,70 @@ if (!fs.existsSync(resolved)) {
   }
 }
 
-/* Every other copy of this project on the machine, and what its database holds.
-   Two copies is the situation this whole script exists for. */
-const siblings = [];
-const parent = path.dirname(process.cwd());
-try {
-  for (const name of fs.readdirSync(parent)) {
-    const candidate = path.join(parent, name);
-    if (candidate === process.cwd()) continue;
-    const theirs = path.join(candidate, "data", "varanasi.db");
-    if (fs.existsSync(path.join(candidate, "package.json")) && fs.existsSync(theirs)) {
-      siblings.push(theirs);
-    }
-  }
-} catch { /* not worth failing over */ }
-
-if (siblings.length) {
-  console.log(`\n${bold("Another copy of the project is on this machine")}`);
-  for (const s of siblings) {
-    let n = "?";
+/**
+ * Every other copy of this database on the machine.
+ *
+ * This started as a look at the folders beside this one, which was not nearly
+ * enough: the copy that mattered turned out to be two levels down a different
+ * branch of the tree. A booking reference that reached Stripe was necessarily
+ * written to *some* file, so when it is not in this one the only useful next
+ * question is which file — and answering it by hand means knowing where to
+ * look, which is the thing nobody knew.
+ *
+ * So: walk the home directory, skip the places a database will never be and
+ * that are expensive to walk, and report every one found with what it holds.
+ */
+function findDatabases(root, maxDepth = 6) {
+  const skip = new Set([
+    "node_modules", ".next", ".git", ".cache", "AppData", "Library",
+    "Windows", "Program Files", "Program Files (x86)", "$Recycle.Bin",
+    "anaconda3", ".gradle", ".m2", "OneDrive", "venv", ".venv", "__pycache__",
+  ]);
+  const found = [];
+  const walk = (dir, depth) => {
+    if (depth > maxDepth || found.length > 40) return;
+    let entries;
     try {
-      const other = new DatabaseSync(s, { readOnly: true });
-      n = other.prepare("select count(*) as n from bookings").get().n;
-      other.close();
-    } catch { /* leave as ? */ }
-    say("also here", `${s}  ${dim(`(${n} bookings)`)}`);
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch { return; }                       // unreadable folder: not our business
+    for (const e of entries) {
+      if (e.name.startsWith("$") || skip.has(e.name)) continue;
+      const full = path.join(dir, e.name);
+      if (e.isFile() && e.name === "varanasi.db") found.push(full);
+      else if (e.isDirectory() && !e.isSymbolicLink()) walk(full, depth + 1);
+    }
+  };
+  walk(root, 0);
+  return found;
+}
+
+const home = process.env.USERPROFILE ?? process.env.HOME ?? path.dirname(process.cwd());
+const elsewhere = findDatabases(home).filter((f) => path.resolve(f) !== resolved);
+
+if (elsewhere.length) {
+  console.log(`\n${bold("Other copies of this database on the machine")}`);
+  for (const other of elsewhere) {
+    let detail = dim("(could not read it)");
+    try {
+      const conn = new DatabaseSync(other, { readOnly: true });
+      const n = conn.prepare("select count(*) as n from bookings").get().n;
+      let mark = "";
+      if (wanted) {
+        const hit = conn.prepare("select reference from bookings where upper(reference) = upper(?)").get(wanted.trim());
+        mark = hit ? `  ${green(bold(`← ${wanted} IS HERE`))}` : "";
+      }
+      conn.close();
+      const when = fs.statSync(other).mtime.toLocaleString("en-GB");
+      detail = `${dim(`${n} bookings · last written ${when}`)}${mark}`;
+    } catch { /* leave the placeholder */ }
+    console.log(`  ${other}\n    ${detail}`);
   }
-  console.log(dim("  If you started the server from there, its bookings go there — not to the file above."));
+  console.log(dim("\n  Whichever folder you start the server from is the one it writes to."));
+} else {
+  console.log(`\n${dim("No other copy of the database found under " + home + ".")}`);
 }
 
 /* ---------- a specific booking ---------- */
-const wanted = process.argv[2];
 if (wanted && db) {
   console.log(`\n${bold(`Booking ${wanted}`)}`);
   let row;

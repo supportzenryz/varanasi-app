@@ -144,6 +144,7 @@ async function notifyOwner(session: Session, entry: AuditEntry): Promise<void> {
 
   await sendMail({
     to,
+    ...sender(),
     subject: `Varanasi admin: ${entry.action} by ${session.name}`,
     text: lines.join("\n"),
   });
@@ -173,6 +174,7 @@ export function recordAnon(entry: AuditEntry & { who?: string }): void {
   if (!to.length) return;
   void sendMail({
     to,
+    ...sender(),
     subject: `Varanasi admin: ${entry.action}`,
     text: [
       entry.action,
@@ -188,6 +190,21 @@ export function recordAnon(entry: AuditEntry & { who?: string }): void {
 }
 
 /* ---------------------------------------------------------------- digest -- */
+
+/**
+ * The address these alerts are sent from.
+ *
+ * Every message in this file used to omit it, so they fell through to the
+ * built-in default while booking confirmations used the address configured in
+ * Admin → Settings. Changing that setting therefore fixed the guest's email and
+ * silently left the owner's alerts on the old address — visible in one log as
+ * two different senders being refused for two different reasons in the same
+ * minute. One setting should mean one sender.
+ */
+function sender() {
+  const n = bookingRules().notifications;
+  return { fromName: n.fromName, fromEmail: n.fromEmail, replyTo: n.replyTo };
+}
 
 function cursor(): number {
   const row = db.select().from(settings).where(eq(settings.key, DIGEST_KEY)).get();
@@ -209,7 +226,11 @@ function digestDue(): boolean {
   const row = db.select().from(settings).where(eq(settings.key, LAST_SENT_KEY)).get();
   const last = Number(row?.value ?? 0);
   if (!last) return true;
-  return Date.now() / 1000 - last >= DIGEST_HOURS * 3600;
+
+  // After a refusal, wait out the backoff rather than the usual interval.
+  const failures = readNumber(FAILURES_KEY);
+  const waitHours = failures > 0 ? Math.max(DIGEST_HOURS, backoffHours(failures)) : DIGEST_HOURS;
+  return Date.now() / 1000 - last >= waitHours * 3600;
 }
 
 function markDigestSent(): void {
@@ -217,6 +238,39 @@ function markDigestSent(): void {
   db.insert(settings).values({ key: LAST_SENT_KEY, value: at, updatedAt: Math.floor(Date.now() / 1000) })
     .onConflictDoUpdate({ target: settings.key, set: { value: at, updatedAt: Math.floor(Date.now() / 1000) } })
     .run();
+}
+
+/**
+ * How many times in a row the digest has failed to send, and when to try next.
+ *
+ * A refused send used to log "will retry next hour" and mean it, for ever. When
+ * the refusal is a configuration fault rather than a hiccup — an unverified
+ * sending domain, say — that is not a retry, it is the same doomed request once
+ * an hour until somebody notices, and a log filled with identical lines that
+ * never said *why*. Seven of them in one paste is what prompted this.
+ *
+ * So the interval doubles: an hour, two, four, up to a day. A genuine outage is
+ * still picked up quickly, a misconfiguration stops shouting, and either way it
+ * recovers on its own the moment sending starts working — nobody has to
+ * remember to restart anything.
+ */
+const FAILURES_KEY = "audit_digest_failures";
+const MAX_BACKOFF_HOURS = 24;
+
+function readNumber(key: string): number {
+  const n = Number(db.select().from(settings).where(eq(settings.key, key)).get()?.value ?? 0);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function writeNumber(key: string, value: number): void {
+  const now = Math.floor(Date.now() / 1000);
+  db.insert(settings).values({ key, value: String(value), updatedAt: now })
+    .onConflictDoUpdate({ target: settings.key, set: { value: String(value), updatedAt: now } }).run();
+}
+
+/** Hours to wait after `n` consecutive failures: 1, 2, 4, 8, 16, then 24. */
+function backoffHours(n: number): number {
+  return Math.min(2 ** Math.max(0, n - 1), MAX_BACKOFF_HOURS);
 }
 
 /**
@@ -297,15 +351,34 @@ export async function sendAuditDigest(force = false): Promise<number> {
 
   const res = await sendMail({
     to,
+    ...sender(),
     subject: `Varanasi admin summary — ${rows.length} change${rows.length === 1 ? "" : "s"}`,
     text: body.join("\n"),
   });
 
   if (!res.ok) {
-    console.error("[audit] digest not sent; will retry next hour");
+    /* Say why, and say when. "will retry next hour" told nobody anything and
+       was not even true after the first hour — it repeated for ever. The
+       provider's own words are in `res.detail`, and they are usually explicit
+       about what is wrong. */
+    const failures = readNumber(FAILURES_KEY) + 1;
+    writeNumber(FAILURES_KEY, failures);
+    // Restart the clock so the backoff is measured from this attempt, not from
+    // the last success, which may be days ago.
+    markDigestSent();
+    const next = backoffHours(failures);
+    console.error(
+      `[audit] digest refused (attempt ${failures}): ${res.detail ?? "no reason given"}`,
+    );
+    console.error(`[audit] next attempt in ${next} hour${next === 1 ? "" : "s"}. `
+      + "The entries are safe — the cursor has not moved, so nothing is skipped when it works.");
     return 0;
   }
 
+  if (readNumber(FAILURES_KEY) > 0) {
+    writeNumber(FAILURES_KEY, 0);
+    console.log("[audit] digest sending again after earlier refusals");
+  }
   setCursor(rows[rows.length - 1].id);
   markDigestSent();
   console.log(`[audit] digest sent: ${rows.length} entries -> ${to.join(", ")}`);

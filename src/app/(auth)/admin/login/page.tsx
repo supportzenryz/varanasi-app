@@ -11,9 +11,16 @@ export default function LoginPage() {
       <div className="hidden lg:flex flex-col justify-between bg-ink text-pale p-12">
         {/* The full mark — Buddha and wordmark — on the dark panel it was drawn
             for. Copied into public/brand so the admin never depends on the
-            media library import having been run. */}
+            media library import having been run.
+
+            `self-start` is load-bearing, not tidiness. This panel is a column
+            flex container, so its children default to `align-items: stretch`
+            — which on a replaced element with `width: auto` stretches the
+            width to the full column and holds the height at h-14, squashing a
+            5:1 mark out to better than 10:1. `w-auto` cannot save it: auto is
+            precisely what stretch is allowed to override. */}
         <Image src="/brand/logo.png" alt="Varanasi" width={520} height={104}
-          className="h-14 w-auto" priority />
+          className="h-14 w-auto self-start" priority />
         <div>
           <h1 className="text-4xl leading-tight max-w-[14ch]">The room behind the restaurant.</h1>
           <p className="mt-4 text-pale/70 max-w-[38ch] text-sm leading-relaxed">
@@ -55,6 +62,18 @@ export default function LoginPage() {
           <p className="mt-6 text-xs text-ink-3 leading-relaxed">
             Forgotten your password? Ask an owner to reset it from Staff access.
           </p>
+
+          {/* Which is no help at all if you ARE the owner: resetting a password
+              requires being signed in, so a forgotten owner password locks the
+              back office from the inside. Development only — a member of staff
+              on the live site has an owner to ask, and should not be reading
+              about terminal commands. */}
+          {process.env.NODE_ENV !== "production" && (
+            <p className="mt-3 text-xs text-ink-3/80 leading-relaxed">
+              Locked out of the owner account?{" "}
+              <code className="text-[0.7rem]">npm run staff:password -- you@example.com --create</code>
+            </p>
+          )}
         </form>
       </div>
     </main>

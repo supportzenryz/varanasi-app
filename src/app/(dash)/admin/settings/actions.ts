@@ -9,7 +9,7 @@ import { bookingRules, SETTINGS_KEY, type BookingRules } from "@/lib/booking-con
 import { parsePounds } from "@/lib/money";
 import { checkEmail, checkPhone, checkTime } from "@/lib/validate";
 import { ok, problem } from "@/lib/admin-feedback";
-import { sendMail } from "@/lib/email";
+import { sendMail, checkSendingDomain } from "@/lib/email";
 
 const num = (v: FormDataEntryValue | null, fallback: number) => {
   const n = Number(String(v ?? "").replace(/[^0-9]/g, ""));
@@ -225,7 +225,22 @@ Replies to: ${rules.notifications.replyTo}
       + `minutes, check the spam folder, then the provider's own dashboard, which shows what `
       + `happened after they took it.`);
   }
+  /* Don't stop at "the usual cause is an unverified domain" and leave them to
+     guess which one. The provider knows; ask it, and name the addresses that
+     would have worked. */
+  const domain = await checkSendingDomain(rules.notifications.fromEmail);
+  const advice = !domain.asked
+    ? "The usual cause is a sending address on a domain the provider has not verified."
+    : domain.verified
+      ? `${domain.domain} IS verified with your provider, so the sending address is not the problem — `
+        + "the reason above is."
+      : domain.usable.length
+        ? `Your provider has not verified ${domain.domain}. It has verified `
+          + `${domain.usable.join(", ")} — set the sending address below to reservations@${domain.usable[0]}.`
+        : `Your provider has not verified ${domain.domain}, and no domain on the account is `
+          + "verified yet. Verify one at resend.com/domains first.";
+
   problem(BACK, `${result.via} refused it: ${result.detail ?? "no reason given"} — `
     + `sending ${rules.notifications.fromEmail} → ${address.value}. A copy has been kept in `
-    + `data/outbox. The usual cause is a sending address on a domain the provider has not verified.`);
+    + `data/outbox. ${advice}`);
 }

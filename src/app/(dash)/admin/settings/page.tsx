@@ -4,7 +4,7 @@ import { branches } from "@/db/schema";
 import { requireAbility } from "@/lib/auth";
 import { bookingRules, prettyTime } from "@/lib/booking-config";
 import { stripeConfigured } from "@/lib/stripe";
-import { mailMode, mailConfigWarning, lastMailResult } from "@/lib/email";
+import { mailMode, mailConfigWarning, sendingDomainWarning, lastMailResult } from "@/lib/email";
 import { saveBookingRules, sendTestEmail } from "./actions";
 import { AdminNotice } from "@/components/AdminNotice";
 
@@ -26,7 +26,13 @@ export default async function SettingsAdmin({
 
   const stripeLive = stripeConfigured();
   const mail = mailMode();
-  const mailWarning = mailConfigWarning(rules.notifications.fromEmail);
+  /* Two warnings, in order of certainty: what we can tell from the address
+     alone, then what the provider itself says about the domain. The second is
+     one HTTP call, cached for five minutes, and it is the one that would have
+     caught the day-and-a-half of refused confirmations on the first look at
+     this page instead of the third day. */
+  const mailWarning = mailConfigWarning(rules.notifications.fromEmail)
+    ?? await sendingDomainWarning(rules.notifications.fromEmail);
   const lastMail = lastMailResult();
   const storage = databaseDiagnostics();
 

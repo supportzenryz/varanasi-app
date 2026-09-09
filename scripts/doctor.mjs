@@ -291,18 +291,66 @@ const resendKey = process.env.RESEND_API_KEY ?? "";
 const mode = resendKey ? "resend" : process.env.MAIL_WEBHOOK_URL ? "webhook" : "outbox";
 say("sending via", mode === "outbox" ? "data/outbox (nothing is actually posted)" : mode);
 
+/* Where the address actually comes from, in the order the running server
+   resolves it. `data/booking.json` is only the seed: once the site is running
+   the address lives in the settings row, and this block used to read the seed
+   file and report an address nobody was sending from. */
 let fromEmail = process.env.MAIL_FROM ?? null;
+let fromSource = process.env.MAIL_FROM ? "MAIL_FROM" : null;
 try {
   const rules = JSON.parse(fs.readFileSync("data/booking.json", "utf8"));
-  fromEmail = rules?.notifications?.fromEmail ?? fromEmail;
+  if (rules?.notifications?.fromEmail) {
+    fromEmail = rules.notifications.fromEmail;
+    fromSource = "data/booking.json (seed)";
+  }
 } catch { /* fall back to the env value */ }
-say("from address", fromEmail ?? "reservations@varanasi.uk");
+try {
+  const probe = new DatabaseSync(resolved, { readOnly: true });
+  const row = probe.prepare("select value from settings where key = ?").get("booking_rules");
+  probe.close();
+  const stored = row ? JSON.parse(row.value)?.notifications?.fromEmail : null;
+  if (stored) {
+    fromEmail = stored;
+    fromSource = "Admin → Settings — this is the one that is used";
+  }
+} catch { /* the database section above has already said why */ }
+say("from address", `${fromEmail ?? "reservations@varanasi.uk"}${fromSource ? dim(`  ← ${fromSource}`) : ""}`);
 
-if (mode === "resend") {
-  const domain = String(fromEmail ?? "").split("@")[1] ?? "";
-  if (domain && domain !== "resend.dev") {
-    console.log(dim(`  ${" ".repeat(22)} Resend refuses this unless ${domain} is verified on the account.`));
-    console.log(dim(`  ${" ".repeat(22)} Admin → Settings → "Send me a test email" asks it and shows the answer.`));
+/* Ask the provider, rather than warn vaguely.
+   This used to print "Resend refuses this unless <domain> is verified", which
+   is true and unactionable: it never says whether it IS verified, and the
+   answer is one HTTP call away. Naming the domains the account can actually
+   send from is the sentence that ends the guessing. */
+const fromDomain = String(fromEmail ?? "").split("@")[1]?.toLowerCase() ?? "";
+if (mode === "resend" && fromDomain && fromDomain !== "resend.dev") {
+  try {
+    const res = await fetch("https://api.resend.com/domains", {
+      headers: { Authorization: `Bearer ${resendKey}` },
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!res.ok) {
+      say("verified domains", dim(`could not ask — the provider answered HTTP ${res.status}`));
+    } else {
+      const body = await res.json();
+      const rows = Array.isArray(body) ? body : (body?.data ?? []);
+      const usable = rows.filter((d) => String(d?.status).toLowerCase() === "verified")
+        .map((d) => String(d.name).toLowerCase());
+      const pending = rows.filter((d) => String(d?.status).toLowerCase() !== "verified")
+        .map((d) => `${d.name} (${d.status})`);
+      say("verified domains", usable.length ? usable.join(", ") : red("none"));
+      if (pending.length) say("not yet verified", dim(pending.join(", ")));
+      if (usable.includes(fromDomain)) {
+        console.log(green(`  ${" ".repeat(22)} ${fromDomain} is verified — the sending address is fine.`));
+      } else if (usable.length) {
+        problems.push(`Every email is refused: ${fromEmail} is on ${fromDomain}, which Resend has not `
+          + `verified. Set Admin → Settings → Sending address to reservations@${usable[0]}.`);
+      } else {
+        problems.push("Every email is refused: no domain on the Resend account is verified yet. "
+          + "Verify one at resend.com/domains, then set the sending address to it.");
+      }
+    }
+  } catch (err) {
+    say("verified domains", dim(`could not ask — ${err.message}`));
   }
 }
 

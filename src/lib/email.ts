@@ -35,9 +35,14 @@ export function mailMode(): MailResult["via"] {
   return "outbox";
 }
 
+/** The address used when nothing has chosen one. Kept in one place because
+ *  two copies of it is how a warning ends up checking a different string from
+ *  the one being sent. */
+const DEFAULT_FROM = "reservations@varanasi.uk";
+
 /** The address every message is sent from, and why it is worth being careful. */
 export function mailFrom(): string {
-  return process.env.MAIL_FROM ?? "reservations@varanasi.uk";
+  return process.env.MAIL_FROM ?? DEFAULT_FROM;
 }
 
 /**
@@ -97,11 +102,91 @@ export function mailConfigWarning(from = mailFrom()): string | null {
       + "Verify a domain at resend.com/domains and set the sending address to one on it.";
   }
 
-  if (process.env.MAIL_FROM || from !== "reservations@varanasi.uk") return null;
+  /* This used to read `if (process.env.MAIL_FROM || from !== DEFAULT_FROM)`,
+     which made a warning about one address depend on a different one. Every
+     real send passes the address from Settings, so MAIL_FROM is only ever the
+     fallback — yet setting it to anything at all silenced the warning about
+     the Settings address, while the Settings address went on being refused.
+     That is precisely the failure this function exists to catch, wearing a
+     disguise. Judge the address you were handed. */
+  if (from !== DEFAULT_FROM) return null;
   return `Email is going out from ${from}, which is the built-in default — nobody has chosen it. `
     + "Resend refuses any address on a domain that has not been verified against the account, "
     + "so confirmations are being rejected. Verify a domain at resend.com/domains and set the "
     + "sending address to one on it.";
+}
+
+/**
+ * Ask the provider which domains it will actually accept mail from.
+ *
+ * Everything above is careful to say that whether a domain is verified is the
+ * provider's to answer and not ours to guess. True — and the provider has an
+ * endpoint for it, so the honest thing is to go and ask rather than to keep
+ * saying it is unknowable. `GET /domains` costs one request and turns the
+ * recurring day-and-a-half failure ("the key is set, the screen says sending,
+ * every message is refused") into a sentence on the settings page naming the
+ * domain that is wrong and the domains that would work.
+ *
+ * Degrades to `asked: false` rather than to a false accusation: a restricted
+ * API key may not be allowed to read domains, and being unable to check is not
+ * evidence of a problem.
+ */
+export type SendingDomain =
+  | { asked: false; reason: string }
+  | { asked: true; domain: string; verified: boolean; usable: string[] };
+
+type DomainRow = { name?: string; status?: string };
+let domainsCache: { at: number; rows: DomainRow[] | null; reason?: string } | null = null;
+const DOMAINS_TTL = 5 * 60_000;
+
+async function providerDomains(): Promise<{ rows: DomainRow[] } | { reason: string }> {
+  const key = process.env.RESEND_API_KEY;
+  if (!key) return { reason: "no provider key is set" };
+  if (domainsCache && Date.now() - domainsCache.at < DOMAINS_TTL) {
+    return domainsCache.rows ? { rows: domainsCache.rows } : { reason: domainsCache.reason! };
+  }
+  const remember = (v: { rows: DomainRow[] } | { reason: string }) => {
+    domainsCache = "rows" in v
+      ? { at: Date.now(), rows: v.rows }
+      : { at: Date.now(), rows: null, reason: v.reason };
+    return v;
+  };
+  try {
+    const res = await fetch("https://api.resend.com/domains", {
+      headers: { Authorization: `Bearer ${key}` },
+      cache: "no-store",
+      signal: AbortSignal.timeout(8_000),
+    });
+    if (!res.ok) return remember({ reason: `the provider answered HTTP ${res.status} when asked` });
+    const body = (await res.json()) as { data?: DomainRow[] } | DomainRow[];
+    const rows = Array.isArray(body) ? body : (body.data ?? []);
+    return remember({ rows });
+  } catch (err) {
+    return remember({ reason: err instanceof Error ? err.message : String(err) });
+  }
+}
+
+export async function checkSendingDomain(from = mailFrom()): Promise<SendingDomain> {
+  if (mailMode() !== "resend") return { asked: false, reason: "no provider is connected" };
+  const domain = from.split("@")[1]?.toLowerCase() ?? "";
+  if (!domain) return { asked: false, reason: `"${from}" is not an email address` };
+  const answer = await providerDomains();
+  if ("reason" in answer) return { asked: false, reason: answer.reason };
+  const usable = answer.rows
+    .filter((d) => (d.status ?? "").toLowerCase() === "verified" && d.name)
+    .map((d) => d.name!.toLowerCase());
+  return { asked: true, domain, verified: usable.includes(domain), usable };
+}
+
+/** The warning above, then the provider's own answer. One sentence each. */
+export async function sendingDomainWarning(from = mailFrom()): Promise<string | null> {
+  const check = await checkSendingDomain(from);
+  if (!check.asked || check.verified) return null;
+  return `Your provider has not verified ${check.domain}, so every email sent from ${from} is refused. `
+    + (check.usable.length
+      ? `Verified on the account: ${check.usable.join(", ")}. Change the sending address below to one `
+        + `on ${check.usable[0]} — reservations@${check.usable[0]}, for instance.`
+      : "No domain on the account is verified yet — verify one at resend.com/domains first.");
 }
 
 /** Write the message to data/outbox. Returns the file, or null if it couldn't. */
@@ -131,7 +216,7 @@ export async function sendMail(mail: Mail): Promise<MailResult> {
 
 async function deliver(mail: Mail): Promise<MailResult> {
   const fromName = mail.fromName ?? "Varanasi Restaurant";
-  const fromEmail = mail.fromEmail ?? process.env.MAIL_FROM ?? "reservations@varanasi.uk";
+  const fromEmail = mail.fromEmail ?? mailFrom();
   const from = `${fromName} <${fromEmail}>`;
   const mode = mailMode();
 

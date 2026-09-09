@@ -78,6 +78,58 @@ export const users = sqliteTable("users", {
   createdAt: integer("created_at").notNull().default(now),
 }, (t) => ({ emailIdx: uniqueIndex("users_email_idx").on(t.email) }));
 
+/**
+ * One-time links for "I've forgotten my password".
+ *
+ * Only a hash of the token is stored, never the token. If this database is
+ * ever read by someone who shouldn't have it — a stolen backup, a support
+ * request answered carelessly — the rows in here are useless to them: the
+ * link that would actually let you in exists only in the email that was sent
+ * and in the recipient's inbox.
+ *
+ * A row is spent (`usedAt`) rather than deleted, so the audit trail can show
+ * that a reset happened, when, and from where.
+ */
+export const passwordResets = sqliteTable("password_resets", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  /** sha256 of the token that went out in the email */
+  tokenHash: text("token_hash").notNull(),
+  expiresAt: integer("expires_at").notNull(),
+  usedAt: integer("used_at"),
+  /** who asked — kept so a flood of requests can be recognised as one */
+  requestedIp: text("requested_ip"),
+  createdAt: integer("created_at").notNull().default(now),
+}, (t) => ({
+  tokenIdx: uniqueIndex("password_resets_token_idx").on(t.tokenHash),
+  userIdx: index("password_resets_user_idx").on(t.userId),
+}));
+
+/**
+ * How many times something has been tried lately, and by whom.
+ *
+ * The login throttle lived in a `Map` in the server process. That works, right
+ * up to the two moments it matters: a deploy (every counter forgotten, so an
+ * attacker who has been locked out waits for the next release), and a second
+ * instance (each process counts its own attempts, so the real limit is
+ * whatever it was times the number of instances). It also could not be used
+ * for the public forms, which had no limit at all — an enquiry form that sends
+ * an email on every submission is a way to empty the restaurant's email quota
+ * and fill its inbox from a laptop.
+ *
+ * A row per key, in the database everything else already lives in. One small
+ * write per attempt, which is nothing next to the bcrypt comparison it is
+ * protecting.
+ */
+export const rateLimits = sqliteTable("rate_limits", {
+  /** what is being counted: "login:email:sam@…", "enquiry:ip:1.2.3.4" */
+  key: text("key").primaryKey(),
+  count: integer("count").notNull().default(0),
+  windowStart: integer("window_start").notNull(),
+  /** set once the limit is crossed; until then, null */
+  blockedUntil: integer("blocked_until"),
+});
+
 /* ---------- menu ---------- */
 export const menuCategories = sqliteTable("menu_categories", {
   id: integer("id").primaryKey({ autoIncrement: true }),

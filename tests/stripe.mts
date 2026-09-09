@@ -15,6 +15,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 
 process.env.STRIPE_SECRET_KEY = "sk_test_dummy_never_sent_anywhere";
 process.env.STRIPE_WEBHOOK_SECRET = "whsec_dummy_local";
@@ -25,7 +26,7 @@ const src = fs.readFileSync(new URL("../src/lib/stripe.ts", import.meta.url), "u
 const tmp = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "stripe-test-")), "stripe.ts");
 fs.writeFileSync(tmp, src.replace(/^import "server-only";\s*$/m, ""));
 const { verifyWebhook, createDepositCheckout, createVoucherCheckout, refundDeposit, refundedSoFar } =
-  await import(tmp);
+  await import(pathToFileURL(tmp).href);
 
 let pass = 0, fail = 0;
 const t = (name: string, ok: boolean, extra = "") => {

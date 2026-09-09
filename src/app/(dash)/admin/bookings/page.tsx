@@ -167,6 +167,9 @@ export default async function BookingsAdmin({
                 {editable && (
                   <td className="px-4 py-3">
                     <form action={updateBookingStatus} className="flex flex-wrap gap-1.5">
+                      {/* So the action can return the manager to this day's
+                          service rather than to today's. */}
+                      <input type="hidden" name="date" value={date} />
                       <input type="hidden" name="id" value={r.id} />
                       {(["confirmed", "seated", "completed", "cancelled", "no_show"] as const)
                         .filter((s) => s !== r.status)
@@ -188,6 +191,7 @@ export default async function BookingsAdmin({
                           Refund {formatPence(r.depositPence)}
                         </summary>
                         <form action={refundBookingAction} className="mt-2 flex flex-wrap items-center gap-1.5">
+                          <input type="hidden" name="date" value={date} />
                           <input type="hidden" name="id" value={r.id} />
                           <input name="amount" inputMode="decimal" placeholder="all of it"
                             aria-label={`Amount to refund for ${r.reference}`}

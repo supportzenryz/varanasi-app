@@ -2,7 +2,7 @@ import Link from "next/link";
 import "../globals.css";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { stripeConfigured } from "@/lib/stripe";
+import { stripeSimulated } from "@/lib/stripe";
 import { formatPence } from "@/lib/money";
 
 export const metadata: Metadata = { title: "Checkout", robots: { index: false } };
@@ -47,8 +47,11 @@ function routeBack(cancel: string): { home: string; edit: string; label: string 
 }
 
 export default async function CheckoutSimulator({ searchParams }: { searchParams: Promise<Search> }) {
-  // With real Stripe configured, this must not be reachable.
-  if (stripeConfigured()) notFound();
+  /* With real Stripe configured this must not be reachable — and in production
+     it must not be reachable at all, configured or not. Being one absent
+     environment variable away from serving a public "Pay" button that charges
+     nothing is not a risk worth the convenience of a demo. */
+  if (!stripeSimulated()) notFound();
 
   const { ref, amount, success, cancel } = await searchParams;
   if (!ref || !success || !cancel) notFound();

@@ -33,13 +33,13 @@ const clean = (v: FormDataEntryValue | null) => {
 function imageBranch(id: number): number {
   const row = db.select({ branchId: galleryImages.branchId }).from(galleryImages)
     .where(eq(galleryImages.id, id)).get();
-  if (!row) throw new Error("Image not found");
+  if (!row) problem("/admin/gallery", "That photograph no longer exists — it may have been removed in another tab.");
   return row.branchId;
 }
 function statBranch(id: number): number {
   const row = db.select({ branchId: branchStats.branchId }).from(branchStats)
     .where(eq(branchStats.id, id)).get();
-  if (!row) throw new Error("Tile not found");
+  if (!row) problem("/admin/gallery", "That tile no longer exists — it may have been removed in another tab.");
   return row.branchId;
 }
 

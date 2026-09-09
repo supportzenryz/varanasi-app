@@ -2,14 +2,24 @@
 import { revalidatePath } from "next/cache";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { vouchers } from "@/db/schema";
+import { vouchers, branches } from "@/db/schema";
 import { record } from "@/lib/audit";
 import { requireAbility, type Session } from "@/lib/auth";
-import { branchBySlug } from "@/lib/branches";
 import { parsePounds, formatPence } from "@/lib/money";
+import { ok, problem } from "@/lib/admin-feedback";
 import {
   redeem, voucherByCode, voucherById, startPurchase, activatePaidVoucher, deliverDueVouchers,
 } from "@/lib/voucher";
+
+/* One vocabulary. This screen spoke its own — `?done=` and `?error=` — while
+   every other admin screen used `?saved=` and `?problem=` through
+   lib/admin-feedback, so the shared banner component could not render it and
+   the messages here were duplicated inline with slightly different colours.
+   `withCode` keeps the looked-up voucher on screen after the action, which is
+   the one thing this page needs that the shared helpers do not do for free. */
+function withCode(code: string): string {
+  return code ? `/admin/vouchers?code=${encodeURIComponent(code)}` : "/admin/vouchers";
+}
 
 function log(session: Session, action: string, entityId: string, detail?: string) {
   record(session, { action, entity: "voucher", entityId, detail });
@@ -21,13 +31,10 @@ export async function redeemVoucher(formData: FormData) {
   const code = String(formData.get("code") ?? "");
   const amount = parsePounds(String(formData.get("amount") ?? ""));
 
-  const back = (msg: string, ok = false) =>
-    `/admin/vouchers?code=${encodeURIComponent(code)}&${ok ? "done" : "error"}=${encodeURIComponent(msg)}`;
+  const BACK = withCode(code);
 
-  if (amount == null) {
-    redirectTo(back("Enter the amount as a number, like 25 or 25.50."));
-  }
-  if (amount === 0) redirectTo(back("Enter an amount greater than zero."));
+  if (amount == null) problem(BACK, "Enter the amount as a number, like 25 or 25.50.");
+  if (amount === 0) problem(BACK, "Enter an amount greater than zero.");
 
   const result = redeem({
     code,
@@ -36,20 +43,22 @@ export async function redeemVoucher(formData: FormData) {
     branchId: session.role === "owner" ? null : session.branchId,
     userId: session.userId,
     note: String(formData.get("note") ?? "") || null,
-    expectedBalancePence: formData.get("expectedBalance") != null
-      ? Number(formData.get("expectedBalance"))
-      : null,
+    /* Passed straight through, missing field and all. `redeem` refuses a
+       balance it cannot read, which is the correct answer to a request that
+       arrived without the one field standing between a double-tap and paying
+       out twice — and a much better answer than the old `: null`, which
+       quietly meant "skip the check". */
+    expectedBalancePence: Number(formData.get("expectedBalance")),
   });
 
-  if (!result.ok) redirectTo(back(result.error));
+  if (!result.ok) problem(BACK, result.error);
 
   log(session, "voucher.redeem", result.voucher.code,
     `${formatPence(amount!)} taken, ${formatPence(result.remaining)} left`);
   revalidatePath("/admin/vouchers");
-  redirectTo(back(
-    `${formatPence(amount!)} redeemed. ${result.remaining > 0
-      ? `${formatPence(result.remaining)} still on the voucher.`
-      : "The voucher is now fully used."}`, true));
+  ok(BACK, `${formatPence(amount!)} redeemed. ${result.remaining > 0
+    ? `${formatPence(result.remaining)} still on the voucher.`
+    : "The voucher is now fully used."}`);
 }
 
 /** Issue a voucher by hand — a gesture, a complaint, a corporate order. */
@@ -57,10 +66,10 @@ export async function issueVoucher(formData: FormData) {
   const session = await requireAbility("issueVoucher");
   const value = parsePounds(String(formData.get("value") ?? ""));
   if (value == null) {
-    redirectTo(`/admin/vouchers?error=${encodeURIComponent("Enter the value as a number, like 50 or 50.00.")}`);
+    problem("/admin/vouchers", "Enter the value as a number, like 50 or 50.00.");
   }
   if (value === 0) {
-    redirectTo(`/admin/vouchers?error=${encodeURIComponent("Enter a value greater than zero.")}`);
+    problem("/admin/vouchers", "Enter a value greater than zero.");
   }
 
   /* Which restaurant the voucher is good at was taken straight from the form
@@ -70,13 +79,23 @@ export async function issueVoucher(formData: FormData) {
    * everyone else gets their own branch or "either", and nothing else. */
   const requested = String(formData.get("validAt") ?? "") || null;
   let validAt = requested;
-  if (session.role !== "owner" && requested) {
-    const target = branchBySlug(requested);
-    if (!target || target.id !== session.branchId) {
-      redirectTo(`/admin/vouchers?error=${encodeURIComponent(
-        "You can only issue vouchers for your own restaurant, or ones valid at either.")}`);
+  if (session.role !== "owner") {
+    /* The gap this closes: the check only ran when a branch WAS named, so a
+       manager who left the box empty created a voucher valid at both
+       restaurants — liability against the other branch's till, which is the
+       exact thing the check exists to prevent, reached by choosing nothing
+       instead of choosing wrongly. A non-owner issues for their own restaurant
+       and nowhere else. */
+    const own = db.select({ slug: branches.slug }).from(branches)
+      .where(eq(branches.id, session.branchId ?? -1)).get()?.slug;
+    if (!own) {
+      problem("/admin/vouchers",
+        "This account has no restaurant assigned, so it cannot issue a voucher. Ask the owner.");
     }
-    validAt = requested;
+    if (requested && requested !== own) {
+      problem("/admin/vouchers", "You can only issue vouchers for your own restaurant.");
+    }
+    validAt = own!;
   }
 
   const started = startPurchase({
@@ -89,7 +108,7 @@ export async function issueVoucher(formData: FormData) {
     message: String(formData.get("message") ?? "") || null,
     deliverOn: null,
   });
-  if (!started.ok) redirectTo(`/admin/vouchers?error=${encodeURIComponent(started.error)}`);
+  if (!started.ok) problem("/admin/vouchers", started.error);
 
   // Issued by staff, so there's no payment to wait for — mark it as manual and
   // activate it straight away.
@@ -99,8 +118,8 @@ export async function issueVoucher(formData: FormData) {
   const issued = voucherById(started.voucher.id)!;
   log(session, "voucher.issue", issued.code, `${formatPence(issued.valuePence)} issued manually`);
   revalidatePath("/admin/vouchers");
-  redirectTo(`/admin/vouchers?code=${encodeURIComponent(issued.code)}&done=${encodeURIComponent(
-    `Voucher ${issued.code} issued for ${formatPence(issued.valuePence)} and emailed to ${issued.recipientEmail}.`)}`);
+  ok(withCode(issued.code),
+    `Voucher ${issued.code} issued for ${formatPence(issued.valuePence)} and emailed to ${issued.recipientEmail}.`);
 }
 
 /** Cancel a voucher — owners only, and it can't be undone. */
@@ -108,7 +127,7 @@ export async function cancelVoucher(formData: FormData) {
   const session = await requireAbility("cancelVoucher");
   const code = String(formData.get("code") ?? "");
   const v = voucherByCode(code);
-  if (!v) redirectTo(`/admin/vouchers?error=${encodeURIComponent("No voucher found with that code.")}`);
+  if (!v) problem("/admin/vouchers", "No voucher found with that code.");
 
   /* Refuse the second press. The button was a plain form post to an action
      that wrote unconditionally, so a double-click, a browser "resend" or the
@@ -117,12 +136,11 @@ export async function cancelVoucher(formData: FormData) {
      The row's own status is the guard: cancelling twice is not a thing that
      can happen. */
   if (v!.status === "cancelled") {
-    redirectTo(`/admin/vouchers?code=${encodeURIComponent(v!.code)}&done=${encodeURIComponent(
-      `Voucher ${v!.code} was already cancelled — nothing further has changed.`)}`);
+    ok(withCode(v!.code), `Voucher ${v!.code} was already cancelled — nothing further has changed.`);
   }
   if (v!.status === "redeemed" || v!.balancePence === 0) {
-    redirectTo(`/admin/vouchers?code=${encodeURIComponent(v!.code)}&error=${encodeURIComponent(
-      "That voucher has already been used in full — there is nothing left to cancel.")}`);
+    problem(withCode(v!.code),
+      "That voucher has already been used in full — there is nothing left to cancel.");
   }
 
   const was = v!.balancePence;
@@ -135,13 +153,17 @@ export async function cancelVoucher(formData: FormData) {
 
   const after = voucherById(v!.id);
   if (after?.status !== "cancelled") {
-    redirectTo(`/admin/vouchers?code=${encodeURIComponent(v!.code)}&error=${encodeURIComponent(
-      "That voucher changed while you were looking at it — check the balance and try again.")}`);
+    problem(withCode(v!.code),
+      "That voucher changed while you were looking at it — check the balance and try again.");
   }
 
   log(session, "voucher.cancel", v!.code, `was ${formatPence(was)}`);
   revalidatePath("/admin/vouchers");
-  redirectTo(`/admin/vouchers?done=${encodeURIComponent(`Voucher ${v!.code} cancelled.`)}`);
+  /* The code stays in the URL on the way out. It used to be dropped only on
+     this one success path, so the owner cancelled a voucher and the voucher
+     vanished from the screen — leaving them to type the code again to check
+     that what they had just done had worked. */
+  ok(withCode(v!.code), `Voucher ${v!.code} cancelled.`);
 }
 
 /** Send any vouchers whose scheduled delivery date has arrived. */
@@ -150,13 +172,6 @@ export async function releaseScheduled() {
   const n = await deliverDueVouchers();
   log(session, "voucher.release", "scheduled", `${n} delivered`);
   revalidatePath("/admin/vouchers");
-  redirectTo(`/admin/vouchers?done=${encodeURIComponent(
-    n ? `${n} scheduled voucher${n === 1 ? "" : "s"} sent.` : "Nothing was due to be sent.")}`);
-}
-
-/* `redirect` throws, which TypeScript can't see through a helper unless we
-   tell it the helper never returns. */
-import { redirect } from "next/navigation";
-function redirectTo(url: string): never {
-  redirect(url);
+  ok("/admin/vouchers",
+    n ? `${n} scheduled voucher${n === 1 ? "" : "s"} sent.` : "Nothing was due to be sent.");
 }

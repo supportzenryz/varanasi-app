@@ -27,11 +27,13 @@ export function databasePath(raw = process.env.DATABASE_URL): string {
 
 type Db = BaseSQLiteDatabase<"sync", unknown, typeof schema>;
 
+let client: Sqlite | null = null;
+
 function connect(): Db {
   const file = databasePath();
   fs.mkdirSync(path.dirname(file), { recursive: true });
 
-  const client = new Sqlite(file);
+  client = new Sqlite(file);
   const dialect = new SQLiteSyncDialect();
 
   const tablesConfig = extractTablesRelationalConfig(schema, createTableRelationsHelpers);
@@ -75,6 +77,23 @@ export const db: Db = new Proxy({} as Db, {
 export { schema };
 
 /**
+ * Let go of the file. For the test suites, and for Windows.
+ *
+ * Nothing in the application calls this — a server holds its database open for
+ * as long as it is running, which is correct. The suites are different: each
+ * one works against a throwaway database inside a temporary folder and deletes
+ * the folder afterwards, and Windows refuses to delete a file that is still
+ * open. On Linux the delete succeeds and nobody notices, so this only shows up
+ * on the machine the project is actually developed on: 34 checks pass, and then
+ * the run ends with EBUSY.
+ */
+export function closeDatabase(): void {
+  try { client?.close(); } catch { /* already closed, or never opened */ }
+  client = null;
+  instance = null;
+}
+
+/**
  * Which file the running server has actually opened, and what is in it.
  *
  * This exists because of a question that took three rounds of guessing to
@@ -102,13 +121,25 @@ export function databaseDiagnostics(): {
 } {
   const configured = process.env.DATABASE_URL ?? "(unset — defaulting to ./data/varanasi.db)";
   const file = databasePath();
-  const resolved = path.resolve(file);
+
+  /* `turbopackIgnore` on both calls below, and it is about deployment size
+     rather than correctness.
+     
+     Turbopack traces what a server bundle touches so it can ship only that.
+     A filesystem call whose path it cannot follow statically — and this one is
+     `process.env.DATABASE_URL`, resolved at runtime, on purpose — makes it give
+     up and include *the whole project* instead: every source file and the whole
+     public folder, photography and all, copied into the server output. It
+     warned about exactly that on every build. The path here is only ever read
+     to be reported on the Settings screen, so there is nothing for tracing to
+     find, and saying so is the fix. */
+  const resolved = path.resolve(/*turbopackIgnore: true*/ file);
 
   let sizeBytes: number | null = null;
   let modified: string | null = null;
   let exists = false;
   try {
-    const stat = fs.statSync(resolved);
+    const stat = fs.statSync(/*turbopackIgnore: true*/ resolved);
     exists = true;
     sizeBytes = stat.size;
     modified = stat.mtime.toISOString();

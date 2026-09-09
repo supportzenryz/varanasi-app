@@ -6,7 +6,7 @@ import { prettyTime } from "@/lib/booking-config";
 import { formatPence } from "@/lib/money";
 import {
   bookingByReference, confirmPaidBooking, dateLabel, markPaymentFailed, notifyPaymentFailed,
-  notifyVerificationFailed,
+  notifyVerificationFailed, tokenMatches,
 } from "@/lib/booking";
 import { retrieveSession, stripeSimulated } from "@/lib/stripe";
 import { databaseDiagnostics } from "@/db";
@@ -28,13 +28,13 @@ export default async function Confirmed({
   params, searchParams,
 }: {
   params: Promise<{ branch: string }>;
-  searchParams: Promise<{ ref?: string; session_id?: string }>;
+  searchParams: Promise<{ ref?: string; session_id?: string; t?: string }>;
 }) {
   const { branch: slug } = await params;
   const branch = branchBySlug(slug);
   if (!branch) notFound();
 
-  const { ref, session_id: sessionId } = await searchParams;
+  const { ref, session_id: sessionId, t: token } = await searchParams;
   const booking = ref ? bookingByReference(ref) : undefined;
 
   /* A reference that reached Stripe but cannot be found here is not a guest
@@ -58,6 +58,26 @@ export default async function Confirmed({
     }
     notFound();
   }
+
+  /* The reference alone is not permission to read a booking.
+   *
+   * This page rendered the guest's name, their party, their occasion and their
+   * allergy notes for anyone who put a reference in the address bar — and a
+   * reference is `VB-` plus six hex characters, which a script walks in an
+   * afternoon. That is the whole reservation book, including health
+   * information, which UK GDPR treats as a special category. The "manage your
+   * booking" page has always required the token; this one, which shows the
+   * same details, did not.
+   *
+   * So the token is required to *display* anything. Fulfilment is separate and
+   * deliberately still runs below without it: the proof of payment is the
+   * Stripe session id, which Stripe gave the guest's own browser, so a return
+   * from checkout confirms the table whether or not the link is complete.
+   * Every link this site generates carries the token — this only bites an old
+   * bookmark, and the answer for one of those is the email or a phone call,
+   * not a page of somebody's personal details.
+   */
+  const maySeeDetails = tokenMatches(token, booking.cancelToken);
 
   let paid = booking.depositStatus === "captured" || booking.depositStatus === "none";
   let problem: string | null = null;
@@ -137,11 +157,43 @@ export default async function Confirmed({
    * that page's whole purpose is that a refresh can try the question again.
    */
   if (paid && sessionId) {
-    redirect(`/${branch.slug}/book-online/confirmed?ref=${encodeURIComponent(booking.reference)}`);
+    // The token stays: it is what lets the guest, and only the guest, read
+    // this page — and what they bookmark has to keep working.
+    redirect(`/${branch.slug}/book-online/confirmed?ref=${encodeURIComponent(booking.reference)}`
+      + `&t=${encodeURIComponent(booking.cancelToken ?? "")}`);
   }
 
   const current = bookingByReference(booking.reference)!;
   const manageHref = `/${branch.slug}/booking/${current.reference}?t=${current.cancelToken}`;
+
+  /* Paid, but this link cannot prove whose booking it is. Confirm that the
+     table is booked — which the person holding the reference already knows —
+     and send them to the email or the telephone for the rest. */
+  if (paid && !maySeeDetails) {
+    return (
+      <>
+        <PageHero image={branch.heroImage} kicker="Reservations" heading="Your table is confirmed" />
+        <section className="bg-ink">
+          <div className="mx-auto max-w-[46rem] px-5 lg:px-10 py-14 sm:py-20">
+            <dl className="border border-[--line] bg-ink-2 px-5 py-4 text-sm">
+              <dt className="text-pale/50">Reference</dt>
+              <dd className="tnum font-semibold">{current.reference}</dd>
+            </dl>
+            <p className="mt-6 text-pale/70">
+              We don&rsquo;t show the details of a booking from this link, so that nobody but you can
+              read them. Everything &mdash; date, time, party and how to change it &mdash; is in the
+              confirmation email we sent you. If you can&rsquo;t find it, ring us with the reference
+              above and we&rsquo;ll go through it with you.
+            </p>
+            <div className="mt-8 flex flex-wrap gap-3">
+              <a href={telHref(branch.phone)} className="btn btn-gold">Call {branch.phone}</a>
+              <Link href={`/${branch.slug}/menu`} className="btn btn-outline">See the menu</Link>
+            </div>
+          </div>
+        </section>
+      </>
+    );
+  }
 
   /* ---------- payment didn't land ---------- */
   if (!paid) {

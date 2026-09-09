@@ -4,6 +4,7 @@ import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { databasePath } from "@/db";
 import { mailConfigWarning, mailFrom, mailMode } from "@/lib/email";
+import { paymentsUnavailable, stripeSimulated } from "@/lib/stripe";
 
 /**
  * Daily backups of the trading data.
@@ -199,6 +200,17 @@ export function startBackupSchedule(): void {
   console.log(`[db] ${path.resolve(databasePath())}`);
   console.log(`[backup] daily backups on, keeping ${KEEP}, in ${backupDir()}`);
   console.log("[scheduler] hourly: due gift vouchers, expiries, owner activity summary");
+
+  /* Said at every boot, because "am I taking real money?" should never be a
+     question anyone has to go and look up. */
+  if (paymentsUnavailable()) {
+    console.error("[payments] STRIPE_SECRET_KEY is not set. Deposits and gift vouchers CANNOT be "
+      + "taken — guests are told to ring the restaurant. Set the key to start taking payment.");
+  } else if (stripeSimulated()) {
+    console.warn("[payments] SIMULATOR ON. No money is being taken and no card is real. "
+      + `${process.env.NODE_ENV === "production" ? "In a PRODUCTION build, via PAYMENTS_SIMULATOR. " : ""}`
+      + "Set STRIPE_SECRET_KEY to take real payments.");
+  }
 
   /* Said once, loudly, on the way up. A provider key with no verified sender
      rejects every message, and the only symptom is guests who say they never

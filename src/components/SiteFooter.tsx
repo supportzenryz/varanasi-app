@@ -35,7 +35,7 @@ export function SiteFooter({ branch }: { branch: Branch }) {
   const link = "block py-1 text-sm text-pale/65 hover:text-gold transition-colors";
 
   return (
-    <footer className="bg-ink border-t border-white/10">
+    <footer className="bg-ink border-t border-white/10 print:hidden">
       <JaliBand className="opacity-30" />
 
       <div className="mx-auto max-w-[84rem] px-5 lg:px-10 pt-16 pb-10">

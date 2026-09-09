@@ -19,9 +19,57 @@ export function stripeConfigured(): boolean {
   return Boolean(process.env.STRIPE_SECRET_KEY);
 }
 
-/** True when we're running the built-in simulator instead of real Stripe. */
+/**
+ * True when we're running the built-in simulator instead of real Stripe.
+ *
+ * Never in production by accident — only when somebody has typed out the
+ * opt-in below — and that is the whole point of this function.
+ *
+ * It used to be `!stripeConfigured()` — so the single fact that decided
+ * between "take a real payment" and "pretend" was whether one environment
+ * variable happened to be set. Misname it in Railway, drop it while editing
+ * the others, deploy a service that hasn't inherited it: every deposit and
+ * every gift voucher becomes a free click, `/checkout-simulator` serves its
+ * "Pay" button to the public, the confirmation page accepts any `sim_` session
+ * id as proof of payment, and refunds report success without contacting
+ * anybody. No error is logged, because from the code's point of view nothing
+ * went wrong.
+ *
+ * A missing key in production is a configuration failure, and it should read
+ * as one: `createDepositCheckout` throws, the guest is told we couldn't open
+ * the payment page and to ring the restaurant, and the table is not confirmed.
+ * A guest who cannot pay is a bad afternoon. A hundred guests who paid nothing
+ * and hold real tables is a bad month.
+ */
 export function stripeSimulated(): boolean {
-  return !stripeConfigured();
+  if (stripeConfigured()) return false;
+  if (process.env.NODE_ENV !== "production") return true;
+  /* One deliberate exception, and it is deliberately awkward to set.
+   *
+   * The end-to-end suite runs against a production build (`next start` sets
+   * NODE_ENV=production), and one of the journeys it has to walk is a table
+   * that is actually paid for. It cannot use real Stripe — there is no account
+   * and no key — so without a way to say "yes, I mean the simulator, in a
+   * production build", fifteen checks covering the paid-booking path and the
+   * refund path simply stop running. Losing the tests that guard the money is
+   * a poor way to protect the money.
+   *
+   * So the escape hatch exists, and asks to be typed out in full. What was
+   * dangerous before was not the simulator; it was that a MISSING variable
+   * silently selected it. Nobody sets this sentence by mistake, and the boot
+   * log and the admin's own Payments tile both say it is on. */
+  return process.env.PAYMENTS_SIMULATOR === "i-understand-no-money-will-be-taken";
+}
+
+/**
+ * Production, and no payment provider at all. Nothing can be charged.
+ *
+ * Worth naming so the booking form can say something true to the guest rather
+ * than failing at Stripe's front door, and so `npm run doctor` and the admin
+ * can report it as the outage it is.
+ */
+export function paymentsUnavailable(): boolean {
+  return !stripeConfigured() && !stripeSimulated();
 }
 
 function key(): string {

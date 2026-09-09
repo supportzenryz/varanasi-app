@@ -3,7 +3,7 @@ import { db, databaseDiagnostics } from "@/db";
 import { branches } from "@/db/schema";
 import { requireAbility } from "@/lib/auth";
 import { bookingRules, prettyTime } from "@/lib/booking-config";
-import { stripeConfigured } from "@/lib/stripe";
+import { stripeConfigured, stripeSimulated, paymentsUnavailable } from "@/lib/stripe";
 import { mailMode, mailConfigWarning, sendingDomainWarning, lastMailResult } from "@/lib/email";
 import { saveBookingRules, sendTestEmail } from "./actions";
 import { AdminNotice } from "@/components/AdminNotice";
@@ -25,6 +25,11 @@ export default async function SettingsAdmin({
   const all = db.select().from(branches).orderBy(asc(branches.sort)).all();
 
   const stripeLive = stripeConfigured();
+  /* Three states, not two. "Not connected" used to cover both "the demo
+     simulator is standing in" and "nothing can be charged at all", which are
+     opposite situations for the restaurant. */
+  const simulated = stripeSimulated();
+  const paymentsOff = paymentsUnavailable();
   const mail = mailMode();
   /* Two warnings, in order of certainty: what we can tell from the address
      alone, then what the provider itself says about the domain. The second is
@@ -44,6 +49,15 @@ export default async function SettingsAdmin({
         These control what guests can book on the website. Changes take effect immediately.
       </p>
 
+      {/* Up here, not down beside the form.
+          It used to sit below five diagnostic panels — payments, email,
+          storage — which on a laptop is off the bottom of the screen. Saving
+          the form redirected to the top of this page, so the confirmation that
+          the save had worked was somewhere the person never looked, and the
+          screen they got back was indistinguishable from one where nothing had
+          happened. */}
+      <AdminNotice saved={saved} problem={problem} />
+
       {/* what's actually wired up right now */}
       <div className="mt-8 grid gap-px bg-[--line] sm:grid-cols-2 border border-[--line]">
         <div className="bg-pale p-5">
@@ -51,6 +65,21 @@ export default async function SettingsAdmin({
           <p className="mt-2 text-sm">
             {stripeLive ? (
               <><strong>Stripe is connected.</strong> Guests pay on Stripe&rsquo;s own secure page.</>
+            ) : paymentsOff ? (
+              <>
+                <strong className="text-brick">No deposits can be taken.</strong>{" "}
+                There is no payment provider configured on this deployment, so the booking form
+                tells guests to ring the restaurant instead of taking a deposit. Add{" "}
+                <code className="text-xs">STRIPE_SECRET_KEY</code> to start taking payment.
+              </>
+            ) : simulated ? (
+              <>
+                <strong className="text-brick">The payment simulator is switched on.</strong>{" "}
+                Nobody is being charged and no card is real — every &ldquo;paid&rdquo; booking on
+                this site is free. Remove <code className="text-xs">PAYMENTS_SIMULATOR</code> and
+                add <code className="text-xs">STRIPE_SECRET_KEY</code> before taking bookings from
+                the public.
+              </>
             ) : (
               <>
                 <strong>Stripe is not connected yet.</strong> The booking flow works end to end, but guests
@@ -149,8 +178,6 @@ export default async function SettingsAdmin({
           </p>
         )}
       </section>
-
-      <AdminNotice saved={saved} problem={problem} />
 
       <form action={saveBookingRules} className="mt-10 grid gap-10">
         {/* deposits */}

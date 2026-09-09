@@ -39,7 +39,11 @@ export function SiteHeader({
 
   return (
     <header
-      className={`${overlay ? "fixed" : "sticky"} top-0 inset-x-0 z-50 transition-colors duration-500 ${
+      /* `print:hidden`: a printed page should be the content, not the
+         navigation. It matters most for the gift voucher, which is meant to be
+         printed and handed over, but nobody has ever wanted a paper copy of a
+         menu with a sticky header across the top of it. */
+      className={`print:hidden ${overlay ? "fixed" : "sticky"} top-0 inset-x-0 z-50 transition-colors duration-500 ${
         solid ? "bg-ink/95 backdrop-blur-sm border-b border-white/10" : "bg-gradient-to-b from-ink/75 to-transparent"
       }`}
     >

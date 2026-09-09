@@ -207,9 +207,35 @@ export function markPaymentFailed(bookingId: number): void {
     .where(eq(bookings.id, bookingId)).run();
 }
 
+/**
+ * Does this link carry the booking's own token?
+ *
+ * The token is what makes a booking link private. The reference cannot do that
+ * job: it is six hex characters, printed on the guest's confirmation and read
+ * out over the telephone, and 24 bits is a few million guesses — which is an
+ * afternoon for a script and yields names, dates, party sizes and allergy
+ * notes. The token is sixteen random bytes and appears only in links we send
+ * to the one address that booked.
+ *
+ * Compared byte-for-byte in constant time. A plain `!==` returns as soon as
+ * two characters differ, which in principle lets an attacker learn a token one
+ * character at a time from the timing; over the internet, against a server
+ * doing database work, that signal is buried — but `timingSafeEqual` costs
+ * nothing and removes the argument.
+ */
+export function tokenMatches(given: string | undefined | null, expected: string | null): boolean {
+  if (!given || !expected) return false;
+  const a = Buffer.from(given);
+  const b = Buffer.from(expected);
+  // timingSafeEqual throws on a length mismatch, which is itself a leak of
+  // length — but a token's length is fixed and public, so there is nothing to
+  // learn from it.
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+
 export function cancelByToken(reference: string, token: string): { ok: boolean; error?: string } {
   const b = bookingByReference(reference);
-  if (!b || !b.cancelToken || b.cancelToken !== token) return { ok: false, error: "We couldn't find that booking." };
+  if (!b || !tokenMatches(token, b.cancelToken)) return { ok: false, error: "We couldn't find that booking." };
   if (b.status === "cancelled") return { ok: true };
   if (!["held", "confirmed"].includes(b.status)) return { ok: false, error: "That booking can no longer be cancelled online — please call us." };
   db.update(bookings).set({ status: "cancelled" }).where(eq(bookings.id, b.id)).run();

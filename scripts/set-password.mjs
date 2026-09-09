@@ -23,6 +23,7 @@ import path from "node:path";
 import readline from "node:readline";
 import { DatabaseSync } from "node:sqlite";
 import bcrypt from "bcryptjs";
+import { passwordComplaint, BCRYPT_COST } from "../src/lib/password-rules.mjs";
 
 /* .env.local, read the same way the app reads it, so this script and the
    server always agree about which database they are talking about. */
@@ -134,24 +135,20 @@ function secret(prompt) {
   });
 }
 
-/* The same rules the admin's own password form applies, checked here too. A
-   back door with a weaker lock than the front one is still a back door. */
-function complaint(pw) {
-  if (pw.length < 12) return "Twelve characters at the very least — this account can read every guest's details.";
-  if (!/[a-z]/.test(pw) || !/[A-Z]/.test(pw)) return "Use both upper and lower case.";
-  if (!/[0-9]/.test(pw)) return "Include a number.";
-  if (/^ | $/.test(pw)) return "It starts or ends with a space, which is almost always a paste that went wrong.";
-  if (/^(changeme|password|varanasi)/i.test(pw)) return "That is one of the first three things anyone would try.";
-  return null;
-}
+/* The rules themselves live in src/lib/password-rules.mjs, imported above.
+   This comment used to say "the same rules the admin's own password form
+   applies" — and it was not true: the form asked for ten characters of
+   anything while this asked for twelve with mixed case. A back door with a
+   different lock from the front one is how a policy quietly stops meaning
+   anything, so there is now one module and no second copy. */
 
 const first = await secret("\n  New password (nothing will appear as you type): ");
-const wrong = complaint(first);
+const wrong = passwordComplaint(first, { email });
 if (wrong) die(`  ${wrong}`);
 const again = await secret("  Type it once more: ");
 if (first !== again) die("  Those two did not match. Nothing has been changed.");
 
-const hash = bcrypt.hashSync(first, 10);
+const hash = bcrypt.hashSync(first, BCRYPT_COST);
 const now = Math.floor(Date.now() / 1000);
 
 if (user) {

@@ -18,7 +18,10 @@
     "test:stripe": "npx --yes tsx tests/stripe.mts",
     "test:validate": "npx --yes tsx tests/validate.mts",
     "test:production": "node tests/production.mjs",
-    "staff:password": "node scripts/set-password.mjs"
+    "staff:password": "node scripts/set-password.mjs",
+    "test:money": "npx --yes tsx tests/money.mts",
+    "test:auth": "npx --yes tsx tests/auth.mts",
+    "test:qr": "npx --yes tsx tests/qr.mts"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
@@ -33,7 +36,7 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/bcryptjs": "^2.4.6",
-    "@types/node": "^26.4.1",
+    "@types/node": "^26.5.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "drizzle-kit": "^0.31.10",

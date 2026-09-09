@@ -12,7 +12,13 @@ import { formatPence, parsePounds } from "@/lib/money";
 
 function bookingBranch(id: number): number {
   const row = db.select({ branchId: bookings.branchId }).from(bookings).where(eq(bookings.id, id)).get();
-  if (!row) throw new Error("Booking not found");
+  /* A row that has gone is a stale form, not a broken program.
+     `throw` here reaches Next's error page: a white screen reading "Internal
+     Server Error" with a digest, which is indistinguishable from the software
+     having crashed — and that exact screen has already produced one support
+     call from a manager who had two tabs open. `problem` says what happened
+     and leaves them somewhere they can carry on. */
+  if (!row) problem("/admin/bookings", "That booking no longer exists — it may have been removed in another tab.");
   return row.branchId;
 }
 
@@ -123,15 +129,33 @@ export async function addBooking(formData: FormData) {
 
 const STATUSES = ["held", "confirmed", "seated", "completed", "cancelled", "no_show"] as const;
 
+/**
+ * Back to the day the person was looking at.
+ *
+ * `updateBookingStatus` and `refundBookingAction` returned to
+ * `/admin/bookings?branch=…` with no date, so marking one Saturday booking as
+ * seated dropped the manager back on today — and the service they were working
+ * through was two taps away again, every time. The date is in the form because
+ * the page it was rendered on knows it; validated to a plain ISO date so it
+ * cannot carry anything else into the URL.
+ */
+function backToDay(formData: FormData, slug: string | undefined): string {
+  const day = String(formData.get("date") ?? "");
+  const dated = /^\d{4}-\d{2}-\d{2}$/.test(day);
+  if (!slug) return "/admin/bookings";
+  return `/admin/bookings?branch=${slug}${dated ? `&date=${day}` : ""}`;
+}
+
 export async function updateBookingStatus(formData: FormData) {
   const session = await requireAbility("editBookings");
   const id = Number(formData.get("id"));
   const status = String(formData.get("status")) as (typeof STATUSES)[number];
-  if (!STATUSES.includes(status)) problem("/admin/bookings", "That isn’t a status we recognise.");
-
   const branchId = bookingBranch(id);
   const slug = db.select({ slug: branches.slug }).from(branches).where(eq(branches.id, branchId)).get()?.slug;
-  const back = "/admin/bookings" + (slug ? `?branch=${slug}` : "");
+  const back = backToDay(formData, slug);
+  /* Refused to the branch's own list, not to the bare path. A Leicester
+     manager's error message used to land on Birmingham's bookings. */
+  if (!STATUSES.includes(status)) problem(back, "That isn’t a status we recognise.");
   if (!branchAllowed(session, branchId)) {
     problem(back, "That booking belongs to the other restaurant.");
   }
@@ -178,7 +202,7 @@ export async function refundBookingAction(formData: FormData) {
   const id = Number(formData.get("id"));
   const branchId = bookingBranch(id);
   const slug = db.select({ slug: branches.slug }).from(branches).where(eq(branches.id, branchId)).get()?.slug;
-  const back = "/admin/bookings" + (slug ? `?branch=${slug}` : "");
+  const back = backToDay(formData, slug);
 
   if (!branchAllowed(session, branchId)) {
     problem(back, "That booking belongs to the other restaurant.");

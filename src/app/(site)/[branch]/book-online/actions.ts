@@ -3,7 +3,8 @@ import { redirect } from "next/navigation";
 import { holdBooking, attachCheckoutSession, confirmPaidBooking, dateLabel } from "@/lib/booking";
 import { rememberSubmission } from "@/lib/form-recall";
 import { bookingRules, prettyTime } from "@/lib/booking-config";
-import { createDepositCheckout, stripeSimulated } from "@/lib/stripe";
+import { createDepositCheckout, stripeSimulated, paymentsUnavailable } from "@/lib/stripe";
+import { guardPublicForm } from "@/lib/public-limit";
 
 function siteUrl(): string {
   return (process.env.SITE_URL ?? "http://localhost:3000").replace(/\/$/, "");
@@ -58,6 +59,12 @@ export async function startBooking(formData: FormData) {
     redirect(await back("Please accept the terms and conditions to continue.", "terms"));
   }
 
+  /* Before the table is held. Every submission takes a table off sale for the
+     length of the deposit window, so an unlimited form is a way to close a
+     Saturday night without paying for anything. */
+  const guard = await guardPublicForm("booking", { email: String(formData.get("email") ?? "") });
+  if (!guard.allowed) redirect(await back(guard.message));
+
   const held = holdBooking({
     branchSlug, date, time, partySize: guests,
     guestName: String(formData.get("name") ?? ""),
@@ -77,11 +84,29 @@ export async function startBooking(formData: FormData) {
   // under the threshold) — it's already confirmed, so just say so.
   if (depositPence <= 0) {
     await confirmPaidBooking({ bookingId: booking.id });
-    redirect(`/${branch.slug}/book-online/confirmed?ref=${booking.reference}`);
+    /* The token travels with the guest, on this page as on the cancel link.
+       Without it the confirmation page will not show a booking's details, and
+       for good reason: a reference is short enough to guess. */
+    redirect(`/${branch.slug}/book-online/confirmed?ref=${booking.reference}`
+      + `&t=${encodeURIComponent(booking.cancelToken ?? "")}`);
+  }
+
+  /* A deposit is due and there is no payment provider configured. Say so to
+     the guest in words that lead somewhere, and say so in the log in words
+     that name the cause — this is a deployment missing STRIPE_SECRET_KEY, not
+     a guest doing anything wrong. Before this, production without a key fell
+     into the demo simulator and confirmed the table for nothing. */
+  if (paymentsUnavailable()) {
+    console.error(`[booking] ${booking.reference}: STRIPE_SECRET_KEY is not set on this deployment, `
+      + `so the ${depositPence}p deposit cannot be taken. The table has NOT been confirmed.`);
+    redirect(await back(
+      "We can't take the deposit online at the moment. Please call the restaurant and we'll hold "
+      + "the table for you — nothing has been charged."));
   }
 
   const rules = bookingRules();
-  const successUrl = `${siteUrl()}/${branch.slug}/book-online/confirmed?ref=${booking.reference}&session_id={CHECKOUT_SESSION_ID}`;
+  const successUrl = `${siteUrl()}/${branch.slug}/book-online/confirmed?ref=${booking.reference}`
+    + `&t=${encodeURIComponent(booking.cancelToken ?? "")}&session_id={CHECKOUT_SESSION_ID}`;
   /* The token goes on the cancel URL because that page releases the table.
    * Without it the only thing needed to cancel someone's hold was their
    * booking reference in a plain GET — so a link preview, an email scanner

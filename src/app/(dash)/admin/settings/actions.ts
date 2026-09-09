@@ -11,10 +11,39 @@ import { checkEmail, checkPhone, checkTime } from "@/lib/validate";
 import { ok, problem } from "@/lib/admin-feedback";
 import { sendMail, checkSendingDomain } from "@/lib/email";
 
-const num = (v: FormDataEntryValue | null, fallback: number) => {
-  const n = Number(String(v ?? "").replace(/[^0-9]/g, ""));
-  return Number.isFinite(n) && n > 0 ? n : fallback;
+/**
+ * A whole number from a box, or a refusal.
+ *
+ * This used to return the previous value for anything it could not read:
+ *
+ *     const n = Number(String(v ?? "").replace(/[^0-9]/g, ""));
+ *     return Number.isFinite(n) && n > 0 ? n : fallback;
+ *
+ * So typing `abc`, or `-5`, or leaving the maximum party size blank, kept the
+ * old number and the page still said "Saved." — with the new figure showing in
+ * the box, because the form re-rendered from the request. The owner believed
+ * they had changed the covers per sitting. They had not. Seven fields went
+ * through it: the interval, party size, covers for each restaurant, lead time,
+ * days ahead, minimum party and the hold.
+ *
+ * Note it also stripped every non-digit before parsing, so `2.5` quietly became
+ * 25 and `-5` became 5. Refusing is the only honest answer to input nobody can
+ * interpret.
+ */
+const num = (v: FormDataEntryValue | null, label: string): number => {
+  const raw = String(v ?? "").trim();
+  if (!raw) problem(BACK, `${label} can't be left blank.`);
+  if (!/^\d+$/.test(raw)) {
+    problem(BACK, `${label}: "${raw}" isn't a whole number. Nothing has been saved.`);
+  }
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n <= 0) {
+    problem(BACK, `${label} has to be more than zero. Nothing has been saved.`);
+  }
+  return n;
 };
+const BACK = "/admin/settings";
+
 const lines = (v: FormDataEntryValue | null) =>
   String(v ?? "").split(/[\n,]/).map((s) => s.trim()).filter(Boolean);
 
@@ -52,8 +81,6 @@ function staffMobile(raw: FormDataEntryValue | null, fallback: string): string {
   return checked.ok && checked.e164 ? checked.value : fallback;
 }
 
-const BACK = "/admin/settings";
-
 export async function saveBookingRules(formData: FormData) {
   const session = await requireAbility("editSettings");
   const current = bookingRules();
@@ -90,9 +117,43 @@ export async function saveBookingRules(formData: FormData) {
     if (!checked.ok) problem(BACK, `"${address}" isn't an email address we can send to.`);
   }
 
-  const interval = num(formData.get("interval"), current.slots.intervalMinutes);
+  const interval = num(formData.get("interval"), "The gap between sittings");
   if (interval < 5 || interval > 240) {
     problem(BACK, "The gap between sittings should be between 5 and 240 minutes.");
+  }
+
+  /* The deposit amount, refused rather than ignored.
+     `parsePounds(...) ?? current.deposit.perPersonPence` meant "25 pounds",
+     "£25.999" and an empty box all kept the old figure while the screen said
+     Saved — and this is the number the site charges people. */
+  const perPersonRaw = String(formData.get("perPerson") ?? "").trim();
+  const depositPerPerson = parsePounds(perPersonRaw);
+  if (depositPerPerson == null) {
+    problem(BACK, `The deposit per person: "${perPersonRaw}" isn't an amount we can read. `
+      + `Write it as 25 or 25.00. Nothing has been saved.`);
+  }
+
+  /* The sending address and the staff mobile keep their stored value when the
+     new one is unusable — a typo here must not stop every confirmation going
+     out or switch the alerts off silently. But the *rejection* was silent too,
+     so the person saw their typo in the box, read "Saved.", and believed it.
+     Refuse the save instead, and say which box. */
+  const fromEmailRaw = String(formData.get("fromEmail") ?? "").trim();
+  if (fromEmailRaw && !checkEmail(fromEmailRaw).ok) {
+    problem(BACK, `The sending address: "${fromEmailRaw}" isn't an email address we can send from. `
+      + `Nothing has been saved.`);
+  }
+  const replyToRaw = String(formData.get("replyTo") ?? "").trim();
+  if (replyToRaw && !checkEmail(replyToRaw).ok) {
+    problem(BACK, `The reply-to address: "${replyToRaw}" isn't an email address. Nothing has been saved.`);
+  }
+  const waRaw = String(formData.get("waNotifyTo") ?? "").trim();
+  if (waRaw) {
+    const checked = checkPhone(waRaw, false);
+    if (!checked.ok || !checked.e164) {
+      problem(BACK, `The staff mobile for WhatsApp alerts: "${waRaw}" isn't a number we can send to. `
+        + `Leave it blank to switch the alerts off. Nothing has been saved.`);
+    }
   }
 
   const policy = String(formData.get("depositPolicy") ?? current.deposit.policy);
@@ -101,24 +162,24 @@ export async function saveBookingRules(formData: FormData) {
     slots: { first: t.value, last: t2.value, intervalMinutes: interval },
     capacity: {
       ...current.capacity,
-      maxPartyOnline: num(formData.get("maxParty"), current.capacity.maxPartyOnline),
+      maxPartyOnline: num(formData.get("maxParty"), "The largest party bookable online"),
       coversPerSlot: Object.fromEntries(
         db.select({ slug: branches.slug }).from(branches).all().map((b) => [
           b.slug,
-          num(formData.get(`covers_${b.slug}`), current.capacity.coversPerSlot[b.slug] ?? 30),
+          num(formData.get(`covers_${b.slug}`), `Covers per sitting for ${b.slug}`),
         ]),
       ),
     },
     leadTime: {
-      minutesBefore: num(formData.get("leadMinutes"), current.leadTime.minutesBefore),
-      maxDaysAhead: num(formData.get("maxDays"), current.leadTime.maxDaysAhead),
+      minutesBefore: num(formData.get("leadMinutes"), "How far ahead a booking has to be made"),
+      maxDaysAhead: num(formData.get("maxDays"), "How many days ahead guests may book"),
     },
     deposit: {
       ...current.deposit,
       policy: policy === "always" || policy === "nights" || policy === "off" ? policy : current.deposit.policy,
-      perPersonPence: parsePounds(String(formData.get("perPerson") ?? "")) ?? current.deposit.perPersonPence,
-      minParty: num(formData.get("minParty"), current.deposit.minParty),
-      holdMinutes: num(formData.get("holdMinutes"), current.deposit.holdMinutes),
+      perPersonPence: depositPerPerson,
+      minParty: num(formData.get("minParty"), "The party size a deposit starts at"),
+      holdMinutes: num(formData.get("holdMinutes"), "How long a table is held for payment"),
       note: String(formData.get("depositNote") ?? current.deposit.note),
     },
     occasions: { options: lines(formData.get("occasions")).length ? lines(formData.get("occasions")) : current.occasions.options },
@@ -153,8 +214,8 @@ export async function saveBookingRules(formData: FormData) {
   // that it failed.
   ok(BACK, `Saved. Service ${t.value}–${t2.value} every ${interval} minutes; ` +
     `deposit ${next.deposit.policy === "off" ? "off" : `${next.deposit.policy}, ` +
-      `${(next.deposit.perPersonPence / 100).toFixed(2)} per person`}; ` +
-    `alerts to ${notifyTo.join(", ")}.`);
+      `£${(next.deposit.perPersonPence / 100).toFixed(2)} per person`}; ` +
+    `alerts to ${notifyTo.join(", ")}; sending from ${next.notifications.fromEmail}.`);
 }
 
 /**

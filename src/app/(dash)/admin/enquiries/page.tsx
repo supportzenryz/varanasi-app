@@ -6,7 +6,7 @@ import { requireAbility, can } from "@/lib/auth";
 import { TYPE_LABEL, type EnquiryType } from "@/lib/enquiry";
 import { AdminNotice } from "@/components/AdminNotice";
 import { setEnquiryStatus, saveEnquiryNote } from "./actions";
-import { buildEnquiryWhere, selectEnquiries, RANGES, type EnquiryQuery } from "./filters";
+import { buildEnquiryWhere, selectEnquiries, filtersToQuery, RANGES, type EnquiryQuery } from "./filters";
 
 export const metadata = { title: "Enquiries" };
 
@@ -40,6 +40,9 @@ export default async function EnquiriesAdmin({
      only route to it was the CSV export. */
   const page = Math.max(1, Number(sp.page ?? 1) || 1);
   const { saved, problem } = sp;
+  /* Carried into every form on this page, so an action can put the person back
+     on the list they were reading rather than on an unfiltered page one. */
+  const filters = filtersToQuery(params);
   const rows = selectEnquiries(session, params, PER_PAGE, (page - 1) * PER_PAGE);
 
   // The counts on the status tabs have to respect the other filters, or the
@@ -236,6 +239,7 @@ export default async function EnquiriesAdmin({
                   <>
                     <form action={setEnquiryStatus} className="mt-6 pt-5 border-t border-[--line] flex flex-wrap gap-2">
                       <input type="hidden" name="id" value={e.id} />
+                      <input type="hidden" name="filters" value={filters} />
                       {(["new", "contacted", "confirmed", "closed"] as const)
                         .filter((s) => s !== e.status)
                         .map((s) => (
@@ -248,6 +252,7 @@ export default async function EnquiriesAdmin({
 
                     <form action={saveEnquiryNote} className="mt-4 flex flex-wrap items-end gap-3">
                       <input type="hidden" name="id" value={e.id} />
+                      <input type="hidden" name="filters" value={filters} />
                       <div className="flex-1 min-w-[16rem]">
                         <label className="block text-xs font-semibold text-ink-3 mb-1" htmlFor={`note${e.id}`}>
                           Internal note (never shown to the customer)

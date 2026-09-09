@@ -135,3 +135,42 @@ export function selectEnquiries(session: Session, params: EnquiryQuery, limit = 
     .offset(offset)
     .all();
 }
+
+/**
+ * The filters the person is looking at, as a query string to come back to.
+ *
+ * Every action on this screen redirected to a bare `/admin/enquiries`, which
+ * threw away the page, the status filter, the type, the branch, the date range
+ * and the search. A manager working through "new catering enquiries this week"
+ * marked one contacted and was returned to an unfiltered list of everything,
+ * at page one — so the next thing they did was set all six filters again. Six
+ * times an afternoon, and the software feels as though it is fighting them.
+ *
+ * Rebuilt from a fixed list of keys rather than echoed back, because this
+ * value arrives in a form body: `?next=https://evil.example` or a query string
+ * carrying a crafted `problem=` message must not survive the round trip.
+ */
+const CARRIED = ["page", "status", "type", "branch", "range", "q"] as const;
+
+export function filtersToQuery(params: EnquiryQuery): string {
+  const out = new URLSearchParams();
+  for (const key of CARRIED) {
+    const value = params[key];
+    if (value) out.set(key, String(value));
+  }
+  const s = out.toString();
+  return s ? `?${s}` : "";
+}
+
+/** The same, read back out of a form's hidden field. */
+export function filtersFromForm(raw: FormDataEntryValue | null): string {
+  const given = new URLSearchParams(String(raw ?? "").replace(/^\?/, ""));
+  const out = new URLSearchParams();
+  for (const key of CARRIED) {
+    const value = given.get(key);
+    // A length cap so a hand-made post cannot push a novel through the URL.
+    if (value && value.length <= 100) out.set(key, value);
+  }
+  const s = out.toString();
+  return s ? `?${s}` : "";
+}

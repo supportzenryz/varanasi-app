@@ -1,81 +1,50 @@
-"use client";
-import Image from "next/image";
-import { useActionState } from "react";
-import { loginAction } from "./actions";
+import Link from "next/link";
+import type { Metadata } from "next";
+import { AuthShell } from "@/components/AuthShell";
+import { LoginForm } from "./LoginForm";
 
-export default function LoginPage() {
-  const [state, action, pending] = useActionState(loginAction, undefined);
+export const metadata: Metadata = { title: "Sign in", robots: { index: false } };
+export const dynamic = "force-dynamic";
+
+/**
+ * A server component now, so it can read `?reset=1` and confirm what just
+ * happened. The form itself is a client component below.
+ *
+ * The two-panel layout moved to `AuthShell`, shared with the forgotten-password
+ * screens. It is also where the stretched logo was fixed: the dark panel is a
+ * column flex container, whose children default to `align-items: stretch`,
+ * which overrides `width: auto` on an image and pulled a 5:1 mark out past
+ * 10:1 while holding its height. One `self-start`, in one place.
+ */
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ reset?: string }>;
+}) {
+  const { reset } = await searchParams;
 
   return (
-    <main className="dash min-h-dvh grid lg:grid-cols-2 bg-pale text-ink">
-      <div className="hidden lg:flex flex-col justify-between bg-ink text-pale p-12">
-        {/* The full mark — Buddha and wordmark — on the dark panel it was drawn
-            for. Copied into public/brand so the admin never depends on the
-            media library import having been run.
-
-            `self-start` is load-bearing, not tidiness. This panel is a column
-            flex container, so its children default to `align-items: stretch`
-            — which on a replaced element with `width: auto` stretches the
-            width to the full column and holds the height at h-14, squashing a
-            5:1 mark out to better than 10:1. `w-auto` cannot save it: auto is
-            precisely what stretch is allowed to override. */}
-        <Image src="/brand/logo.png" alt="Varanasi" width={520} height={104}
-          className="h-14 w-auto self-start" priority />
-        <div>
-          <h1 className="text-4xl leading-tight max-w-[14ch]">The room behind the restaurant.</h1>
-          <p className="mt-4 text-pale/70 max-w-[38ch] text-sm leading-relaxed">
-            Menus, private rooms, gift vouchers and enquiries for Birmingham and Leicester — in one place.
-          </p>
-        </div>
-        <span className="text-pale/40 text-xs">Staff access only</span>
-      </div>
-
-      <div className="flex items-center justify-center p-6 sm:p-12">
-        <form action={action} className="w-full max-w-sm">
-          {/* Narrow screens lose the dark panel, so the form carries the mark
-              itself — in the ink variant, since this side is cream. */}
-          <Image src="/brand/logo-dark.png" alt="Varanasi" width={520} height={104}
-            className="lg:hidden h-11 w-auto mb-8" priority />
-          <span className="accent text-xs text-gold-ink">Sign in</span>
-          <h2 className="text-3xl mt-3">Welcome back</h2>
-          <p className="text-ink-3 text-sm mt-2 mb-8">Use the account your manager set up for you.</p>
-
-          <label className="block text-sm font-medium mb-1.5" htmlFor="email">Email</label>
-          <input id="email" name="email" type="email" autoComplete="username" required
-            className="w-full rounded-none border border-[--line] bg-white px-3.5 py-2.5 text-sm outline-none focus:border-gold" />
-
-          <label className="block text-sm font-medium mb-1.5 mt-5" htmlFor="password">Password</label>
-          <input id="password" name="password" type="password" autoComplete="current-password" required
-            className="w-full rounded-none border border-[--line] bg-white px-3.5 py-2.5 text-sm outline-none focus:border-gold" />
-
-          {state?.error && (
-            <p role="alert" className="mt-4 text-sm text-brick bg-clay/10 border-l-2 border-brick px-3 py-2">
-              {state.error}
-            </p>
-          )}
-
-          <button type="submit" disabled={pending}
-            className="mt-7 w-full bg-ink text-pale py-3 text-sm font-semibold tracking-wide hover:bg-ink-2 disabled:opacity-60">
-            {pending ? "Signing in…" : "Sign in"}
-          </button>
-
-          <p className="mt-6 text-xs text-ink-3 leading-relaxed">
-            Forgotten your password? Ask an owner to reset it from Staff access.
-          </p>
-
-          {/* Which is no help at all if you ARE the owner: resetting a password
-              requires being signed in, so a forgotten owner password locks the
-              back office from the inside. Development only — a member of staff
-              on the live site has an owner to ask, and should not be reading
-              about terminal commands. */}
-          {process.env.NODE_ENV !== "production" && (
-            <p className="mt-3 text-xs text-ink-3/80 leading-relaxed">
-              Locked out of the owner account?{" "}
-              <code className="text-[0.7rem]">npm run staff:password -- you@example.com --create</code>
-            </p>
-          )}
-        </form>
-      </div>
-    </main>
+    <AuthShell
+      kicker="Sign in"
+      heading="Welcome back"
+      intro="Use the account your manager set up for you."
+      aside={
+        <p className="mt-6 text-xs text-ink-3 leading-relaxed">
+          Forgotten your password? <Link href="/admin/forgot" className="underline hover:text-gold-ink">
+            Email yourself a link</Link> — or ask an owner to reset it from Staff access.
+        </p>
+      }
+    >
+      {/* Said here rather than left implicit. Someone who has just set a new
+          password on another screen needs to know it worked, and that the
+          reason they are being asked to sign in is not that something failed. */}
+      {reset === "1" && (
+        <p role="status" className="mb-6 border-l-2 border-leaf bg-leaf/10 px-4 py-3 text-sm">
+          <strong>Your new password is saved.</strong> Sign in with it below. Anyone who was signed
+          in to this account elsewhere has been signed out.
+        </p>
+      )}
+      <LoginForm />
+    </AuthShell>
   );
 }

@@ -3,7 +3,8 @@ import { redirect } from "next/navigation";
 import { startPurchase, attachVoucherSession } from "@/lib/voucher";
 import { rememberSubmission } from "@/lib/form-recall";
 import { voucherRules } from "@/lib/booking-config";
-import { createVoucherCheckout, stripeSimulated } from "@/lib/stripe";
+import { createVoucherCheckout, stripeSimulated, paymentsUnavailable } from "@/lib/stripe";
+import { guardPublicForm } from "@/lib/public-limit";
 import { parsePounds, formatPence } from "@/lib/money";
 
 function siteUrl(): string {
@@ -61,6 +62,9 @@ export async function buyVoucher(formData: FormData) {
       `Please choose an amount between ${formatPence(rules.minPence)} and ${formatPence(rules.maxPence)}.`));
   }
 
+  const guard = await guardPublicForm("voucher", { email: String(formData.get("fromEmail") ?? "") });
+  if (!guard.allowed) redirect(await back(guard.message));
+
   const started = startPurchase({
     branchSlug: validAt || null,
     valuePence: valuePence!,
@@ -74,6 +78,18 @@ export async function buyVoucher(formData: FormData) {
 
   if (!started.ok) redirect(await back(started.error));
   const { voucher } = started;
+
+  /* No payment provider on this deployment. The purchase row exists as
+     `pending` and carries no balance, so nothing has been given away — but the
+     buyer must be told rather than dropped into a demo checkout that issues a
+     real voucher for no money. */
+  if (paymentsUnavailable()) {
+    console.error(`[voucher] ${voucher.code}: STRIPE_SECRET_KEY is not set on this deployment, `
+      + `so the purchase cannot be taken. No voucher has been issued.`);
+    redirect(await back(
+      "We can't take payment online at the moment. Please call the restaurant and we'll arrange "
+      + "the voucher for you — nothing has been charged."));
+  }
 
   const successUrl = `${siteUrl()}/${branchSlug}/gift-vouchers/confirmed?code=${encodeURIComponent(voucher.code)}&session_id={CHECKOUT_SESSION_ID}`;
   const cancelUrl = `${siteUrl()}/${branchSlug}/gift-vouchers/unconfirmed?code=${encodeURIComponent(voucher.code)}`;

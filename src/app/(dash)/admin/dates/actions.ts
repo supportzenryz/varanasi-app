@@ -51,7 +51,7 @@ export async function addBlockedDate(formData: FormData) {
 
   if (!Number.isInteger(branchId) || branchId <= 0) problem("/admin/dates", "Choose a restaurant.");
   if (!branchAllowed(session, branchId)) {
-    problem("/admin/dates", "You can only close dates at your own restaurant.");
+    problem(back, "You can only close dates at your own restaurant.");
   }
 
   const date = checkDate(formData.get("date") as string);
@@ -114,7 +114,7 @@ export async function deleteBlockedDate(formData: FormData) {
   const branchId = blockBranch(id);
   if (branchId == null) problem("/admin/dates", "That closure has already been removed.");
   if (!branchAllowed(session, branchId!)) {
-    problem("/admin/dates", "That closure belongs to the other restaurant.");
+    problem(backTo(branchId), "That closure belongs to the other restaurant.");
   }
 
   db.delete(blockedDates).where(eq(blockedDates.id, id)).run();

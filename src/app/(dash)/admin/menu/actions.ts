@@ -39,13 +39,13 @@ function priceOrRefuse(raw: FormDataEntryValue | null, field: string, back: stri
 function categoryBranch(categoryId: number): number {
   const row = db.select({ branchId: menuCategories.branchId }).from(menuCategories)
     .where(eq(menuCategories.id, categoryId)).get();
-  if (!row) throw new Error("Category not found");
+  if (!row) problem("/admin/menu", "That section no longer exists — it may have been removed in another tab.");
   return row.branchId;
 }
 function itemCategory(itemId: number): number {
   const row = db.select({ categoryId: menuItems.categoryId }).from(menuItems)
     .where(eq(menuItems.id, itemId)).get();
-  if (!row) throw new Error("Dish not found");
+  if (!row) problem("/admin/menu", "That dish no longer exists — it may have been removed in another tab.");
   return row.categoryId;
 }
 /** The public pages are prerendered, so an edit here has to invalidate them too —
@@ -159,7 +159,14 @@ export async function toggleItem(formData: FormData) {
 export async function moveItem(formData: FormData) {
   const session = await requireAbility("editMenu");
   const id = Number(formData.get("id"));
+  /* An unrecognised direction used to mean "down", silently. A stale form or a
+     hand-made post could therefore move a dish the opposite way from the one
+     nobody asked for. */
   const dir = String(formData.get("dir"));
+  if (dir !== "up" && dir !== "down") {
+    problem(backTo(categoryBranch(itemCategory(Number(formData.get("id")))),
+      String(formData.get("kind") ?? "")), "That wasn't a direction we recognise. Nothing has moved.");
+  }
   const categoryId = itemCategory(id);
   const branchId = categoryBranch(categoryId);
   assertBranchAccess(session, branchId);
@@ -180,6 +187,13 @@ export async function moveItem(formData: FormData) {
   db.update(menuItems).set({ sort: neighbour!.sort }).where(eq(menuItems.id, me!.id)).run();
   db.update(menuItems).set({ sort: me!.sort }).where(eq(menuItems.id, neighbour!.id)).run();
   publish(branchId);
+
+  /* Say so. This was the one action in the whole admin that finished in
+     silence — its three siblings (moving a gallery image, moving a room,
+     moving a section) all report. The new order is visible in the re-rendered
+     list, so it was not invisible; it was just the one button on the screen
+     that behaved differently from every other one. */
+  ok(back, `${me!.name} moved ${dir}.`);
 }
 
 export async function saveCategory(formData: FormData) {

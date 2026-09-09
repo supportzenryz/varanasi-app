@@ -1,0 +1,32 @@
+From: Varanasi Restaurant <reservations@varanasi.uk>
+To: sathish@zenryz.com
+Reply-To: reservations@varanasi.uk
+Subject: Your table at Varanasi Birmingham is confirmed — VB-001562
+Date: Fri, 04 Sep 2026 12:04:04 GMT
+
+Dear Test,
+
+Thank you — your table is confirmed and your deposit has been received.
+
+Reference:  VB-001562
+Restaurant: Varanasi Birmingham — 184 Broad Street, B15 1DA
+Date:       Friday, 4 September 2026
+Time:       5:00pm
+Guests:     7
+Name:       Test
+Phone:      0
+Email:      sathish@zenryz.com
+Occasion:   Anniversary
+Deposit:    £70 paid
+
+Your deposit is deducted from your final bill.
+
+Need to change or cancel? Please give us at least 24 hours' notice:
+http://localhost:3000/birmingham/booking/VB-001562?t=e246e0b521b1f96459e299b1174468be
+
+Or call us on 0121 633 3700.
+
+We look forward to welcoming you.
+
+Varanasi Birmingham
+184 Broad Street, B15 1DA

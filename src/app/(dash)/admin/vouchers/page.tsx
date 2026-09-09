@@ -1,7 +1,15 @@
-import { and, asc, desc, inArray, isNull, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { branches, vouchers, users } from "@/db/schema";
 import { requireAbility, can, visibleBranchIds } from "@/lib/auth";
+
+/** Which branch's URL the guest's copy of a voucher lives under. One valid at
+ *  either restaurant is shown under Birmingham; the page says so on its face. */
+function branchSlugFor(v: { branchId: number | null }): string {
+  if (!v.branchId) return "birmingham";
+  return db.select({ slug: branches.slug }).from(branches).where(eq(branches.id, v.branchId)).get()?.slug
+    ?? "birmingham";
+}
 
 /** Small helper so the branch test reads the same way in both places. */
 function mineIncludes(session: { role: string; branchId: number | null }, branchId: number) {
@@ -12,6 +20,7 @@ import { voucherRules } from "@/lib/booking-config";
 import { voucherByCode, redemptionsFor, expiryLabel, expireOldVouchers } from "@/lib/voucher";
 import { redeemVoucher, issueVoucher, cancelVoucher, releaseScheduled } from "./actions";
 import { ConfirmButton } from "@/components/ConfirmButton";
+import { AdminNotice } from "@/components/AdminNotice";
 
 export const metadata = { title: "Gift vouchers" };
 
@@ -28,9 +37,13 @@ const STATUS_COLOUR: Record<string, string> = {
 
 export default async function VouchersAdmin({
   searchParams,
-}: { searchParams: Promise<{ code?: string; error?: string; done?: string }> }) {
+}: { searchParams: Promise<{ code?: string; saved?: string; problem?: string }> }) {
   const session = await requireAbility("redeemVoucher");
-  const { code, error, done } = await searchParams;
+  /* `saved` and `problem`, the same two words as every other admin screen.
+     This page used to invent `done` and `error`, which meant its actions could
+     not use the shared feedback helpers and its banners were a second,
+     slightly different copy of the same component. */
+  const { code, saved, problem } = await searchParams;
 
   // Anything past its date stops being redeemable the moment this screen opens.
   expireOldVouchers();
@@ -90,8 +103,7 @@ export default async function VouchersAdmin({
         Look a voucher up by its code to check the balance or take money off it at the till.
       </p>
 
-      {error && <p role="alert" className="mt-6 border-l-2 border-brick bg-clay/10 px-4 py-3 text-sm text-brick">{error}</p>}
-      {done && <p role="status" className="mt-6 border-l-2 border-leaf bg-leaf/10 px-4 py-3 text-sm">{done}</p>}
+      <div className="mt-6"><AdminNotice saved={saved} problem={problem} /></div>
 
       <div className="mt-8 grid gap-px bg-[--line] sm:grid-cols-3 border border-[--line]">
         <div className="bg-pale p-5">
@@ -141,6 +153,14 @@ export default async function VouchersAdmin({
                 <span className={`ml-3 inline-block px-2 py-1 text-xs font-semibold ${STATUS_COLOUR[looked.status]}`}>
                   {looked.status}
                 </span>
+                {/* The guest's own copy — worth having to hand when somebody
+                    rings asking where their voucher went, or when a print has
+                    smudged and the code needs reading out. */}
+                <a href={`/${branchSlugFor(looked)}/gift-vouchers/${encodeURIComponent(looked.code)}`}
+                  target="_blank" rel="noreferrer"
+                  className="ml-3 text-xs underline hover:text-gold-ink">
+                  the guest&rsquo;s voucher
+                </a>
               </div>
               <div className="text-right">
                 <span className="block text-3xl display tnum">{formatPence(looked.balancePence)}</span>
@@ -160,7 +180,10 @@ export default async function VouchersAdmin({
                 ["Expires", expiryLabel(looked)],
                 ["Type", looked.origin === "thank_you" ? "Complimentary (after dining)" : looked.origin === "manual" ? "Issued by staff" : "Bought online"],
                 ...(looked.deliverOn ? [["Scheduled delivery", looked.deliverOn + (looked.deliveredAt ? " (sent)" : " (waiting)")]] : []),
-                ...(looked.message ? [["Message", `"${looked.message}"`]] : []),
+                /* The message is as personal as the names it sits beside —
+                   "happy 40th, from all of us at the office" — so it is hidden
+                   from the other restaurant's staff for the same reason. */
+                ...(looked.message && !otherBranch ? [["Message", `"${looked.message}"`]] : []),
               ].map(([k, v]) => (
                 <div key={k}>
                   <dt className="text-xs font-semibold text-ink-3">{k}</dt>

@@ -1,5 +1,6 @@
 import { DatabaseSync } from "node:sqlite";
 import bcrypt from "bcryptjs";
+import { STARTING_STAFF_PASSWORD, BCRYPT_COST } from "../src/lib/password-rules.mjs";
 import fs from "node:fs";
 import { imageSize } from "./image-size.mjs";
 
@@ -144,7 +145,7 @@ for (const [bslug, bid] of Object.entries(branchIds)) {
 /* ---------- staff ---------- */
 const insUser = db.prepare(`insert into users (email,password_hash,name,role,branch_id,is_active,must_change_password)
   values (?,?,?,?,?,1,?)`);
-const placeholder = bcrypt.hashSync("ChangeMe!2026", 10);
+const placeholder = bcrypt.hashSync(STARTING_STAFF_PASSWORD, BCRYPT_COST);
 insUser.run("owner@varanasi.uk", placeholder, "Varanasi Owner", "owner", null, 1);
 insUser.run("birmingham@varanasi.uk", placeholder, "Birmingham Manager", "manager", bhamId, 1);
 insUser.run("leicester@varanasi.uk", placeholder, "Leicester Manager", "manager", leicId, 1);

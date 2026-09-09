@@ -12,7 +12,7 @@ import { ok, problem } from "@/lib/admin-feedback";
 function roomBranch(roomId: number): number {
   const row = db.select({ branchId: privateRooms.branchId }).from(privateRooms)
     .where(eq(privateRooms.id, roomId)).get();
-  if (!row) throw new Error("Room not found");
+  if (!row) problem("/admin/rooms", "That room no longer exists — it may have been removed in another tab.");
   return row.branchId;
 }
 

@@ -43,6 +43,11 @@ const IMMEDIATE = [
   "gdpr.erase",       // a person erased under Article 17 — irreversible
   "booking.refund",   // money leaving the account
   "login.locked",     // repeated failures against one account or from one address
+  /* A reset is both the remedy for a stolen password and the first move of
+     somebody stealing an account, so the owner hears about every one of them
+     while it is still happening rather than in tomorrow's summary. */
+  "password.reset.used",
+  "password.reset.throttled",
 ] as const;
 
 const DIGEST_KEY = "audit_digest_cursor";

@@ -6,8 +6,13 @@ import { enquiries } from "@/db/schema";
 import { record } from "@/lib/audit";
 import { requireAbility, assertBranchAccess, type Session } from "@/lib/auth";
 import { ok, problem } from "@/lib/admin-feedback";
+import { filtersFromForm } from "./filters";
 
-const BACK = "/admin/enquiries";
+const BASE = "/admin/enquiries";
+
+/** Back to the list the person was actually looking at, filters and page
+ *  intact. See filtersFromForm for why it is rebuilt rather than echoed. */
+const backTo = (formData: FormData) => `${BASE}${filtersFromForm(formData.get("filters"))}`;
 
 function enquiryBranch(id: number): number | null | undefined {
   const row = db.select({ branchId: enquiries.branchId }).from(enquiries).where(eq(enquiries.id, id)).get();
@@ -22,6 +27,7 @@ const STATUSES = ["new", "contacted", "confirmed", "closed"] as const;
 
 export async function setEnquiryStatus(formData: FormData) {
   const session = await requireAbility("editEnquiries");
+  const BACK = backTo(formData);
   const id = Number(formData.get("id"));
   const status = String(formData.get("status")) as (typeof STATUSES)[number];
   if (!STATUSES.includes(status)) problem(BACK, "That isn't a status we recognise.");
@@ -44,7 +50,7 @@ export async function setEnquiryStatus(formData: FormData) {
   }).where(eq(enquiries.id, id)).run();
 
   log(session, "enquiry.status", String(id), status);
-  revalidatePath(BACK);
+  revalidatePath(BASE);
   ok(BACK, status === "new"
     ? "Put back in the new list."
     : `Marked ${status}${status === "closed" ? "" : " — it's yours now"}.`);
@@ -52,6 +58,7 @@ export async function setEnquiryStatus(formData: FormData) {
 
 export async function saveEnquiryNote(formData: FormData) {
   const session = await requireAbility("editEnquiries");
+  const BACK = backTo(formData);
   const id = Number(formData.get("id"));
   const branchId = enquiryBranch(id);
   if (branchId === undefined) problem(BACK, "That enquiry no longer exists.");
@@ -64,6 +71,6 @@ export async function saveEnquiryNote(formData: FormData) {
   const note = String(formData.get("internalNote") ?? "").trim();
   db.update(enquiries).set({ internalNote: note || null }).where(eq(enquiries.id, id)).run();
   log(session, "enquiry.note", String(id));
-  revalidatePath(BACK);
+  revalidatePath(BASE);
   ok(BACK, note ? "Note saved." : "Note cleared.");
 }

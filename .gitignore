@@ -49,7 +49,7 @@ shot.mjs
 !/public/media/**/themes/yootheme/fonts/**
 shot*.mjs
 
-# build artefacts — these are produced, not authored, and a stale one
-# committed by mistake is 2.4MB of noise in every clone
-*.tar.gz
-*.zip
+# scratch tree written by npm run test:money
+.tmp-money-test/
+.tmp-auth-test/
+.tmp-qr-test/

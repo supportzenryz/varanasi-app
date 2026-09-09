@@ -10,6 +10,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 
 /* validate.ts imports "@/lib/whatsapp" via the tsconfig alias, which tsx does
    not resolve outside Next. Load copies with the alias rewritten to a relative
@@ -20,14 +21,18 @@ for (const f of ["whatsapp.ts", "validate.ts"]) {
   const src = fs.readFileSync(new URL(`../src/lib/${f}`, here), "utf8");
   fs.writeFileSync(path.join(dir, f), src.replace(/@\/lib\//g, "./").replace(/^import "server-only";\s*$/m, ""));
 }
+/* `pathToFileURL`, not the bare path: on Windows a dynamic import of
+   `C:\Users\…` is read as a URL with the scheme "c:" and refused outright
+   (ERR_UNSUPPORTED_ESM_URL_SCHEME), so this suite has never run on the machine
+   the project is developed on. */
 const { checkPhone, checkEmail, checkName, checkDate, checkTime, checkPartySize } =
-  await import(path.join(dir, "validate.ts"));
+  await import(pathToFileURL(path.join(dir, "validate.ts")).href);
 
 /* parsePounds lives in money.ts and has no imports to rewrite. It is here
    because it is the same class of problem: input a member of staff types. */
 fs.writeFileSync(path.join(dir, "money.ts"),
   fs.readFileSync(new URL("../src/lib/money.ts", here), "utf8"));
-const { parsePounds } = await import(path.join(dir, "money.ts"));
+const { parsePounds } = await import(pathToFileURL(path.join(dir, "money.ts")).href);
 
 /* The checkers are loaded dynamically from a rewritten copy, so TypeScript
    sees `any` coming back and cannot narrow the discriminated union for us.
@@ -208,7 +213,7 @@ for (const [bad, why] of [
  */
 fs.writeFileSync(path.join(dir, "mosaic.ts"),
   fs.readFileSync(new URL("../src/lib/mosaic.ts", here), "utf8"));
-const { mosaic } = await import(path.join(dir, "mosaic.ts"));
+const { mosaic } = await import(pathToFileURL(path.join(dir, "mosaic.ts")).href);
 
 console.log("\n── gallery mosaic ──");
 

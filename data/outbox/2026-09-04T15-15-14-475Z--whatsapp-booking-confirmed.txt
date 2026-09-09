@@ -1,0 +1,7 @@
+WhatsApp to: +917200222040
+Kind: booking-confirmed
+Template: varanasi_booking_confirmed
+Variables: ["Sathish","Birmingham","Friday, 4 September 2026","10:00pm","2","VB-CDEA9C"]
+Date: Fri, 04 Sep 2026 15:15:14 GMT
+
+Hello Sathish, your table at Varanasi Birmingham is confirmed for Friday, 4 September 2026 at 10:00pm, for 2 guests. Your reference is VB-CDEA9C and your deposit has been received — it comes off your bill. To change or cancel, please call us with 24 hours' notice.

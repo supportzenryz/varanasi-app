@@ -168,7 +168,34 @@ export async function activatePaidVoucher(opts: {
 }): Promise<{ activated: boolean; alreadyDone: boolean; voucher?: Voucher }> {
   const existing = voucherById(opts.voucherId);
   if (!existing) return { activated: false, alreadyDone: false };
-  if (existing.status !== "pending") return { activated: true, alreadyDone: true, voucher: existing };
+
+  /* A cancelled purchase that has now been paid for is not "already done".
+   *
+   * This read `status !== "pending"` and gave up, which turned an abandoned
+   * checkout into money taken for nothing: the guest reaches the "payment not
+   * completed" page (the back button, a link preview, a mail scanner following
+   * the cancel URL), the purchase is marked cancelled, and then they go back
+   * and finish paying. Stripe charges the card, the webhook arrives here, sees
+   * a status that is not pending, logs "already done" — and the voucher keeps
+   * a zero balance, nothing is emailed, and the confirmation page tells the
+   * buyer no voucher was issued. Nobody is told. The restaurant finds out when
+   * the recipient tries to spend it.
+   *
+   * The money is the authority. A cancelled purchase that was never issued —
+   * no `issuedAt`, no balance — is exactly the state a paid activation should
+   * recover from, and `confirmPaidBooking` has always done this for tables.
+   * A voucher that has genuinely been issued, redeemed, or cancelled by an
+   * owner *after* issue keeps its status. */
+  const abandonedThenPaid =
+    existing.status === "cancelled" && !existing.issuedAt && existing.balancePence === 0;
+
+  if (existing.status !== "pending" && !abandonedThenPaid) {
+    return { activated: true, alreadyDone: true, voucher: existing };
+  }
+  if (abandonedThenPaid) {
+    console.log(`[voucher] ${existing.code}: payment arrived for a purchase that had been `
+      + `marked as abandoned — issuing it.`);
+  }
 
   const rules = voucherRules();
   const now = Math.floor(Date.now() / 1000);
@@ -213,6 +240,18 @@ function whereValid(v: Voucher): string {
 }
 
 /** Sends the voucher to the recipient, and stamps it so it goes only once. */
+/**
+ * The voucher's own page — something to print, or to show at the table.
+ *
+ * A branch-specific voucher lives under that branch; one valid at either is
+ * shown under Birmingham, because the page has to live somewhere and it says
+ * "Birmingham or Leicester" on the face of it either way.
+ */
+export function voucherLink(v: Voucher, site: string): string {
+  const slug = branchOf(v)?.slug ?? "birmingham";
+  return `${site.replace(/\/$/, "")}/${slug}/gift-vouchers/${encodeURIComponent(v.code)}`;
+}
+
 export async function deliverVoucher(v: Voucher): Promise<void> {
   if (v.deliveredAt) return;
   const rules = voucherRules();
@@ -233,6 +272,13 @@ Your voucher code:  ${v.code}
 Value:              ${formatPence(v.valuePence)}
 Valid at:           ${whereValid(v)}
 Valid until:        ${expiryLabel(v)}
+
+Your voucher to print or show us:
+
+  ${voucherLink(v, site)}
+
+That page has the code as a barcode we can scan, so there is nothing to read
+out. Or just quote the code above — either works.
 
 How to use it: quote the code when you book, or hand it to us when you settle
 the bill. You don't have to spend it all at once — we'll keep track of the
@@ -258,6 +304,7 @@ Varanasi Restaurant`,
 async function notifyPurchaser(v: Voucher): Promise<void> {
   const rules = voucherRules();
   if (!v.purchaserEmail) return;
+  const site = (process.env.SITE_URL ?? "https://varanasi.uk").replace(/\/$/, "");
   const when = v.deliverOn
     ? `We'll send it to ${v.recipientName} on ${new Date(`${v.deliverOn}T12:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" })}.`
     : `We've sent it straight to ${v.recipientName} at ${v.recipientEmail}.`;
@@ -281,6 +328,8 @@ Valid until: ${expiryLabel(v)}
 
 ${when}
 
+The voucher itself, to print or show us:  ${voucherLink(v, site)}
+
 If anything looks wrong, reply to this email and we'll put it right.
 
 Varanasi Restaurant`,
@@ -302,6 +351,7 @@ For:        ${v.recipientName} (${v.recipientEmail})
 Valid at:   ${whereValid(v)}
 Expires:    ${expiryLabel(v)}
 Delivery:   ${v.deliverOn ? `scheduled for ${v.deliverOn}` : "sent immediately"}
+Voucher:    ${voucherLink(v, site)}
 ${v.message ? `Message:    "${v.message}"` : ""}`,
     });
   }
@@ -366,8 +416,14 @@ export function redeem(opts: {
    * that into a refusal — a replayed or stale submission no longer matches
    * what is in the database, so only the first one lands. It also settles the
    * case of two staff redeeming the same voucher at once.
+   *
+   * Required, and not by accident. It used to be optional, which meant the
+   * guard was opt-in *by whoever posted the form*: omit the hidden field and
+   * the old unguarded behaviour came back, so anyone signed in could draw the
+   * same voucher down again and again. A guard that the attacker can decline
+   * is not a guard.
    */
-  expectedBalancePence?: number | null;
+  expectedBalancePence: number;
 }): RedeemResult {
   expireOldVouchers();
   const v = voucherByCode(opts.code);
@@ -384,10 +440,14 @@ export function redeem(opts: {
     return { ok: false, error: `That voucher is only valid at Varanasi ${b?.city ?? "the other branch"}.` };
   }
 
-  if (
-    opts.expectedBalancePence != null &&
-    Number(opts.expectedBalancePence) !== v.balancePence
-  ) {
+  if (!Number.isInteger(opts.expectedBalancePence)) {
+    /* Not a validation nicety. Reaching here means the form that was posted
+       did not carry the balance it was rendered with, which is either a
+       hand-made request or a page old enough to predate the guard — and in
+       both cases the safe answer is no. */
+    return { ok: false, error: "Please reload the voucher and try again." };
+  }
+  if (Number(opts.expectedBalancePence) !== v.balancePence) {
     return {
       ok: false,
       error:
@@ -396,17 +456,43 @@ export function redeem(opts: {
     };
   }
 
-  const amount = Math.round(Number(opts.amountPence));
-  if (!Number.isInteger(amount) || amount <= 0) return { ok: false, error: "Enter the amount to take off the voucher." };
+  /* Checked before rounding, not after. `Math.round(x)` is always an integer,
+     so `Number.isInteger(Math.round(x))` asks nothing at all — 12.5 pence
+     sailed through as 13. Money that cannot be represented exactly is a sum
+     somebody computed wrongly upstream, and the honest response is to refuse
+     it rather than to quietly pick the nearest penny. */
+  const amount = Number(opts.amountPence);
+  if (!Number.isInteger(amount) || amount <= 0) {
+    return { ok: false, error: "Enter the amount to take off the voucher." };
+  }
   if (amount > v.balancePence) {
     return { ok: false, error: `That's more than the voucher holds — ${formatPence(v.balancePence)} remaining.` };
   }
 
   const remaining = v.balancePence - amount;
+
+  /* Compare-and-set, not just the check above.
+   *
+   * The check above reads the row and compares; this write then names the
+   * balance it expects to be replacing. Between those two statements another
+   * till can spend from the same voucher — the window is small and behind a
+   * bar on a Saturday it is not theoretical — and without the WHERE clause the
+   * second write would happily overwrite the first, giving away the amount
+   * twice. `cancelVoucher` already does exactly this; redemption, which is the
+   * one that actually moves money, did not. */
   db.update(vouchers).set({
     balancePence: remaining,
     status: remaining === 0 ? "redeemed" : "active",
-  }).where(eq(vouchers.id, v.id)).run();
+  }).where(and(eq(vouchers.id, v.id), eq(vouchers.balancePence, v.balancePence))).run();
+
+  const after = voucherById(v.id);
+  if (!after || after.balancePence !== remaining) {
+    return {
+      ok: false,
+      error: "Someone else was redeeming this voucher at the same moment. Nothing has been taken off — "
+        + "please reload it and check the balance.",
+    };
+  }
 
   db.insert(voucherRedemptions).values({
     voucherId: v.id,

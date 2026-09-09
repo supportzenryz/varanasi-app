@@ -2,6 +2,7 @@
 import { revalidatePath } from "next/cache";
 import { and, eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
+import { BCRYPT_COST } from "@/lib/password-rules.mjs";
 import { db } from "@/db";
 import { branches, users } from "@/db/schema";
 import { record } from "@/lib/audit";
@@ -73,7 +74,7 @@ export async function addStaff(formData: FormData) {
   // login — the gate that `requireAbility` enforces, so it can't be skipped.
   const created = db.insert(users).values({
     email: email.value, name: name.value, role, branchId,
-    passwordHash: bcrypt.hashSync(STARTING_PASSWORD, 10),
+    passwordHash: bcrypt.hashSync(STARTING_PASSWORD, BCRYPT_COST),
     isActive: true,
     mustChangePassword: true,
   }).returning({ id: users.id }).get();
@@ -145,7 +146,7 @@ export async function resetStaffPassword(formData: FormData) {
   if (!row) problem(BACK, "That account no longer exists.");
 
   db.update(users).set({
-    passwordHash: bcrypt.hashSync(STARTING_PASSWORD, 10),
+    passwordHash: bcrypt.hashSync(STARTING_PASSWORD, BCRYPT_COST),
     mustChangePassword: true,
   }).where(eq(users.id, id)).run();
 

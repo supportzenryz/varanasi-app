@@ -9,7 +9,43 @@ import { db } from "@/db";
 import { users, branches } from "@/db/schema";
 
 const COOKIE = "varanasi_session";
-const secret = new TextEncoder().encode(process.env.SESSION_SECRET ?? "dev-only-insecure-secret-change-me");
+
+/**
+ * The key every session cookie is signed with.
+ *
+ * This read `process.env.SESSION_SECRET ?? "dev-only-insecure-secret-change-me"`
+ * with no assertion anywhere, so forgetting the variable in production was not
+ * an error — it was a deployment signing its admin sessions with a string
+ * published in this repository. Anyone who read the source could mint a cookie
+ * claiming to be the owner. That it did not work is luck rather than design:
+ * `getSession` also compares a fingerprint of the account's password hash, and
+ * a forger would have had to guess that too. A defence nobody intended is a
+ * defence nobody will remember to keep.
+ *
+ * So: in production, no secret means the process does not start. A site that
+ * refuses to boot gets fixed in five minutes. A site with a public signing key
+ * looks perfectly healthy until somebody notices.
+ */
+function sessionSecret(): Uint8Array {
+  const configured = process.env.SESSION_SECRET;
+  if (!configured || configured.length < 32) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error(
+        "SESSION_SECRET is missing or too short (32 characters minimum). Admin sessions cannot be "
+        + "signed safely without it, so this server is refusing to start rather than signing them "
+        + "with a value anyone can read. Generate one with `openssl rand -hex 32` and set it in the "
+        + "hosting environment.",
+      );
+    }
+    if (!configured) {
+      console.warn("[auth] SESSION_SECRET is not set — using a development-only key. "
+        + "Production will refuse to start without a real one.");
+    }
+  }
+  return new TextEncoder().encode(configured ?? "dev-only-insecure-secret-change-me");
+}
+
+const secret = sessionSecret();
 
 export type Role = "owner" | "manager" | "staff";
 export type Session = {
@@ -156,7 +192,12 @@ export async function getSession(): Promise<Session | null> {
 
   let claim: Session & { fp?: string };
   try {
-    const { payload } = await jwtVerify(token, secret);
+    /* Name the algorithm. Without `algorithms`, verification accepts whatever
+       the token's own header asks for — jose is careful enough to refuse
+       `none` and to refuse an asymmetric algorithm against a symmetric key, so
+       this was never exploitable here, but relying on a library's good sense
+       for something a single option states outright is a poor trade. */
+    const { payload } = await jwtVerify(token, secret, { algorithms: ["HS256"] });
     claim = payload as unknown as Session & { fp?: string };
   } catch {
     return null;

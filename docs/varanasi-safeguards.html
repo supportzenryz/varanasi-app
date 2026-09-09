@@ -1,0 +1,642 @@
+<title>Varanasi Safeguards</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,400&family=Manrope:wght@400;500;700&family=Tenor+Sans&display=swap">
+<style>
+  /* Varanasi's own tokens — the palette and the three faces are the ones the
+     website and the printed menus already use, so this document reads as part
+     of the same restaurant rather than as a consultant's template. */
+  :root {
+    --gold: #B69112;
+    --gold-bright: #E9BA20;
+    --gold-ink: #7A5C04;
+    --ink: #0F0F0F;
+    --ink-soft: #4A4C42;
+    --page: #F5F9E9;
+    --surface: #FFFFFF;
+    --pale-2: #ECF4D5;
+    --line: #D7DFBF;
+    --leaf: #2F6B34;
+    --brick: #882D25;
+
+    --text: var(--ink);
+    --muted: var(--ink-soft);
+    --ground: var(--page);
+    --card: var(--surface);
+    --rule: var(--line);
+    --accent: var(--gold-ink);
+    --accent-line: rgba(182, 145, 18, 0.35);
+    --good: var(--leaf);
+    --watch: var(--brick);
+
+    --display: "Fraunces", Georgia, "Times New Roman", serif;
+    --body: "Manrope", ui-sans-serif, system-ui, -apple-system, sans-serif;
+    --label: "Tenor Sans", Optima, Georgia, serif;
+  }
+
+  /* The un-stamped default: only prefers-color-scheme separates the two, and an
+     explicit light choice has to beat a dark operating system. */
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --text: #F5F9E9;
+      --muted: rgba(245, 249, 233, 0.62);
+      --ground: var(--ink);
+      --card: #1A1A18;
+      --rule: rgba(233, 186, 32, 0.20);
+      --accent: var(--gold-bright);
+      --accent-line: rgba(233, 186, 32, 0.30);
+      --good: #6FBF74;
+      --watch: #E08472;
+    }
+  }
+  :root[data-theme="dark"] {
+    --text: #F5F9E9;
+    --muted: rgba(245, 249, 233, 0.62);
+    --ground: var(--ink);
+    --card: #1A1A18;
+    --rule: rgba(233, 186, 32, 0.20);
+    --accent: var(--gold-bright);
+    --accent-line: rgba(233, 186, 32, 0.30);
+    --good: #6FBF74;
+    --watch: #E08472;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--text);
+    font-family: var(--body);
+    font-size: 17px;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .sheet {
+    max-width: 46rem;
+    margin: 0 auto;
+    padding: 3.5rem 1.5rem 5rem;
+  }
+
+  /* ---- masthead ---- */
+  header.masthead {
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+    padding-bottom: 2rem;
+    border-bottom: 1px solid var(--accent-line);
+  }
+  .eyebrow {
+    font-family: var(--label);
+    font-size: 0.72rem;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0;
+  }
+  h1 {
+    font-family: var(--display);
+    font-weight: 600;
+    font-size: clamp(2.1rem, 6vw, 3.1rem);
+    line-height: 1.08;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+    margin: 0;
+  }
+  .standfirst {
+    font-size: 1.08rem;
+    color: var(--muted);
+    max-width: 34rem;
+    margin: 0;
+  }
+  .byline {
+    font-family: var(--label);
+    font-size: 0.78rem;
+    color: var(--muted);
+    margin: 0;
+  }
+
+  /* ---- questions ---- */
+  section.q {
+    padding: 2.4rem 0;
+    border-bottom: 1px solid var(--rule);
+  }
+  section.q:last-of-type { border-bottom: none; }
+  h2 {
+    font-family: var(--display);
+    font-weight: 600;
+    font-size: 1.42rem;
+    line-height: 1.25;
+    letter-spacing: -0.005em;
+    text-wrap: balance;
+    margin: 0 0 0.9rem;
+  }
+  h3 {
+    font-family: var(--label);
+    font-size: 0.82rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 1.8rem 0 0.6rem;
+  }
+  p { margin: 0 0 1rem; }
+  p:last-child { margin-bottom: 0; }
+  strong { font-weight: 700; }
+  em { font-style: italic; }
+
+  ul.plain {
+    margin: 0 0 1rem;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+  }
+  ul.plain li {
+    padding-left: 1.4rem;
+    position: relative;
+  }
+  ul.plain li::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0.62em;
+    width: 0.5rem;
+    height: 1px;
+    background: var(--accent);
+  }
+
+  /* ---- the one table that is genuinely tabular ---- */
+  .scroller { overflow-x: auto; margin: 0 0 1rem; }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    min-width: 32rem;
+    font-size: 0.94rem;
+  }
+  caption {
+    text-align: left;
+    font-family: var(--label);
+    font-size: 0.78rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding-bottom: 0.7rem;
+  }
+  th, td {
+    text-align: left;
+    padding: 0.7rem 0.9rem 0.7rem 0;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: top;
+  }
+  thead th {
+    font-family: var(--label);
+    font-weight: 400;
+    font-size: 0.78rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    border-bottom-color: var(--accent-line);
+  }
+  tbody th {
+    font-weight: 700;
+    white-space: nowrap;
+    padding-right: 1.4rem;
+  }
+  .yes { color: var(--good); font-weight: 700; }
+  .no  { color: var(--muted); }
+
+  /* ---- the two panels that earn a fill ---- */
+  .panel {
+    background: var(--card);
+    border-left: 2px solid var(--accent);
+    padding: 1.3rem 1.4rem;
+    margin: 0 0 1rem;
+  }
+  .panel.watch { border-left-color: var(--watch); }
+  .panel p:last-child { margin-bottom: 0; }
+  .panel h3 { margin-top: 0; }
+
+  ol.todo {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    counter-reset: todo;
+    display: flex;
+    flex-direction: column;
+    gap: 1.1rem;
+  }
+  ol.todo li {
+    counter-increment: todo;
+    display: grid;
+    grid-template-columns: 1.9rem 1fr;
+    gap: 0.4rem 0.8rem;
+  }
+  ol.todo li::before {
+    content: counter(todo);
+    font-family: var(--display);
+    font-size: 1.1rem;
+    color: var(--accent);
+    line-height: 1.5;
+  }
+  ol.todo .what { font-weight: 700; }
+  ol.todo .why { color: var(--muted); font-size: 0.94rem; }
+
+  code {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.86em;
+    background: var(--card);
+    border: 1px solid var(--rule);
+    padding: 0.08em 0.34em;
+  }
+
+  footer.colophon {
+    margin-top: 3rem;
+    padding-top: 1.6rem;
+    border-top: 1px solid var(--accent-line);
+    font-size: 0.88rem;
+    color: var(--muted);
+  }
+
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  a:focus-visible, :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  @media print {
+    body { background: #fff; color: #000; font-size: 11pt; }
+    .sheet { padding: 0; max-width: none; }
+    section.q { page-break-inside: avoid; }
+  }
+</style>
+
+<div class="sheet">
+  <header class="masthead">
+    <p class="eyebrow">Varanasi &middot; Birmingham &amp; Leicester</p>
+    <h1>What protects your guests and your money</h1>
+    <p class="standfirst">
+      A plain-English account of how the reservations, gift vouchers and back office on
+      varanasi.uk keep guests&rsquo; details private and the restaurant&rsquo;s money where it
+      belongs &mdash; and the handful of things only you can do.
+    </p>
+    <p class="byline">Prepared by Zenryz &middot; September 2026</p>
+  </header>
+
+  <section class="q">
+    <h2>Does the website ever see a guest&rsquo;s card?</h2>
+    <p>
+      No &mdash; and this is the single most important sentence in this document. When a guest
+      pays a deposit or buys a gift voucher, they are handed over to <strong>Stripe</strong>, who
+      host the payment page on their own systems. The card number, the expiry date and the
+      security code are typed into Stripe&rsquo;s page, not ours. They never reach this website,
+      they are never written to its database, and they are never in a backup.
+    </p>
+    <p>
+      That matters because it changes what a break-in could cost you. If somebody got into this
+      website tomorrow, there would be no card numbers to find &mdash; because there have never
+      been any. Stripe is certified to the payment industry&rsquo;s highest level (PCI DSS Level
+      1) and is used by millions of businesses for exactly this reason.
+    </p>
+    <p>
+      What the site keeps is a reference from Stripe saying &ldquo;this booking was paid
+      for&rdquo;. That reference is useless to anyone else: it cannot be used to charge a card
+      again, anywhere.
+    </p>
+  </section>
+
+  <section class="q">
+    <h2>How do you know a deposit was really paid?</h2>
+    <p>
+      Because Stripe says so, in a message the site can prove came from Stripe. Every payment
+      confirmation carries a cryptographic signature, and one that does not match is refused. A
+      forged &ldquo;this was paid&rdquo; message cannot confirm a table.
+    </p>
+    <p>
+      The amount is also worked out here, on the restaurant&rsquo;s side, from the deposit rules
+      you set in Settings &mdash; never taken from the guest&rsquo;s browser, where it could be
+      edited. A guest cannot change what they owe by fiddling with the page.
+    </p>
+    <h3>Refunds</h3>
+    <p>
+      A refund can only be issued by an owner or a manager, is checked against Stripe&rsquo;s own
+      record of what has already been refunded, and is recorded in the activity log with who did
+      it. Pressing the button twice does not send the money twice; neither does a browser
+      resending the request.
+    </p>
+  </section>
+
+  <section class="q">
+    <h2>Can a gift voucher be spent twice?</h2>
+    <p>
+      No. Every voucher has its own balance and its own ledger: each redemption records the
+      amount, the balance afterwards, which restaurant took it and which member of staff. A
+      &pound;100 voucher against a &pound;64 bill leaves &pound;36 on it, and the guest can come
+      back for the rest.
+    </p>
+    <p>
+      Two things stop the same voucher being drawn down twice. The till has to send back the
+      balance it was showing, and if the voucher has changed in the meantime the redemption is
+      refused rather than applied &mdash; so a double-tap behind the bar, a browser
+      &ldquo;resend&rdquo;, or two members of staff redeeming at the same moment can only ever
+      take the amount once. And the balance is written with a condition attached, so even in the
+      fraction of a second between reading and writing, only the first of two attempts lands.
+    </p>
+    <h3>The codes themselves</h3>
+    <p>
+      A voucher code is twelve characters from a thirty-two letter alphabet, chosen by the same
+      kind of random generator used for encryption keys. There are more possible codes than
+      there are grains of sand on Earth, so guessing one is not a thing that happens. The
+      easily-confused characters &mdash; I, O, 0, 1 &mdash; are left out, so a code can be read
+      out over the telephone without ambiguity.
+    </p>
+    <p>
+      Each voucher now also has its own page, which the guest can print or show on a phone. It
+      carries a scannable code that opens the till screen with the voucher already looked up, so
+      a member of staff can scan it or type it &mdash; whichever suits the moment.
+    </p>
+  </section>
+
+  <section class="q">
+    <h2>Who can see what?</h2>
+    <p>
+      Every person who works on the site has their own account, and each account has a role.
+      Managers and staff see their own restaurant only: a Leicester manager cannot open
+      Birmingham&rsquo;s bookings, menus, rooms or vouchers, and cannot spend Birmingham&rsquo;s
+      voucher balances. This is enforced on the server, not merely hidden on screen &mdash; the
+      difference matters, because hiding a button is not the same as refusing the action.
+    </p>
+    <div class="scroller">
+      <table>
+        <caption>What each role may do</caption>
+        <thead>
+          <tr>
+            <th scope="col">&nbsp;</th>
+            <th scope="col">Staff</th>
+            <th scope="col">Manager</th>
+            <th scope="col">Owner</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row">See today&rsquo;s bookings</th>
+            <td class="yes">Yes</td><td class="yes">Yes</td><td class="yes">Yes</td>
+          </tr>
+          <tr>
+            <th scope="row">Look up and redeem a voucher</th>
+            <td class="yes">Yes</td><td class="yes">Yes</td><td class="yes">Yes</td>
+          </tr>
+          <tr>
+            <th scope="row">Change menus, rooms and opening dates</th>
+            <td class="no">No</td><td class="yes">Yes</td><td class="yes">Yes</td>
+          </tr>
+          <tr>
+            <th scope="row">Refund a deposit</th>
+            <td class="no">No</td><td class="yes">Yes</td><td class="yes">Yes</td>
+          </tr>
+          <tr>
+            <th scope="row">Export the enquiry list as a file</th>
+            <td class="no">No</td><td class="yes">Yes</td><td class="yes">Yes</td>
+          </tr>
+          <tr>
+            <th scope="row">Cancel a voucher (write off a balance)</th>
+            <td class="no">No</td><td class="no">No</td><td class="yes">Yes</td>
+          </tr>
+          <tr>
+            <th scope="row">Add or remove staff accounts</th>
+            <td class="no">No</td><td class="no">No</td><td class="yes">Yes</td>
+          </tr>
+          <tr>
+            <th scope="row">Change deposit and payment settings</th>
+            <td class="no">No</td><td class="no">No</td><td class="yes">Yes</td>
+          </tr>
+          <tr>
+            <th scope="row">Download a backup of everything</th>
+            <td class="no">No</td><td class="no">No</td><td class="yes">Yes</td>
+          </tr>
+          <tr>
+            <th scope="row">Erase a person&rsquo;s data on request</th>
+            <td class="no">No</td><td class="no">No</td><td class="yes">Yes</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>
+      Reading one guest&rsquo;s enquiry on screen and walking out with the whole customer list as
+      a file are different risks, so they are different permissions &mdash; and every export is
+      written to the activity log and emailed to you as it happens.
+    </p>
+  </section>
+
+  <section class="q">
+    <h2>How hard is it to get into the back office?</h2>
+    <p>
+      A password is never stored. What is stored is a one-way scramble of it (bcrypt), which
+      cannot be turned back into the password even by us &mdash; so a stolen copy of the database
+      does not hand anybody a way in.
+    </p>
+    <ul class="plain">
+      <li>
+        <strong>Twelve characters minimum</strong>, with upper and lower case and a number. The
+        starting password every new account is given is refused as a new one, so nobody can stay
+        on it. Three or four unrelated words are the easiest thing to remember and the hardest to
+        guess.
+      </li>
+      <li>
+        <strong>Five wrong passwords locks that account for fifteen minutes</strong>, and you are
+        emailed when it happens. There is a second, wider limit per internet address, so somebody
+        working through a list of staff addresses is stopped as well.
+      </li>
+      <li>
+        <strong>Signing in lasts a week</strong>, then asks again. Changing a password signs that
+        account out everywhere immediately &mdash; which is the point of changing it, if somebody
+        else had it.
+      </li>
+      <li>
+        <strong>Suspending an account takes effect on the next click</strong>, not whenever their
+        session happens to run out.
+      </li>
+    </ul>
+    <h3>Forgotten passwords</h3>
+    <p>
+      A member of staff can email themselves a link that lets them set a new one. The link works
+      <em>once</em>, expires after thirty minutes, and asking for a new one cancels the previous
+      link &mdash; so an old email left in a shared inbox is worthless. Only a scrambled copy of
+      the link is stored, so a stolen backup contains nothing that opens an account. Every reset
+      is logged and you are emailed the moment one is used, because a password reset nobody asked
+      for is how an account takeover starts.
+    </p>
+    <p>
+      An owner can also reset any account directly, and there is a command-line tool as the last
+      resort &mdash; for the case where nobody knows the owner password and email is not yet
+      working. That was a real gap: resetting a password requires being signed in, so
+      &ldquo;ask an owner&rdquo; is no help when you <em>are</em> the owner.
+    </p>
+  </section>
+
+  <section class="q">
+    <h2>What happens to a guest&rsquo;s details?</h2>
+    <p>
+      The site keeps what a restaurant needs to seat someone: name, telephone number, email
+      address, party size, the occasion if they mention one, and any allergies or dietary needs.
+      Nothing is sold, shared or sent anywhere else. Marketing consent is a separate tick that is
+      never pre-ticked and never carried over from a previous form.
+    </p>
+    <p>
+      Allergy notes are treated as the most sensitive thing on the site, because under UK data
+      protection law health information is a special category. They are shown to the kitchen and
+      the people seating the table, and they are not in any page a guest could reach by guessing
+      a booking reference &mdash; a booking&rsquo;s details are shown only to somebody holding the
+      private link we emailed them.
+    </p>
+    <h3>If somebody asks to be erased</h3>
+    <p>
+      An owner can answer a request under Article 17 from the admin. It rewrites that
+      person&rsquo;s records across the whole business, cannot be undone, and records that it
+      happened without keeping the name or address it erased &mdash; only a fingerprint, enough to
+      prove the request was answered and useless for anything else.
+    </p>
+  </section>
+
+  <section class="q">
+    <h2>If something goes wrong, will you know who did it?</h2>
+    <p>
+      Yes. Every action that changes money, permissions or personal data is written to an activity
+      log with the person, the time and what changed. You can read it in the admin under
+      <em>Activity</em>.
+    </p>
+    <p>
+      Some things do not wait for you to look. A refund, a cancelled voucher, a voucher issued by
+      hand, a change to payment settings, a staff account added or removed, a data export, an
+      erasure, an account locked out by repeated wrong passwords, a password reset used &mdash;
+      each of those emails you as it happens. Everything quieter arrives in one daily summary, so
+      the interesting things are not buried in the ordinary ones.
+    </p>
+  </section>
+
+  <section class="q">
+    <h2>What if the site or the data is lost?</h2>
+    <p>
+      A full copy of everything the restaurant has recorded &mdash; bookings, deposits, gift
+      vouchers and their balances, enquiries, menus &mdash; is taken automatically every day and
+      the last thirty are kept. Each one is opened and checked after it is made, because a backup
+      nobody has ever opened is a hope rather than a backup. You can take one on demand and
+      download it, and doing so is logged.
+    </p>
+    <p>
+      The site itself is hosted on Railway, served only over an encrypted connection, and the
+      database lives on storage that survives a redeployment.
+    </p>
+  </section>
+
+  <section class="q">
+    <h2>What stops a bored teenager with a script?</h2>
+    <p>
+      Every public form &mdash; enquiries, bookings, voucher purchases &mdash; is limited by how
+      many times it can be used in an hour, counted three different ways so that changing one
+      detail does not get round it. Without that, a loop in a browser could fill the enquiry list
+      with thousands of fakes, burn through the restaurant&rsquo;s email allowance, and hold a
+      Saturday night&rsquo;s tables hostage with bookings nobody pays for.
+    </p>
+    <p>
+      The site also tells browsers not to allow it to be framed inside another site, not to guess
+      at file types, and to load scripts only from itself &mdash; so a script that somehow got
+      onto a page would have nowhere to send anything it read.
+    </p>
+  </section>
+
+  <section class="q">
+    <h2>What this does <em>not</em> do</h2>
+    <p>
+      Being straight about the edges is part of the point of a document like this.
+    </p>
+    <ul class="plain">
+      <li>
+        <strong>It cannot stop someone you have given access from misusing it.</strong> What it
+        does is make it visible: every action carries a name and a time, and the ones that matter
+        email you as they happen. Give people the smallest role that lets them do their job, and
+        never share an account.
+      </li>
+      <li>
+        <strong>There is no second factor on sign-in today.</strong> An authenticator app for
+        owners and managers is the obvious next step and can be added; it is a decision about how
+        much friction is right on a shared iPad at the pass, not a technical obstacle.
+      </li>
+      <li>
+        <strong>Email delivery depends on the email provider.</strong> The site now checks with
+        the provider which sending domains it will accept and says so on screen, because the one
+        failure that has actually cost this project days was every confirmation being silently
+        refused while the screen said all was well.
+      </li>
+      <li>
+        <strong>No system is unbreakable.</strong> The aim is that a bad day is recoverable and
+        visible: nothing worth stealing in the database, a full backup every night, and a log that
+        says what happened.
+      </li>
+    </ul>
+  </section>
+
+  <section class="q">
+    <h2>The five things only you can do</h2>
+    <p>
+      Everything above is built and running. These are the ones that need a person with the
+      passwords, and the first three matter before the site takes a real booking.
+    </p>
+    <ol class="todo">
+      <li>
+        <span class="what">Change the owner password.</span>
+        <span class="why">
+          New installations start on a shared password that is written down in the project notes.
+          Sign in, change it, and let the site email each member of staff their own link rather
+          than telling them a password over the phone.
+        </span>
+      </li>
+      <li>
+        <span class="what">Finish the sending domain.</span>
+        <span class="why">
+          Confirmations, gift vouchers and staff alerts all go out by email. The provider will
+          only send from a domain you have verified with them, and the sending address in
+          Settings has to be on that domain &mdash; the admin now tells you which domains it will
+          accept.
+        </span>
+      </li>
+      <li>
+        <span class="what">Switch Stripe from test to live.</span>
+        <span class="why">
+          Both keys together, and a payment webhook for the live domain. Until then no real money
+          moves. The site refuses to pretend: with no payment provider configured it tells guests
+          to ring the restaurant rather than confirming a table nobody has paid for.
+        </span>
+      </li>
+      <li>
+        <span class="what">Keep the two secrets secret.</span>
+        <span class="why">
+          The Stripe webhook signing secret and the session signing key live in the hosting
+          settings and nowhere else &mdash; not in an email, not in a screenshot, not in a chat
+          window. If one is ever pasted somewhere it should not be, roll it; it takes a minute.
+        </span>
+      </li>
+      <li>
+        <span class="what">Give people the smallest role that works.</span>
+        <span class="why">
+          Front-of-house needs <em>staff</em>. A head of service needs <em>manager</em>. Almost
+          nobody needs <em>owner</em>. Suspend accounts the day somebody leaves &mdash; it takes
+          effect immediately.
+        </span>
+      </li>
+    </ol>
+  </section>
+
+  <div class="panel watch">
+    <h3>One sentence to remember</h3>
+    <p>
+      There are no card numbers in this system, there never have been, and the worst day it could
+      have is one you can see in the log and undo from last night&rsquo;s backup.
+    </p>
+  </div>
+
+  <footer class="colophon">
+    <p>
+      Written for Varanasi Restaurant, Birmingham and Leicester. It describes the site as built in
+      September 2026; if the way payments, roles or backups work is changed, this should be
+      changed with it. Questions about anything in here are welcome &mdash; there is nothing in
+      the way this site is put together that cannot be explained in plain English.
+    </p>
+  </footer>
+</div>

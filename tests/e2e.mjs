@@ -1,5 +1,6 @@
 import { chromium } from 'playwright';
-import { execFileSync } from 'node:child_process';
+import { DatabaseSync } from 'node:sqlite';
+import bcrypt from 'bcryptjs';
 import fs from 'node:fs';
 
 /* Point this at a deployment to smoke-test it:
@@ -14,40 +15,118 @@ const t = (name, ok, detail = '') => {
   console.log(`${ok ? '  PASS' : '  FAIL'}  ${name}${detail ? ` — ${detail}` : ''}`);
 };
 
-/** Read straight from SQLite, so we are checking the database and not the page
- *  that just rendered it. */
-const q = (sql) =>
-  JSON.parse(execFileSync('python3', ['-c', `
-import sqlite3, json
-db = sqlite3.connect('data/varanasi.db')
-db.row_factory = sqlite3.Row
-print(json.dumps([dict(r) for r in db.execute(${JSON.stringify(sql)})]))
-`]).toString());
+/* The database, read and written directly.
+ *
+ * Every query and every fixture in this suite used to shell out to `python3`,
+ * which is fine on the machine I run it on and useless on the machine this
+ * project is developed on: Git Bash on Windows has no python, so the whole
+ * suite stopped at the first query with "Python was not found". Node ships
+ * SQLite in core and bcryptjs is already a dependency, so there was nothing
+ * python was needed for.
+ *
+ * Opened read-write, deliberately. A read-only connection cannot recover a
+ * write-ahead log, so against a server that is mid-write it can report rows
+ * that are not there — which is exactly the wrong answer for a suite whose job
+ * is to check what the database actually holds. Nothing here writes unless it
+ * says so. */
+const DB = 'data/varanasi.db';
+
+/** Rows, as plain objects keyed by the column names the SQL asked for. */
+const q = (sql, ...params) => {
+  const db = new DatabaseSync(DB);
+  try { return db.prepare(sql).all(...params); } finally { db.close(); }
+};
+
+/**
+ * The same read, retried until it returns something.
+ *
+ * Needed the moment these queries stopped being a `python3` subprocess. That
+ * subprocess took a couple of hundred milliseconds to start, which quietly
+ * covered the gap between the browser being redirected and the server
+ * finishing its write — so a read that looked immediate never was. Reading
+ * directly is fast enough to lose that race, and the failure looks exactly
+ * like a booking that was never created.
+ *
+ * A poll rather than a sleep: it returns as soon as the row is there, so the
+ * suite is faster than it was and no longer depends on how slow python is. */
+const qUntil = async (sql, ...params) => {
+  const deadline = Date.now() + 8000;
+  for (;;) {
+    const rows = q(sql, ...params);
+    if (rows.length || Date.now() > deadline) return rows;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+};
+
+/** One statement, with parameters. */
+const run = (sql, ...params) => {
+  const db = new DatabaseSync(DB);
+  try { return db.prepare(sql).run(...params); } finally { db.close(); }
+};
+
+/** Several statements over one connection, for the fixtures. */
+const withDb = (fn) => {
+  const db = new DatabaseSync(DB);
+  try { return fn(db); } finally { db.close(); }
+};
+
+/** The same read against some other database file — used on a backup. */
+const qAt = (file, sql) => {
+  const db = new DatabaseSync(file, { readOnly: true });
+  try { return db.prepare(sql).all(); } finally { db.close(); }
+};
+
+const hash = (pw) => bcrypt.hashSync(pw, 10);
+const nowSec = () => Math.floor(Date.now() / 1000);
+const branchId = (slug) => q('select id from branches where slug = ?', slug)[0].id;
 
 const stamp = Date.now();
 
-/* The sign-in throttle lives in the server's memory, and this suite spends a
-   whole run's worth of failed attempts from one address on purpose (section
-   6c). Three runs inside the fifteen-minute window used to trip the per-address
-   cap and fail "Owner can sign in" — the guard working, and the suite unable to
-   tell that apart from a broken login. Restart the server between runs, or set
-   LOGIN_MAX_PER_IP higher for the run. */
+/**
+ * Forget every rate-limit counter.
+ *
+ * The public forms and the sign-in form are throttled, and the counters now
+ * live in the database rather than in the server's memory — so, unlike before,
+ * they survive a restart. That is the point of them, and it means this suite
+ * has to clear them itself: one run posts far more enquiries, bookings and
+ * failed sign-ins from a single address than any real guest ever would, so by
+ * section 4 the form was answering "that's a lot of messages in a short time"
+ * and twenty-nine checks failed. The guard was working; the suite was the
+ * attacker.
+ *
+ * Called at the start, and again before each section that submits a form, so
+ * a limit tripped by section 3 cannot be mistaken for a bug in section 5.
+ */
+const forgetLimits = () => run('delete from rate_limits');
+forgetLimits();
 
 // Reset the owner to the seeded credentials so the run does not depend on
 // whether a previous run already changed the password.
-execFileSync('python3', ['-c', `
-import sqlite3, bcrypt
-db = sqlite3.connect('data/varanasi.db')
-db.execute('update users set password_hash=?, must_change_password=1 where email=?',
-           (bcrypt.hashpw(b'ChangeMe!2026', bcrypt.gensalt(10)).decode(), 'owner@varanasi.uk'))
-db.commit()
-`]);
+run('update users set password_hash = ?, must_change_password = 1 where email = ?',
+    hash('ChangeMe!2026'), 'owner@varanasi.uk');
 
 /* The browser Playwright would pick is not always the one installed here — a
    container may ship a build that does not match the npm package's expected
    revision, and the failure is a wall of "Executable doesn't exist". Naming it
    through the environment lets a machine say where its browser is; with nothing
    set, Playwright resolves it as usual. */
+/* Section 3d walks a booking that is actually paid for, and 6g refunds it.
+   Neither can use real Stripe, so both need the built-in simulator — which a
+   production build (`next start`) now refuses to use unless it is asked for
+   explicitly. Say so here rather than reporting fifteen failures that all mean
+   "the server was started without the flag". */
+if (!process.env.STRIPE_SECRET_KEY) {
+  const probe = await fetch(`${BASE}/checkout-simulator?ref=VB-PROBE&amount=1&success=/&cancel=/`)
+    .then((r) => r.status).catch(() => 0);
+  if (probe === 404) {
+    console.error(`\n  The payment simulator is switched off on ${BASE}, so the paid-booking and`);
+    console.error('  refund journeys cannot run. Start the server with:\n');
+    console.error('    PAYMENTS_SIMULATOR=i-understand-no-money-will-be-taken npm start\n');
+    console.error('  or give it a real STRIPE_SECRET_KEY.\n');
+    process.exit(1);
+  }
+}
+
 const browser = await chromium.launch(
   process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {},
 );
@@ -239,6 +318,7 @@ console.log('\n── 1b. The home page opens on one line, and shows the page be
   await phone.close();
 }
 
+forgetLimits();
 console.log('\n── 2. Front-end form writes to the database ──');
 
 const testEmail = `e2e.${stamp}@zenryz-test.com`;
@@ -280,15 +360,12 @@ console.log('\n── 2b. The date picker knows what the restaurant is doing ─
      then found out. If a manager blocks a date for a wedding, every guest who
      wants that date discovers it one at a time, after committing to it. */
   const blocked = new Date(Date.now() + 20 * 864e5).toISOString().slice(0, 10);
-  execFileSync('python3', ['-c', `
-import sqlite3
-db = sqlite3.connect('data/varanasi.db')
-b = db.execute("select id from branches where slug='birmingham'").fetchone()[0]
-db.execute("delete from blocked_dates where reason like 'E2E %'")
-db.execute("insert into blocked_dates (branch_id,date,all_day,reason) values (?,?,1,?)",
-           (b, '${blocked}', 'E2E Wedding'))
-db.commit()
-`]);
+  withDb((db) => {
+    const b = db.prepare("select id from branches where slug = 'birmingham'").get().id;
+    db.prepare("delete from blocked_dates where reason like 'E2E %'").run();
+    db.prepare('insert into blocked_dates (branch_id, date, all_day, reason) values (?, ?, 1, ?)')
+      .run(b, blocked, 'E2E Wedding');
+  });
 
   const book = `${BASE}/birmingham/book-online`;
   await page.goto(`${book}?guests=2`, { waitUntil: 'networkidle' });
@@ -326,14 +403,10 @@ db.commit()
   t('An available date shows no warning at all',
     await page.locator('[role="status"]').count() === 0);
 
-  execFileSync('python3', ['-c', `
-import sqlite3
-db = sqlite3.connect('data/varanasi.db')
-db.execute("delete from blocked_dates where reason like 'E2E %'")
-db.commit()
-`]);
+  run("delete from blocked_dates where reason like 'E2E %'");
 }
 
+forgetLimits();
 console.log('\n── 3. Consent is enforced by the server, not just the browser ──');
 
 await page.goto(`${BASE}/birmingham/contact`, { waitUntil: 'networkidle' });
@@ -348,6 +421,7 @@ await page.waitForURL(/\?(sent|error)=/, { timeout: 15000 }).catch(() => {});
 t('Enquiry without consent is refused server-side',
   q(`select id from enquiries where email = '${refusedEmail}'`).length === 0);
 
+forgetLimits();
 console.log('\n── 3b. Junk contact details are refused by the server ──');
 
 /* The browser's own validation is trivially bypassed, so each of these strips
@@ -404,6 +478,7 @@ t('gmial.com is refused, not silently accepted',
 t('  · and the guest is told what to fix',
   /did you mean/i.test(await page.locator('main').innerText()));
 
+forgetLimits();
 console.log('\n── 3e. A rejected booking keeps what the guest typed ──');
 
 {
@@ -488,6 +563,7 @@ console.log('\n── 3e. A rejected booking keeps what the guest typed ──')
   await p.close();
 }
 
+forgetLimits();
 console.log('\n── 3c. Both sides are emailed, on every outcome ──');
 
 /* The outbox is where mail lands when no provider key is set, so it is also
@@ -528,8 +604,11 @@ const bookOnce = async (email) => {
     await box.check();
   }
   await page.click('form button.btn-gold');
-  await page.waitForURL(/checkout-simulator|confirmed|book-online/, { timeout: 20000 }).catch(() => {});
-  const rows = q(`select reference, cancel_token from bookings where email = '${email}'`);
+  /* `book-online` was in this pattern, which the page is already on — so
+     `waitForURL` matched instantly and waited for nothing at all. Only the two
+     destinations a successful submit can reach belong here. */
+  await page.waitForURL(/checkout-simulator|\/confirmed/, { timeout: 20000 }).catch(() => {});
+  const rows = await qUntil('select reference, cancel_token from bookings where email = ?', email);
   return rows[0] ?? null;
 };
 
@@ -601,6 +680,7 @@ if (cxlBk) {
   }
 }
 
+forgetLimits();
 console.log('\n── 3d. A booking that is actually paid for ──');
 
 {
@@ -668,6 +748,7 @@ console.log('\n── 3d. A booking that is actually paid for ──');
     q(`select id from bookings where email='${payEmail}'`).length === 1);
 }
 
+forgetLimits();
 console.log('\n── 4. Admin: sign in ──');
 
 await page.goto(`${BASE}/admin/login`, { waitUntil: 'networkidle' });
@@ -697,6 +778,7 @@ if (page.url().includes('/admin/password')) {
 await page.goto(`${BASE}/admin`, { waitUntil: 'networkidle' });
 t('Admin sidebar shows the logo', await page.locator('aside img[alt="Varanasi"]').isVisible());
 
+forgetLimits();
 console.log('\n── 5. Admin enquiries: search, filters, export ──');
 
 await page.goto(`${BASE}/admin/enquiries?status=all`, { waitUntil: 'networkidle' });
@@ -808,6 +890,7 @@ if (await addTo.count() > 0) {
   t('It does NOT leak into the other branch', !leicester.includes(dishName));
 }
 
+forgetLimits();
 console.log('\n── 5b. What a guest sees when something goes wrong ──');
 
 {
@@ -894,6 +977,7 @@ console.log('\n── 5b. What a guest sees when something goes wrong ──');
   }
 }
 
+forgetLimits();
 console.log('\n── 6a. Money and authority ──');
 
 /* Each of these was a real hole found in audit, and each is the sort that
@@ -902,12 +986,8 @@ console.log('\n── 6a. Money and authority ──');
   // ---- a revoked account stops working immediately ----
   const ctx2 = await browser.newContext();
   const p2 = await ctx2.newPage();
-  execFileSync('python3', ['-c', `
-import sqlite3, bcrypt
-db = sqlite3.connect('data/varanasi.db')
-db.execute("update users set password_hash=?, must_change_password=0, is_active=1 where email='leicester@varanasi.uk'",
-           (bcrypt.hashpw(b'ChangeMe!2026', bcrypt.gensalt(10)).decode(),))
-db.commit()`]);
+  run("update users set password_hash = ?, must_change_password = 0, is_active = 1 "
+      + "where email = 'leicester@varanasi.uk'", hash('ChangeMe!2026'));
   await p2.goto(`${BASE}/admin/login`, { waitUntil: 'networkidle' });
   await p2.fill('input[name="email"]', 'leicester@varanasi.uk');
   await p2.fill('input[name="password"]', 'ChangeMe!2026');
@@ -917,32 +997,20 @@ db.commit()`]);
   t('A signed-in manager can reach the vouchers screen', p2.url().includes('/admin/vouchers'));
 
   // deactivate them while that session is still open
-  execFileSync('python3', ['-c', `
-import sqlite3
-db = sqlite3.connect('data/varanasi.db')
-db.execute("update users set is_active=0 where email='leicester@varanasi.uk'")
-db.commit()`]);
+  run("update users set is_active = 0 where email = 'leicester@varanasi.uk'");
   await p2.goto(`${BASE}/admin/vouchers`, { waitUntil: 'domcontentloaded' });
   t('Deactivating an account ends its session at once, not in 7 days',
     p2.url().includes('/admin/login'), new URL(p2.url()).pathname);
 
   // and a password change does the same, which is what makes "reset" a remedy
-  execFileSync('python3', ['-c', `
-import sqlite3, bcrypt
-db = sqlite3.connect('data/varanasi.db')
-db.execute("update users set is_active=1, password_hash=? where email='leicester@varanasi.uk'",
-           (bcrypt.hashpw(b'Something-Else!2026', bcrypt.gensalt(10)).decode(),))
-db.commit()`]);
+  run("update users set is_active = 1, password_hash = ? where email = 'leicester@varanasi.uk'",
+      hash('Something-Else!2026'));
   await p2.goto(`${BASE}/admin/vouchers`, { waitUntil: 'domcontentloaded' });
   t('Changing the password ends existing sessions too',
     p2.url().includes('/admin/login'), new URL(p2.url()).pathname);
   await ctx2.close();
-  execFileSync('python3', ['-c', `
-import sqlite3, bcrypt
-db = sqlite3.connect('data/varanasi.db')
-db.execute("update users set password_hash=?, must_change_password=1, is_active=1, role='manager' where email='leicester@varanasi.uk'",
-           (bcrypt.hashpw(b'ChangeMe!2026', bcrypt.gensalt(10)).decode(),))
-db.commit()`]);
+  run("update users set password_hash = ?, must_change_password = 1, is_active = 1, "
+      + "role = 'manager' where email = 'leicester@varanasi.uk'", hash('ChangeMe!2026'));
 
   // ---- a resubmitted enquiry is one enquiry ----
   const dupeEmail = `e2e.dupe.${stamp}@zenryz-test.com`;
@@ -961,16 +1029,15 @@ db.commit()`]);
 
   // ---- money is parsed, not guessed, and a redemption cannot be replayed ----
   await page.goto(`${BASE}/admin/vouchers`, { waitUntil: 'networkidle' });
-  execFileSync('python3', ['-c', `
-import sqlite3, time
-db = sqlite3.connect('data/varanasi.db')
-now = int(time.time())
-db.execute("delete from vouchers where code='VG-E2ET-ESTE-ST01'")
-db.execute('''insert into vouchers (code,value_pence,balance_pence,status,purchaser_name,purchaser_email,
-recipient_name,recipient_email,origin,issued_at,expires_at,created_at)
-values ('VG-E2ET-ESTE-ST01',5000,5000,'active','E2E Buyer','buyer@zenryz-test.com','E2E Recipient',
-'recip@zenryz-test.com','purchase',?,?,?)''', (now, now + 31536000, now))
-db.commit()`]);
+  withDb((db) => {
+    const now = nowSec();
+    db.prepare("delete from vouchers where code = 'VG-E2ET-ESTE-ST01'").run();
+    db.prepare(`insert into vouchers (code, value_pence, balance_pence, status, purchaser_name,
+      purchaser_email, recipient_name, recipient_email, origin, issued_at, expires_at, created_at)
+      values ('VG-E2ET-ESTE-ST01', 5000, 5000, 'active', 'E2E Buyer', 'buyer@zenryz-test.com',
+      'E2E Recipient', 'recip@zenryz-test.com', 'purchase', ?, ?, ?)`)
+      .run(now, now + 31536000, now);
+  });
   const v = q(`select code, balance_pence from vouchers where code='VG-E2ET-ESTE-ST01'`)[0];
   if (!v) {
     t('A live voucher exists to test redemption against', false, 'none found');
@@ -1015,13 +1082,11 @@ console.log('\n── 6b. Backups, and who may take the customer list ──');
       .sort((a, z) => z.m - a.m)[0].f;
 
     // It has to open and hold the data, or it is a file rather than a backup.
-    const rows = JSON.parse(execFileSync('python3', ['-c', `
-import sqlite3, json
-db = sqlite3.connect('${dir}/${newest}')
-print(json.dumps({
-  'tables': db.execute("select count(*) from sqlite_master where type='table'").fetchone()[0],
-  'items':  db.execute('select count(*) from menu_items').fetchone()[0],
-}))`]).toString());
+    const backup = `${dir}/${newest}`;
+    const rows = {
+      tables: qAt(backup, "select count(*) as n from sqlite_master where type = 'table'")[0].n,
+      items: qAt(backup, 'select count(*) as n from menu_items')[0].n,
+    };
     t('  · the newest backup opens and holds the schema', rows.tables >= 15, `${rows.tables} tables`);
     t('  · and the menu is in it', rows.items > 0, `${rows.items} items`);
 
@@ -1050,20 +1115,30 @@ console.log('\n── 6b. Branch isolation: a Leicester manager cannot see Birmi
    checks sign in as real accounts rather than asserting on the source. */
 
 const MGR_PW = 'MgrPass!2026x';
-execFileSync('python3', ['-c', `
-import sqlite3, bcrypt
-db = sqlite3.connect('data/varanasi.db')
-h = bcrypt.hashpw(b'${MGR_PW}', bcrypt.gensalt(10)).decode()
-b = db.execute("select id from branches where slug='birmingham'").fetchone()[0]
-l = db.execute("select id from branches where slug='leicester'").fetchone()[0]
-for email, name, branch in [('e2e.leic@zenryz-test.com','E2E Leicester Manager', l),
-                            ('e2e.brum@zenryz-test.com','E2E Birmingham Manager', b),
-                            ('e2e.nobranch@zenryz-test.com','E2E Unassigned Manager', None)]:
-    db.execute("delete from users where email=?", (email,))
-    db.execute("insert into users (email,name,role,branch_id,password_hash,is_active,must_change_password)"
-               " values (?,?,'manager',?,?,1,0)", (email, name, branch, h))
-db.commit()
-`]);
+withDb((db) => {
+  const h = hash(MGR_PW);
+  const b = db.prepare("select id from branches where slug = 'birmingham'").get().id;
+  const l = db.prepare("select id from branches where slug = 'leicester'").get().id;
+  /* The audit log references these accounts, and node's SQLite enforces
+     foreign keys where python's sqlite3 left them off by default — so deleting
+     a user that has ever done anything now fails with FOREIGN KEY constraint
+     failed. Dependents first. The app itself has always run with them on;
+     python was the odd one out, and it was hiding this. */
+  const dropAudit = db.prepare('delete from audit_log where user_id in '
+    + '(select id from users where email = ?)');
+  const drop = db.prepare('delete from users where email = ?');
+  const add = db.prepare('insert into users (email, name, role, branch_id, password_hash, '
+    + "is_active, must_change_password) values (?, ?, 'manager', ?, ?, 1, 0)");
+  for (const [email, name, branch] of [
+    ['e2e.leic@zenryz-test.com', 'E2E Leicester Manager', l],
+    ['e2e.brum@zenryz-test.com', 'E2E Birmingham Manager', b],
+    ['e2e.nobranch@zenryz-test.com', 'E2E Unassigned Manager', null],
+  ]) {
+    dropAudit.run(email);
+    drop.run(email);
+    add.run(email, name, branch, h);
+  }
+});
 
 /** A signed-in browser context for one account, isolated from the owner's. */
 const signInAs = async (email) => {
@@ -1083,16 +1158,16 @@ const signInAs = async (email) => {
    reason. These are planted with unique names instead. */
 const brumDish = `E2E Brum Only ${stamp}`;
 const leicDish = `E2E Leic Only ${stamp}`;
-execFileSync('python3', ['-c', `
-import sqlite3
-db = sqlite3.connect('data/varanasi.db')
-for slug, name in [('birmingham', '${brumDish}'), ('leicester', '${leicDish}')]:
-    cat = db.execute("select mc.id from menu_categories mc join branches b on b.id=mc.branch_id"
-                     " where b.slug=? and mc.kind='food' limit 1", (slug,)).fetchone()[0]
-    db.execute("insert into menu_items (category_id,name,price_pence,sort,is_published)"
-               " values (?,?,1234,999,1)", (cat, name))
-db.commit()
-`]);
+withDb((db) => {
+  const pickCategory = db.prepare('select mc.id from menu_categories mc '
+    + 'join branches b on b.id = mc.branch_id '
+    + "where b.slug = ? and mc.kind = 'food' limit 1");
+  const add = db.prepare('insert into menu_items (category_id, name, price_pence, sort, '
+    + 'is_published) values (?, ?, 1234, 999, 1)');
+  for (const [slug, name] of [['birmingham', brumDish], ['leicester', leicDish]]) {
+    add.run(pickCategory.get(slug).id, name);
+  }
+});
 
 const { c: leicCtx, p: leic } = await signInAs('e2e.leic@zenryz-test.com');
 t('A branch manager can sign in', !leic.url().includes('/admin/login'), leic.url());
@@ -1360,6 +1435,7 @@ console.log('\n── 6e. Admin forms answer back ──');
   }
 }
 
+forgetLimits();
 console.log('\n── 6f. A voucher is not minted for a table nobody paid for ──');
 
 {
@@ -1368,16 +1444,11 @@ console.log('\n── 6f. A voucher is not minted for a table nobody paid for �
      that was never paid used to mint a real gift voucher on that click, email
      the code to someone who never came, and put a live balance on the books. */
   const ref = `VB-E2E${String(stamp).slice(-6)}`;
-  execFileSync('python3', ['-c', `
-import sqlite3
-db = sqlite3.connect('data/varanasi.db')
-b = db.execute("select id from branches where slug='birmingham'").fetchone()[0]
-db.execute("insert into bookings (reference,branch_id,guest_name,email,party_size,date,time,"
-           "status,deposit_pence,deposit_status,source) values (?,?,?,?,?,?,?,?,?,?,?)",
-           ('${ref}', b, 'E2E Unpaid Hold', 'e2e.unpaid.${stamp}@zenryz-test.com', 2,
-            '${new Date().toISOString().slice(0, 10)}', '19:00', 'held', 2000, 'required', 'website'))
-db.commit()
-`]);
+  run('insert into bookings (reference, branch_id, guest_name, email, party_size, date, time, '
+    + 'status, deposit_pence, deposit_status, source) '
+    + "values (?, ?, ?, ?, 2, ?, '19:00', 'held', 2000, 'required', 'website')",
+    ref, branchId('birmingham'), 'E2E Unpaid Hold', `e2e.unpaid.${stamp}@zenryz-test.com`,
+    new Date().toISOString().slice(0, 10));
 
   const before = q(`select count(*) as n from vouchers where origin='thank_you'`)[0].n;
   const id = q(`select id from bookings where reference='${ref}'`)[0].id;
@@ -1397,20 +1468,16 @@ db.commit()
     q(`select id from vouchers where booking_id=${id}`).length === 0);
 }
 
+forgetLimits();
 console.log('\n── 6g. Refunding a deposit ──');
 
 {
   const ref = `VB-E2R${String(stamp).slice(-6)}`;
-  execFileSync('python3', ['-c', `
-import sqlite3
-db = sqlite3.connect('data/varanasi.db')
-b = db.execute("select id from branches where slug='birmingham'").fetchone()[0]
-db.execute("insert into bookings (reference,branch_id,guest_name,email,party_size,date,time,"
-           "status,deposit_pence,deposit_status,source) values (?,?,?,?,?,?,?,?,?,?,?)",
-           ('${ref}', b, 'E2E Refund Me', 'e2e.refund.${stamp}@zenryz-test.com', 4,
-            '${new Date().toISOString().slice(0, 10)}', '20:00', 'cancelled', 4000, 'captured', 'website'))
-db.commit()
-`]);
+  run('insert into bookings (reference, branch_id, guest_name, email, party_size, date, time, '
+    + 'status, deposit_pence, deposit_status, source) '
+    + "values (?, ?, ?, ?, 4, ?, '20:00', 'cancelled', 4000, 'captured', 'website')",
+    ref, branchId('birmingham'), 'E2E Refund Me', `e2e.refund.${stamp}@zenryz-test.com`,
+    new Date().toISOString().slice(0, 10));
 
   const t0 = Date.now();
   await page.goto(`${BASE}/admin/bookings?branch=birmingham`, { waitUntil: 'networkidle' });
@@ -1459,21 +1526,19 @@ console.log('\n── 6h. Erasure: answering a GDPR request ──');
   const personEmail = `e2e.erase.${stamp}@zenryz-test.com`;
   const eraseRef = `VB-E2E${String(stamp).slice(-5)}R`;
   const eraseCode = `VG-E2E${String(stamp).slice(-5)}R`;
-  execFileSync('python3', ['-c', `
-import sqlite3, time
-db = sqlite3.connect('data/varanasi.db')
-b = db.execute("select id from branches where slug='birmingham'").fetchone()[0]
-now = int(time.time())
-db.execute("insert into enquiries (branch_id,type,name,email,phone,dietary,message,status,created_at)"
-           " values (?,?,?,?,?,?,?,?,?)",
-           (b,'contact','E2E Erase Me','${personEmail}','07700900321','nuts,dairy',
-            'Please note a severe nut allergy.','new',now))
-db.execute("insert into bookings (reference,branch_id,guest_name,email,phone,party_size,date,time,"
-           "status,deposit_status,source,cancel_token) values (?,?,?,?,?,?,?,?,?,?,?,?)",
-           ('${eraseRef}', b, 'E2E Erase Me', '${personEmail}', '07700900321', 2,
-            '2026-01-15','19:00','completed','none','website','tok123'))
-db.commit()
-`]);
+  withDb((db) => {
+    const b = branchId('birmingham');
+    const now = nowSec();
+    db.prepare('insert into enquiries (branch_id, type, name, email, phone, dietary, message, '
+      + "status, created_at) values (?, 'contact', 'E2E Erase Me', ?, '07700900321', "
+      + "'nuts,dairy', 'Please note a severe nut allergy.', 'new', ?)")
+      .run(b, personEmail, now);
+    db.prepare('insert into bookings (reference, branch_id, guest_name, email, phone, party_size, '
+      + 'date, time, status, deposit_status, source, cancel_token) '
+      + "values (?, ?, 'E2E Erase Me', ?, '07700900321', 2, '2026-01-15', '19:00', "
+      + "'completed', 'none', 'website', 'tok123')")
+      .run(eraseRef, b, personEmail);
+  });
 
   await page.goto(`${BASE}/admin/erasure?q=${encodeURIComponent(personEmail)}`, { waitUntil: 'networkidle' });
   let text = await page.locator('main').innerText();
@@ -1481,15 +1546,9 @@ db.commit()
     text.includes('E2E Erase Me') && text.includes(eraseRef));
 
   // A live voucher blocks erasure — that is money owed to whoever holds the code.
-  execFileSync('python3', ['-c', `
-import sqlite3, time
-db = sqlite3.connect('data/varanasi.db')
-now = int(time.time())
-db.execute("insert into vouchers (code,value_pence,balance_pence,status,recipient_name,"
-           "recipient_email,origin,issued_at) values (?,?,?,?,?,?,?,?)",
-           ('${eraseCode}', 5000, 5000, 'active', 'E2E Erase Me', '${personEmail}', 'manual', now))
-db.commit()
-`]);
+  run('insert into vouchers (code, value_pence, balance_pence, status, recipient_name, '
+    + "recipient_email, origin, issued_at) values (?, 5000, 5000, 'active', 'E2E Erase Me', "
+    + "?, 'manual', ?)", eraseCode, personEmail, nowSec());
   await page.goto(`${BASE}/admin/erasure?q=${encodeURIComponent(personEmail)}`, { waitUntil: 'networkidle' });
   text = await page.locator('main').innerText();
   t('A live gift voucher blocks erasure', /can.t be erased yet/i.test(text));
@@ -1498,12 +1557,7 @@ db.commit()
   t('  · with no erase button offered', await page.locator('button', { hasText: /Erase permanently/ }).count() === 0);
 
   // Spend it down, and erasure becomes possible.
-  execFileSync('python3', ['-c', `
-import sqlite3
-db = sqlite3.connect('data/varanasi.db')
-db.execute("update vouchers set balance_pence=0, status='redeemed' where code='${eraseCode}'")
-db.commit()
-`]);
+  run("update vouchers set balance_pence = 0, status = 'redeemed' where code = ?", eraseCode);
   await page.goto(`${BASE}/admin/erasure?q=${encodeURIComponent(personEmail)}`, { waitUntil: 'networkidle' });
   t('Once the voucher is spent, erasure is offered',
     await page.locator('button', { hasText: /Erase permanently/ }).count() === 1);
@@ -1654,23 +1708,29 @@ console.log('\n── 8. Console health ──');
 t('No uncaught JavaScript errors during the run', errors.length === 0, errors.slice(0, 3).join(' | '));
 
 // ---- tidy up the rows this run created ----
-execFileSync('python3', ['-c', `
-import sqlite3
-db = sqlite3.connect('data/varanasi.db')
-db.execute("delete from menu_items where name like 'E2E Dish %' or name like 'E2E Brum Only %' or name like 'E2E Leic Only %'")
-db.execute("delete from menu_categories where name like 'E2E Section %'")
-db.execute("delete from enquiries where email like 'e2e.%@zenryz-test.com'")
-db.execute("delete from users where email like 'e2e.%@zenryz-test.com'")
-db.execute("delete from bookings where guest_name like 'E2E Guest %' or guest_name like 'E2E Unpaid%' or guest_name like 'E2E Refund%' or guest_name like 'E2E Paid%' or reference like 'VB-E2E%R'")
-db.execute("delete from vouchers where code like 'VG-E2E%R' or recipient_name like 'E2E %'")
-db.execute("delete from enquiries where name like 'E2E Erase%'")
-# the erased one no longer carries its name, so bound it by this run's window
-db.execute("delete from enquiries where name like '%erased at the person%' and created_at > ${Math.floor(stamp / 1000) - 60}")
-db.execute("delete from audit_log where action in ('gdpr.erase','booking.refund')")
-db.execute("delete from audit_log where action like 'login.%' and entity_id like 'e2e.%'")
-db.execute("delete from audit_log where action in ('menu.category.create','enquiry.export') and detail like '%E2E%'")
-db.commit()
-`]);
+withDb((db) => {
+  for (const sql of [
+    "delete from menu_items where name like 'E2E Dish %' or name like 'E2E Brum Only %' or name like 'E2E Leic Only %'",
+    "delete from menu_categories where name like 'E2E Section %'",
+    "delete from enquiries where email like 'e2e.%@zenryz-test.com'",
+    // Before the users themselves: audit_log references them, and foreign
+    // keys are enforced.
+    "delete from audit_log where user_id in (select id from users where email like 'e2e.%@zenryz-test.com')",
+    "delete from users where email like 'e2e.%@zenryz-test.com'",
+    "delete from bookings where guest_name like 'E2E Guest %' or guest_name like 'E2E Unpaid%' or guest_name like 'E2E Refund%' or guest_name like 'E2E Paid%' or reference like 'VB-E2E%R'",
+    "delete from vouchers where code like 'VG-E2E%R' or recipient_name like 'E2E %'",
+    "delete from enquiries where name like 'E2E Erase%'",
+    "delete from audit_log where action in ('gdpr.erase','booking.refund')",
+    "delete from audit_log where action like 'login.%' and entity_id like 'e2e.%'",
+    "delete from audit_log where action in ('menu.category.create','enquiry.export') and detail like '%E2E%'",
+    'delete from rate_limits',
+  ]) db.prepare(sql).run();
+
+  // The erased enquiry no longer carries its name, so bound it by this run's
+  // own window rather than deleting anybody else's.
+  db.prepare("delete from enquiries where name like '%erased at the person%' and created_at > ?")
+    .run(Math.floor(stamp / 1000) - 60);
+});
 
 await browser.close();
 

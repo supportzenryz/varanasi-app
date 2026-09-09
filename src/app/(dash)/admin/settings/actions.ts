@@ -174,12 +174,25 @@ export async function saveBookingRules(formData: FormData) {
  * words on screen — including the rejection, which is usually explicit about
  * what is wrong ("The varanasi.uk domain is not verified").
  */
-export async function sendTestEmail() {
+export async function sendTestEmail(formData: FormData) {
   const session = await requireAbility("editSettings");
   const rules = bookingRules();
 
+  /* Ask where to send it, rather than assuming the signed-in account.
+   *
+   * This sent to `session.email` — which sounds right and is wrong on the one
+   * deployment that matters. The owner account ships as owner@varanasi.uk, a
+   * name for signing in rather than a mailbox anyone reads, so the provider
+   * accepted the message, the screen said "sent", and nothing arrived. A test
+   * whose result you cannot check is not a test.
+   */
+  const typed = String(formData.get("to") ?? "").trim();
+  const to = typed || session.email;
+  const address = checkEmail(to);
+  if (!address.ok) problem(BACK, `That isn't an address we can send to: ${address.error}`);
+
   const result = await sendMail({
-    to: [session.email],
+    to: [address.value],
     subject: "Varanasi — email delivery test",
     fromName: rules.notifications.fromName,
     fromEmail: rules.notifications.fromEmail,
@@ -199,7 +212,7 @@ Replies to: ${rules.notifications.replyTo}
     action: "settings.email.test",
     entity: "settings",
     entityId: "email",
-    detail: `${result.via}: ${result.ok ? "accepted" : result.detail ?? "rejected"}`,
+    detail: `${result.via} -> ${address.value}: ${result.ok ? "accepted" : result.detail ?? "rejected"}`,
   });
 
   if (result.ok && result.via === "outbox") {
@@ -207,10 +220,12 @@ Replies to: ${rules.notifications.replyTo}
       + `That is the right behaviour for testing — add RESEND_API_KEY to send for real.`);
   }
   if (result.ok) {
-    ok(BACK, `Sent to ${session.email} via ${result.via}, from ${rules.notifications.fromEmail}. `
-      + `If it doesn't arrive within a minute or two, check the spam folder — and check the provider's own dashboard.`);
+    ok(BACK, `${result.via} accepted it: ${rules.notifications.fromEmail} → ${address.value}. `
+      + `Accepted is not the same as delivered — if it isn't in that inbox within a couple of `
+      + `minutes, check the spam folder, then the provider's own dashboard, which shows what `
+      + `happened after they took it.`);
   }
   problem(BACK, `${result.via} refused it: ${result.detail ?? "no reason given"} — `
-    + `sent from ${rules.notifications.fromEmail}. A copy has been kept in data/outbox. `
-    + `The usual cause is a sending address on a domain the provider has not verified.`);
+    + `sending ${rules.notifications.fromEmail} → ${address.value}. A copy has been kept in `
+    + `data/outbox. The usual cause is a sending address on a domain the provider has not verified.`);
 }

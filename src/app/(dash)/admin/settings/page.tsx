@@ -91,13 +91,23 @@ export default async function SettingsAdmin({
               {lastMail.ok ? `accepted by ${lastMail.via}` : `REFUSED — ${lastMail.detail ?? "no reason given"}`}
             </p>
           )}
-          <form action={sendTestEmail} className="mt-3">
-            <button className="border border-[--line] bg-white px-3 py-1.5 text-xs font-semibold hover:bg-pale">
-              Send me a test email
+          {/* Where to send it is a field, not an assumption. It used to go to
+              the signed-in account's address — which on the live site is
+              owner@varanasi.uk, a name for signing in rather than a mailbox
+              anyone reads. The provider accepted it, the screen said "sent",
+              and nothing ever arrived. */}
+          <form action={sendTestEmail} className="mt-3 flex flex-wrap items-end gap-2">
+            <div className="min-w-56 flex-1">
+              <label className={label} htmlFor="testTo">Send a test email to</label>
+              <input id="testTo" name="to" type="email" className={field}
+                placeholder="an inbox you can actually check" />
+            </div>
+            <button className="border border-[--line] bg-white px-3 py-2 text-xs font-semibold hover:bg-pale">
+              Send test
             </button>
-            <span className="block text-xs text-ink-3 mt-1.5">
-              Asks your provider now, and shows you its answer. Worth doing after any change to
-              the sending address, and before handing the site to anyone.
+            <span className="block w-full text-xs text-ink-3">
+              Asks your provider now and shows you its answer. Use an address you can open —
+              the point is to see the message arrive, not to be told it was accepted.
             </span>
           </form>
         </div>

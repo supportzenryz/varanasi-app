@@ -5,6 +5,7 @@ import { bookings, blockedDates } from "@/db/schema";
 import type { Branch } from "@/lib/branches";
 import { openingHours } from "@/lib/branches";
 import { allSlots, bookingRules, depositFor, type BookingRules } from "@/lib/booking-config";
+import { liveStatuses } from "@/lib/booking";
 
 export type Slot = {
   time: string;          // "19:30"
@@ -34,7 +35,7 @@ function committedCovers(branchId: number, date: string): Map<string, number> {
       eq(bookings.branchId, branchId),
       eq(bookings.date, date),
       // anything that still occupies a table
-      inArray(bookings.status, ["held", "confirmed", "seated"]),
+      liveStatuses(),
       // ...but a `held` booking whose payment window has passed no longer does
       or(
         inArray(bookings.status, ["confirmed", "seated"]),
@@ -198,7 +199,7 @@ export function calendarFor(
       eq(bookings.branchId, branch.id),
       gte(bookings.date, from),
       lte(bookings.date, to),
-      inArray(bookings.status, ["held", "confirmed", "seated"]),
+      liveStatuses(),
       or(
         inArray(bookings.status, ["confirmed", "seated"]),
         isNull(bookings.holdExpiresAt),

@@ -16,10 +16,7 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
   return (
     <div className="on-dark bg-ink text-pale min-h-dvh">
       {children}
-      <Analytics
-        measurementId={analytics.ga4MeasurementId}
-        consentRequired={analytics.consentRequired}
-      />
+      <Analytics rules={analytics} />
     </div>
   );
 }

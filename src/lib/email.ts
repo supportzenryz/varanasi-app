@@ -20,6 +20,13 @@ export type Mail = {
   to: string[];
   subject: string;
   text: string;
+  /** Optional HTML alternative. Plain text is always sent alongside it —
+   *  every message here has to be readable without it. */
+  html?: string;
+  /** Extra headers. Used for List-Unsubscribe on the weekly marketing email,
+   *  which Gmail requires of bulk senders and which every mail client turns
+   *  into a one-press unsubscribe next to the sender's name. */
+  headers?: Record<string, string>;
   replyTo?: string;
   fromName?: string;
   fromEmail?: string;
@@ -195,13 +202,37 @@ function writeToOutbox(mail: Mail, from: string, note?: string): string | null {
     fs.mkdirSync(OUTBOX, { recursive: true });
     const stamp = new Date().toISOString().replace(/[:.]/g, "-");
     const slug = mail.subject.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60);
-    const file = path.join(OUTBOX, `${stamp}--${note ? "UNDELIVERED--" : ""}${slug}.txt`);
-    fs.writeFileSync(file,
+
+    /* The name has to be unique, and a millisecond is not.
+     *
+     * The stamp goes down to the millisecond, and two messages written inside
+     * the same one produced the same filename — so the second silently wrote
+     * over the first and the outbox was one message short. It went unnoticed
+     * while every message here was a booking confirmation, which arrive one at
+     * a time; the weekly marketing email sends to the whole list in a loop,
+     * where same-millisecond writes are not an edge case but the normal
+     * pattern. In outbox mode this file IS the record of what was sent, and a
+     * record that drops entries under load is worse than no record.
+     *
+     * `wx` fails rather than overwrites, and the counter is only reached when
+     * it does. */
+    const base = `${stamp}--${note ? "UNDELIVERED--" : ""}${slug}`;
+    const contents =
       (note ? `X-Delivery-Failure: ${note}\n` : "") +
       `From: ${from}\nTo: ${mail.to.join(", ")}\n` +
       (mail.replyTo ? `Reply-To: ${mail.replyTo}\n` : "") +
-      `Subject: ${mail.subject}\nDate: ${new Date().toUTCString()}\n\n${mail.text}\n`);
-    return file;
+      `Subject: ${mail.subject}\nDate: ${new Date().toUTCString()}\n\n${mail.text}\n`;
+
+    for (let n = 0; n < 1000; n++) {
+      const file = path.join(OUTBOX, `${base}${n ? `--${n}` : ""}.txt`);
+      try {
+        fs.writeFileSync(file, contents, { flag: "wx" });
+        return file;
+      } catch (err) {
+        if ((err as NodeJS.ErrnoException).code !== "EEXIST") throw err;
+      }
+    }
+    throw new Error("a thousand messages in one millisecond — something is wrong");
   } catch (err) {
     console.error(`[email:outbox] could not write "${mail.subject}": ${err instanceof Error ? err.message : String(err)}`);
     return null;
@@ -230,6 +261,8 @@ async function deliver(mail: Mail): Promise<MailResult> {
         },
         body: JSON.stringify({
           from, to: mail.to, subject: mail.subject, text: mail.text,
+          ...(mail.html ? { html: mail.html } : {}),
+          ...(mail.headers ? { headers: mail.headers } : {}),
           reply_to: mail.replyTo,
         }),
         cache: "no-store",

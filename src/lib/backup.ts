@@ -188,6 +188,19 @@ export function startBackupSchedule(): void {
     } catch (err) {
       console.error("[scheduler] audit digest failed:", err instanceof Error ? err.message : err);
     }
+
+    /* This week's marketing draft, written and then left alone.
+     *
+     * It prepares; it never sends. The row it writes is a draft waiting for an
+     * owner to read it, and `week_of` is unique, so running hourly produces
+     * one draft a week rather than one an hour — and a container that restarts
+     * on Tuesday still finds Monday's draft already there. */
+    try {
+      const { prepareWeeklyDraft } = await import("@/lib/campaign");
+      prepareWeeklyDraft();
+    } catch (err) {
+      console.error("[scheduler] weekly draft failed:", err instanceof Error ? err.message : err);
+    }
   };
 
   setTimeout(tick, 30_000).unref?.();      // let the server finish booting first
@@ -199,7 +212,8 @@ export function startBackupSchedule(): void {
      folders. Nothing anywhere said which file was in use. */
   console.log(`[db] ${path.resolve(databasePath())}`);
   console.log(`[backup] daily backups on, keeping ${KEEP}, in ${backupDir()}`);
-  console.log("[scheduler] hourly: due gift vouchers, expiries, owner activity summary");
+  console.log("[scheduler] hourly: due gift vouchers, expiries, owner activity summary, "
+    + "weekly marketing draft (prepared only — never sent automatically)");
 
   /* Said at every boot, because "am I taking real money?" should never be a
      question anyone has to go and look up. */

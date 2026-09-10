@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { branchBySlug, telHref } from "@/lib/branches";
 import { prettyTime } from "@/lib/booking-config";
-import { bookingByReference, dateLabel, markPaymentFailed, notifyPaymentFailed } from "@/lib/booking";
+import { bookingByReference, dateLabel, markPaymentFailed, notifyPaymentFailed , tokenMatches } from "@/lib/booking";
 import { PageHero } from "@/components/PageHero";
 
 export const metadata: Metadata = { title: "Payment not completed", robots: { index: false } };
@@ -38,7 +38,8 @@ export default async function Unconfirmed({
    *
    * And only if it really is unpaid: a guest can reach this page by pressing
    * Back after paying, and a paid booking must never be cancelled here. */
-  const authorised = Boolean(booking?.cancelToken) && token === booking?.cancelToken;
+  // Constant-time — see lib/booking.tokenMatches.
+  const authorised = tokenMatches(token, booking?.cancelToken ?? null);
   if (authorised && booking && booking.branchId === branch.id && booking.depositStatus !== "captured") {
     markPaymentFailed(booking.id);
     await notifyPaymentFailed(booking);

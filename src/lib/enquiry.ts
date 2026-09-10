@@ -6,6 +6,9 @@ import { branchBySlug } from "@/lib/branches";
 import { bookingRules } from "@/lib/booking-config";
 import { sendMail } from "@/lib/email";
 import { checkName, checkEmail, checkPhone } from "@/lib/validate";
+import { recordGuest } from "@/lib/audit";
+import { recordConsent } from "@/lib/marketing";
+import { siteUrl } from "@/lib/site";
 
 export type Enquiry = typeof enquiries.$inferSelect;
 export type EnquiryType = "booking" | "private_room" | "corporate" | "catering" | "contact" | "franchise";
@@ -137,6 +140,26 @@ export async function submitEnquiry(input: EnquiryInput): Promise<EnquiryResult>
     status: "new",
   }).returning().get();
 
+  if (created.marketingConsent && created.email) {
+    recordConsent({
+      email: created.email,
+      name: created.name,
+      branchId: created.branchId,
+      source: "enquiry",
+      consentText: "I'd also like to hear about events, new menus and offers.",
+    });
+  }
+
+  recordGuest({
+    action: "enquiry.received",
+    entity: "enquiry",
+    entityId: String(created.id),
+    by: created.name,
+    detail: `${created.type}${created.partySize ? `, ${created.partySize} guests` : ""}` +
+      (created.requestedDate ? `, for ${created.requestedDate}` : "") +
+      `, marketing consent ${created.marketingConsent ? "given" : "not given"}`,
+  });
+
   await notify(created);
   return { ok: true, enquiry: created };
 }
@@ -152,7 +175,7 @@ async function notify(e: Enquiry): Promise<void> {
   const branch = e.branchId
     ? db.select().from(branches).where(eq(branches.id, e.branchId)).get()
     : undefined;
-  const site = (process.env.SITE_URL ?? "https://varanasi.uk").replace(/\/$/, "");
+  const site = siteUrl();
   const label = TYPE_LABEL[e.type as EnquiryType] ?? "Enquiry";
 
   const detail = [

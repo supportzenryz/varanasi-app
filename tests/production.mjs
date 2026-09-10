@@ -12,7 +12,7 @@
  * site the public can reach actually working. It writes nothing, books nothing
  * and signs in to nothing, so it is safe to run against a live restaurant.
  */
-import { chromium } from 'playwright';
+import { launchBrowser } from './browser.mjs';
 
 const BASE = (process.env.BASE_URL || 'https://varanasi-app-production.up.railway.app').replace(/\/+$/, '');
 const results = [];
@@ -23,9 +23,7 @@ const t = (name, ok, detail = '') => {
 
 console.log(`\nChecking ${BASE}\n`);
 
-const browser = await chromium.launch(
-  process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {},
-);
+const browser = await launchBrowser();
 const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
 const page = await ctx.newPage();
 /* Track failing RESPONSES, not console text. "Failed to load resource: 404"

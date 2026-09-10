@@ -1,12 +1,11 @@
 import "../../globals.css";
-import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession, can, type Session } from "@/lib/auth";
 import { db } from "@/db";
 import { branches } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { logoutAction } from "./actions";
+import { AdminNav } from "./AdminNav";
 
 /** `ready: false` sections are shown but not linked, so the navigation shows the
  *  shape of the finished admin without handing anyone a dead link. */
@@ -18,6 +17,7 @@ const NAV = [
   { href: "/admin/dates", label: "Blocked dates", ability: "editBlockedDates", ready: true },
   { href: "/admin/vouchers", label: "Gift vouchers", ability: "redeemVoucher", ready: true },
   { href: "/admin/enquiries", label: "Enquiries", ability: "viewEnquiries", ready: true },
+  { href: "/admin/marketing", label: "Weekly email", ability: "editMarketing", ready: true },
   { href: "/admin/gallery", label: "Gallery & tiles", ability: "editRooms", ready: true },
   { href: "/admin/staff", label: "Staff access", ability: "manageStaff", ready: true },
   { href: "/admin/settings", label: "Settings", ability: "editSettings", ready: true },
@@ -37,52 +37,23 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const session = await getSession();
   if (!session) redirect("/admin/login");
 
+  const items = NAV
+    .filter((i) => !i.ability || can(session, i.ability))
+    .map((i) => ({ href: i.href, label: i.label, ready: i.ready }));
+
   return (
     <div className="dash min-h-dvh lg:grid lg:grid-cols-[15rem_1fr] bg-pale text-ink">
-      {/* The rail scrolls sideways on a phone. It used to scroll as a whole,
-          which put "Sign out" 1,466px to the right of a 375px screen — present
-          in the markup, unreachable in practice, and the one control every
-          member of staff needs on a shared iPad at the pass. Only the list of
-          links scrolls now; the account block stays put. */}
-      <aside className="bg-ink text-pale lg:min-h-dvh flex lg:flex-col gap-4 lg:gap-0 items-center lg:items-stretch px-5 py-4 lg:py-7 lg:px-0">
-        {/* The sidebar is ink, so the white mark is the right variant here.
-            Narrow screens collapse the rail to a scrolling strip, where the
-            mark shrinks and the "Admin" caption is dropped. */}
-        <Link href="/admin" className="shrink-0 lg:px-6 lg:mb-7 flex lg:flex-col lg:items-start items-center gap-2">
-          <Image src="/brand/logo.png" alt="Varanasi" width={520} height={104}
-            className="h-8 lg:h-10 w-auto" priority />
-          <span className="accent text-gold/70 hidden lg:inline">Admin</span>
-        </Link>
+      {/* Both shapes of the navigation live in AdminNav: the rail on a laptop,
+          a bar and a drawer on a phone. It used to be one row of markup doing
+          both jobs, which on a 390px screen gave thirteen sections about ninety
+          pixels of sideways-scrolling window between the logo and Sign out. */}
+      <AdminNav items={items} name={session.name} role={session.role}
+        branch={branchLabel(session)} />
 
-        <nav className="flex lg:flex-col gap-1 lg:gap-0 flex-1 min-w-0 overflow-x-auto lg:overflow-visible">
-          {NAV.filter((i) => !i.ability || can(session, i.ability)).map((item) =>
-            item.ready ? (
-              <Link key={item.href} href={item.href}
-                className="whitespace-nowrap text-sm px-3 lg:px-6 py-2 lg:py-2.5 text-pale/70 hover:text-pale hover:bg-white/5 border-l-2 border-transparent hover:border-gold">
-                {item.label}
-              </Link>
-            ) : (
-              <span key={item.href} aria-disabled="true"
-                className="whitespace-nowrap text-sm px-3 lg:px-6 py-2 lg:py-2.5 text-pale/30 border-l-2 border-transparent flex items-baseline gap-2">
-                {item.label}
-                <span className="text-[0.58rem] uppercase tracking-widest text-gold/50">Soon</span>
-              </span>
-            )
-          )}
-        </nav>
-
-        <div className="lg:px-6 lg:pt-6 lg:border-t border-white/10 shrink-0 lg:ml-0">
-          <p className="text-sm font-semibold leading-tight hidden lg:block">{session.name}</p>
-          <p className="text-xs text-pale/50 mt-0.5 capitalize hidden lg:block">{session.role} · {branchLabel(session)}</p>
-          <form action={logoutAction}>
-            <button className="lg:mt-3 whitespace-nowrap text-xs text-gold hover:underline border border-gold/30 lg:border-0 px-3 py-1.5 lg:p-0">
-              Sign out
-            </button>
-          </form>
-        </div>
-      </aside>
-
-      <main className="p-6 sm:p-10 max-w-6xl w-full">
+      {/* `min-w-0` so a wide table inside a page cannot stretch this column
+          and push the whole layout sideways — the grid track would otherwise
+          grow to fit its content and take the page with it. */}
+      <main className="min-w-0 p-5 sm:p-8 lg:p-10 max-w-6xl w-full">
         {session.mustChangePassword && (
           <div className="mb-8 border-l-2 border-gold bg-gold/10 px-4 py-3 text-sm">
             You&rsquo;re still using the password you were given.{" "}

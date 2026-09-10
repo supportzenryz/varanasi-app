@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 import { branchBySlug, telHref } from "@/lib/branches";
 import { prettyTime } from "@/lib/booking-config";
 import { formatPence } from "@/lib/money";
-import { bookingByReference, dateLabel } from "@/lib/booking";
+import { bookingByReference, dateLabel, tokenMatches } from "@/lib/booking";
 import { PageHero } from "@/components/PageHero";
 import { cancelBooking } from "./actions";
 
@@ -29,7 +29,11 @@ export default async function ManageBooking({
   const confirming = cancel === "1";
   const booking = bookingByReference(reference);
   if (!booking || booking.branchId !== branch.id) notFound();
-  if (!token || !booking.cancelToken || token !== booking.cancelToken) notFound();
+  // Constant-time, like every other place this token is checked.
+  // A plain !== leaks the token a character at a time to anyone holding the
+  // reference, and this page shows the guest's name, party, occasion and
+  // allergy notes — special-category data under UK GDPR.
+  if (!tokenMatches(token, booking.cancelToken)) notFound();
 
   const isCancelled = booking.status === "cancelled" || cancelled === "1";
   const depositPaid = Boolean(booking.depositPence) && booking.depositStatus === "captured";

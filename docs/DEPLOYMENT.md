@@ -142,8 +142,7 @@ MAIL_FROM=reservations@varanasi.uk
 ### Admin Configuration
 1. Log in as owner (password will need changing on first login)
 2. Update Settings:
-   - GA4 measurement ID
-   - Google review URLs per branch
+   - Google review URLs per branch (analytics is not here — see data/booking.json)
 3. Verify Gallery and Venue tiles display correctly
 4. Test Staff access creation
 

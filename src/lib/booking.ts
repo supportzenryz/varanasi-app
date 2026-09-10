@@ -12,6 +12,9 @@ import { refundDeposit, refundedSoFar, stripeSimulated } from "@/lib/stripe";
 import { checkName, checkEmail, checkPhone } from "@/lib/validate";
 import { sendWhatsApp, toE164 } from "@/lib/whatsapp";
 import { issueThankYouVoucher, expiryLabel } from "@/lib/voucher";
+import { recordGuest } from "@/lib/audit";
+import { recordConsent } from "@/lib/marketing";
+import { siteUrl } from "@/lib/site";
 
 export type Booking = typeof bookings.$inferSelect;
 
@@ -117,10 +120,28 @@ export function holdBooking(input: HoldInput): HoldResult {
     eq(bookings.email, email.value),
     eq(bookings.date, input.date),
     eq(bookings.time, input.time),
+    /* Party size is part of what makes this the same booking.
+     *
+     * It was not, and the two lines below were the consequence: a guest who
+     * submitted for twelve, pressed back on Stripe's page and resubmitted for
+     * one within two minutes was handed back the TWELVE-cover hold, while
+     * `depositPence` had been recomputed for one. Stripe then charged £10
+     * against a £120 table, the row still said £120, and the confirmation
+     * email and the admin list both reported £120 paid. Nothing anywhere
+     * showed a discrepancy — the restaurant simply lost £110 on a Saturday.
+     *
+     * A double-click has the same party size by definition; a changed party
+     * size is a different booking and now gets its own hold. */
+    eq(bookings.partySize, partySize),
     eq(bookings.status, "held"),
     gte(bookings.createdAt, now - 120),
   )).get();
-  if (recent) return { ok: true, booking: recent, depositPence, branch };
+  /* And the deposit that comes back is the one recorded on the row being
+     handed back, never a freshly computed one — the row is what Stripe will
+     be asked to charge against, and the two must not be able to disagree. */
+  if (recent) {
+    return { ok: true, booking: recent, depositPence: recent.depositPence ?? depositPence, branch };
+  }
 
   const created = db.insert(bookings).values({
     reference: reference(branch.slug),
@@ -147,6 +168,30 @@ export function holdBooking(input: HoldInput): HoldResult {
     cancelToken: crypto.randomBytes(16).toString("hex"),
     source: "website",
   }).returning().get();
+
+  /* Consent recorded as its own fact, at the moment it is given, with the
+     wording the guest actually saw. The boolean on the booking row stays —
+     it is what the kitchen printout reads — but it cannot survive the
+     booking being anonymised for an erasure request, and it cannot hold an
+     unsubscribe. See lib/marketing.ts. */
+  if (input.marketingConsent && email.value) {
+    recordConsent({
+      email: email.value,
+      name: name.value,
+      branchId: branch.id,
+      source: "booking",
+      consentText: rules.consents?.marketing ?? null,
+    });
+  }
+
+  recordGuest({
+    action: "booking.held",
+    entity: "booking",
+    entityId: created.reference,
+    by: created.guestName,
+    detail: `${created.partySize} on ${created.date} at ${created.time}` +
+      (depositPence > 0 ? `, ${depositPence / 100} deposit to pay` : ", no deposit"),
+  });
 
   return { ok: true, booking: created, depositPence, branch };
 }
@@ -180,11 +225,52 @@ export async function confirmPaidBooking(opts: {
   const existing = bookingById(opts.bookingId);
   if (!existing) return { confirmed: false, alreadyDone: false };
 
-  if (existing.depositStatus === "captured" && existing.status !== "cancelled") {
+  const now = Math.floor(Date.now() / 1000);
+
+  if (existing.depositStatus === "captured") {
     return { confirmed: true, alreadyDone: true, booking: existing };
   }
+  /* Money that has already gone back does not get re-taken by a late webhook.
+     The old guard was `captured && status !== "cancelled"`, which let a
+     refunded row fall through to the write below and be set to `captured`
+     again — a booking whose deposit had been returned reappearing as paid. */
+  if (existing.depositStatus === "refunded") {
+    return { confirmed: false, alreadyDone: true, booking: existing };
+  }
 
-  const now = Math.floor(Date.now() / 1000);
+  /* The guest cancelled between paying and this arriving.
+   *
+   * Stripe retries a webhook for up to three days, and a manager can resend
+   * one by hand, so this ordering is ordinary rather than exotic: the guest
+   * pays, the return page confirms and emails them, they change their mind and
+   * cancel through the link in that email, and the retried
+   * `checkout.session.completed` lands afterwards. The old code put the
+   * booking back to `confirmed` — the covers came off sale again and the guest
+   * received a second "your table is confirmed" for a table they had cancelled.
+   *
+   * The money is real and has to be recorded, or nobody can refund it. The
+   * cancellation is also real. So the deposit is marked captured and the
+   * status is left alone. */
+  if (existing.status === "cancelled") {
+    db.update(bookings).set({
+      depositStatus: "captured",
+      depositPaidAt: now,
+      stripePaymentIntent: opts.paymentIntent ?? existing.stripePaymentIntent,
+      stripeSessionId: opts.sessionId ?? existing.stripeSessionId,
+    }).where(eq(bookings.id, opts.bookingId)).run();
+
+    const after = bookingById(opts.bookingId)!;
+    recordGuest({
+      action: "booking.paid_after_cancelling",
+      entity: "booking",
+      entityId: after.reference,
+      by: after.guestName,
+      detail: `deposit ${formatPence(after.depositPence ?? 0)} taken for a booking already cancelled `
+        + "— it needs refunding",
+    });
+    console.warn(`[booking] ${after.reference}: paid after cancelling — the deposit needs refunding`);
+    return { confirmed: false, alreadyDone: false, booking: after };
+  }
   db.update(bookings).set({
     status: "confirmed",
     depositStatus: "captured",
@@ -195,6 +281,14 @@ export async function confirmPaidBooking(opts: {
   }).where(eq(bookings.id, opts.bookingId)).run();
 
   const booking = bookingById(opts.bookingId)!;
+  recordGuest({
+    action: "booking.confirmed",
+    entity: "booking",
+    entityId: booking.reference,
+    by: booking.guestName,
+    detail: `deposit paid${booking.depositPence ? ` (${booking.depositPence / 100})` : ""}` +
+      `, ${booking.partySize} on ${booking.date} at ${booking.time}`,
+  });
   await notifyConfirmed(booking);
   return { confirmed: true, alreadyDone: false, booking };
 }
@@ -239,6 +333,18 @@ export function cancelByToken(reference: string, token: string): { ok: boolean; 
   if (b.status === "cancelled") return { ok: true };
   if (!["held", "confirmed"].includes(b.status)) return { ok: false, error: "That booking can no longer be cancelled online — please call us." };
   db.update(bookings).set({ status: "cancelled" }).where(eq(bookings.id, b.id)).run();
+  /* The entry that closes the original gap: until now a booking cancelled by
+     the guest through the link in their own confirmation simply changed state,
+     and "why did table 12 go on Saturday" had no answer unless a member of
+     staff happened to have done it. */
+  recordGuest({
+    action: "booking.cancelled",
+    entity: "booking",
+    entityId: b.reference,
+    by: b.guestName,
+    detail: `cancelled by the guest — ${b.partySize} on ${b.date} at ${b.time}` +
+      (b.depositStatus === "captured" ? ", deposit still held" : ""),
+  });
   void notifyCancelled(b);
   return { ok: true };
 }
@@ -317,9 +423,24 @@ export async function refundBookingDeposit(opts: {
     const refund = await refundDeposit({
       paymentIntent: b.stripePaymentIntent,
       amountPence: amount,
-      // Keyed on the intent AND the amount, so refunding the remainder of a
-      // partial refund is a new request rather than a replay of the first.
-      idempotencyKey: `refund:${b.stripePaymentIntent}:${amount}`,
+      /* Keyed on the intent, what has ALREADY been refunded, and the amount.
+       *
+       * It used to be intent + amount, with a comment claiming that made
+       * "refunding the remainder of a partial refund a new request rather than
+       * a replay" — true only when the two amounts differ. Refund £50 of a
+       * £100 deposit, then the other £50, and both requests key to
+       * `refund:pi_X:5000`: identical key, identical parameters, so Stripe
+       * replays the first refund's response instead of sending a second £50.
+       * The reply says "succeeded", the row is marked fully refunded, and the
+       * guest gets a second email about £50 they never received. Halves and
+       * thirds are the most natural way a manager splits a refund.
+       *
+       * Adding `already` makes each step of the sequence its own key while
+       * keeping the property that matters: a double-click on the SAME refund
+       * reads the same `already` and still replays rather than paying twice.
+       * Two managers refunding simultaneously also collide on one key — which
+       * refunds once instead of twice, the right way to fail. */
+      idempotencyKey: `refund:${b.stripePaymentIntent}:${already}:${amount}`,
     });
 
     if (refund.status === "failed" || refund.status === "canceled") {
@@ -410,7 +531,7 @@ function summary(b: Booking, branch?: Branch): string {
 export async function notifyConfirmed(b: Booking): Promise<void> {
   const rules = bookingRules();
   const branch = branchFor(b);
-  const site = process.env.SITE_URL ?? "https://varanasi.uk";
+  const site = siteUrl();
   const manageUrl = `${site}/${branch?.slug ?? ""}/booking/${b.reference}?t=${b.cancelToken}`;
 
   await sendMail({
@@ -502,7 +623,7 @@ See it in the admin: ${site}/admin/bookings?branch=${branch?.slug ?? ""}`,
 export async function notifyPaymentFailed(b: Booking): Promise<void> {
   const rules = bookingRules();
   const branch = branchFor(b);
-  const site = process.env.SITE_URL ?? "https://varanasi.uk";
+  const site = siteUrl();
   if (!b.email) return;
 
   await sendMail({
@@ -554,7 +675,7 @@ See it in the admin: ${site}/admin/bookings?branch=${branch?.slug ?? ""}`,
 async function notifyCancelled(b: Booking): Promise<void> {
   const rules = bookingRules();
   const branch = branchFor(b);
-  const site = process.env.SITE_URL ?? "https://varanasi.uk";
+  const site = siteUrl();
 
   if (rules.notifications.to.length) {
     await sendMail({
@@ -651,7 +772,7 @@ export async function sendPostDiningFollowUp(bookingId: number): Promise<{ sent:
   }
 
   const branch = branchFor(b);
-  const site = (process.env.SITE_URL ?? "https://varanasi.uk").replace(/\/$/, "");
+  const site = siteUrl();
   const reviewUrl = branch ? (rules.reviewUrl[branch.slug] || "") : "";
   const firstName = b.guestName.split(" ")[0];
 
@@ -681,12 +802,17 @@ export async function sendPostDiningFollowUp(bookingId: number): Promise<{ sent:
     : "";
 
   if (b.email) {
+    /* One read, not three. `bookingRules()` is a settings row plus a JSON.parse
+       of a ~6KB blob plus a spread over the defaults, and this asked for it
+       three times in one object literal. `notifyRefunded` already does it this
+       way. */
+    const notify = bookingRules().notifications;
     await sendMail({
       to: [b.email],
       subject: `Thank you for dining with us, ${firstName}`,
-      replyTo: bookingRules().notifications.replyTo,
-      fromName: bookingRules().notifications.fromName,
-      fromEmail: bookingRules().notifications.fromEmail,
+      replyTo: notify.replyTo,
+      fromName: notify.fromName,
+      fromEmail: notify.fromEmail,
       text:
 `Dear ${firstName},
 

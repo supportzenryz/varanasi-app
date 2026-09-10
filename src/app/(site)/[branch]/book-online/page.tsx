@@ -12,6 +12,7 @@ import { startBooking } from "./actions";
 import { SubmitButton } from "@/components/SubmitButton";
 import { BookingCalendar } from "@/components/BookingCalendar";
 import { recallSubmission, recalledList } from "@/lib/form-recall";
+import { choice, choiceText, field, label } from "@/lib/forms";
 
 export async function generateMetadata({ params }: { params: Promise<{ branch: string }> }): Promise<Metadata> {
   const { branch: slug } = await params;
@@ -24,9 +25,6 @@ export async function generateMetadata({ params }: { params: Promise<{ branch: s
   };
 }
 
-const field =
-  "w-full border border-[--line] bg-ink-2 px-3.5 py-3 text-[0.95rem] outline-none focus:border-gold rounded-none";
-const label = "block accent text-[0.6rem] text-gold mb-2";
 
 /** The three steps are driven by the URL, so Back works and a slot can be shared. */
 export default async function BookOnline({
@@ -312,7 +310,7 @@ export default async function BookOnline({
                     <legend className={label}>Allergies in the party</legend>
                     <div className="flex flex-wrap gap-x-5 gap-y-2.5">
                       {rules.allergens.options.map((a) => (
-                        <label key={a} className="flex items-center gap-2 text-sm">
+                        <label key={a} className={`${choice} items-center`}>
                           <input type="checkbox" name="allergens" value={a}
                             defaultChecked={wasChecked("allergens", a)} /> {a}
                         </label>
@@ -348,30 +346,30 @@ export default async function BookOnline({
 
                   <fieldset className="grid gap-3">
                     <legend className={label}>Please confirm</legend>
-                    <label className="flex gap-3 text-sm items-start">
-                      <input type="checkbox" name="terms" required className="mt-1" />
-                      <span>{rules.consents.terms}</span>
+                    <label className={choice}>
+                      <input type="checkbox" name="terms" required />
+                      <span className={choiceText}>{rules.consents.terms}</span>
                     </label>
                     {deposit > 0 && (
                       <>
-                        <label className="flex gap-3 text-sm items-start">
-                          <input type="checkbox" name="depositTerms" required className="mt-1" />
-                          <span>{rules.consents.deposit}</span>
+                        <label className={choice}>
+                          <input type="checkbox" name="depositTerms" required />
+                          <span className={choiceText}>{rules.consents.deposit}</span>
                         </label>
-                        <label className="flex gap-3 text-sm items-start">
-                          <input type="checkbox" name="depositRate" required className="mt-1" />
-                          <span>{rules.consents.depositRate}</span>
+                        <label className={choice}>
+                          <input type="checkbox" name="depositRate" required />
+                          <span className={choiceText}>{rules.consents.depositRate}</span>
                         </label>
                       </>
                     )}
-                    <label className="flex gap-3 text-sm items-start">
+                    <label className={choice}>
                       {/* Not carried back on an error, deliberately — see the
                           SKIP list in form-recall. Every other answer returns,
                           but a marketing consent that reappears already ticked
                           without the guest touching it is a pre-ticked box, and
                           consent has to be a thing they did. */}
-                      <input type="checkbox" name="marketing" className="mt-1" />
-                      <span>{rules.consents.marketing}</span>
+                      <input type="checkbox" name="marketing" />
+                      <span className={choiceText}>{rules.consents.marketing}</span>
                     </label>
                   </fieldset>
 

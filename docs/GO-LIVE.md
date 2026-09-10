@@ -156,9 +156,12 @@ queue to `data/outbox` — so it need not hold up go-live.
 
 ### Set in Admin → Settings, not environment variables
 
-- **GA4 measurement ID.** There is no analytics on the current live site, so there
-  is no historical baseline; installing at launch starts one. Nothing loads until
-  a visitor accepts cookies, and no banner appears until an ID exists.
+- **Analytics is not set in Admin → Settings.** It is in `data/booking.json`
+  under `"analytics"`: set `"provider"` to `"plausible"` or `"umami"` and fill in
+  the domain (Plausible) or website id (Umami). It is cookieless, so there is no
+  consent banner and every visitor is counted. There is no analytics on the
+  current live site, so there is no historical baseline — installing at launch
+  starts one.
 - **Google review links, per branch** — Google Business Profile → "Ask for
   reviews" → short link. Feeds the after-dining message.
 

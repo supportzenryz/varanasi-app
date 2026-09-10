@@ -5,6 +5,7 @@ import { auditLog, users } from "@/db/schema";
 import { requireAbility } from "@/lib/auth";
 import { ownerRecipients } from "@/lib/audit";
 import { mailMode } from "@/lib/email";
+import { field, label } from "@/lib/forms";
 
 export const metadata = { title: "Activity log" };
 export const dynamic = "force-dynamic";
@@ -109,22 +110,22 @@ export default async function LogsPage({ searchParams }: {
 
       <form className="mt-8 flex flex-wrap items-end gap-3" action="/admin/logs">
         <div>
-          <label className="block text-xs font-medium mb-1" htmlFor="q">Search</label>
+          <label className={label} htmlFor="q">Search</label>
           <input id="q" name="q" defaultValue={q} placeholder="code, name, price…"
-            className="border border-[--line] bg-white px-3 py-2 text-sm w-56" />
+            className={`${field} sm:w-56`} />
         </div>
         <div>
-          <label className="block text-xs font-medium mb-1" htmlFor="who">Who</label>
+          <label className={label} htmlFor="who">Who</label>
           <select id="who" name="who" defaultValue={who}
-            className="border border-[--line] bg-white px-3 py-2 text-sm">
+            className={field}>
             <option value="">Anyone</option>
             {staff.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
           </select>
         </div>
         <div>
-          <label className="block text-xs font-medium mb-1" htmlFor="area">Area</label>
+          <label className={label} htmlFor="area">Area</label>
           <select id="area" name="area" defaultValue={area}
-            className="border border-[--line] bg-white px-3 py-2 text-sm">
+            className={field}>
             <option value="">Everything</option>
             {AREAS.map((a) => <option key={a.key} value={a.key}>{a.label}</option>)}
           </select>
@@ -161,8 +162,24 @@ export default async function LogsPage({ searchParams }: {
                 return (
                   <tr key={r.id} className="border-t border-[--line] align-top">
                     <td className="px-4 py-2.5 whitespace-nowrap tnum text-ink-3">{when(r.createdAt)}</td>
+                    {/* A member of staff, or the guest who did it themselves.
+                        "not signed in" was the only answer this column could
+                        give for anything that happened on the public site —
+                        which after guest actions started being logged is most
+                        of the table on a busy Saturday, and useless. */}
                     <td className="px-4 py-2.5 whitespace-nowrap">
-                      {u ? u.name : <span className="text-ink-3 italic">not signed in</span>}
+                      {u ? (
+                        u.name
+                      ) : r.actor ? (
+                        <>
+                          {r.actor}
+                          <span className="block text-[0.62rem] uppercase tracking-widest text-ink-3">
+                            {r.actor === "scheduler" ? "automatic" : "guest"}
+                          </span>
+                        </>
+                      ) : (
+                        <span className="text-ink-3 italic">not signed in</span>
+                      )}
                     </td>
                     <td className="px-4 py-2.5 whitespace-nowrap">
                       <code className="text-xs">{r.action}</code>

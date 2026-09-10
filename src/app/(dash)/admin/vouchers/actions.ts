@@ -40,7 +40,8 @@ export async function redeemVoucher(formData: FormData) {
     code,
     amountPence: amount!,
     // Staff and managers are pinned to their branch; an owner redeems anywhere.
-    branchId: session.role === "owner" ? null : session.branchId,
+    branchId: session.branchId,
+    anyBranch: session.role === "owner",
     userId: session.userId,
     note: String(formData.get("note") ?? "") || null,
     /* Passed straight through, missing field and all. `redeem` refuses a

@@ -43,6 +43,25 @@ next-env.d.ts
 # local database and staging artefacts
 /data/*.db
 /data/*.db-*
+
+# Nightly backups and the local email outbox.
+#
+# `/data/*.db` above does NOT cover `/data/backups/varanasi-….db` — a leading
+# slash pattern matches one level only — so thirty database copies were on
+# their way into the repository, and beside them an outbox of every message the
+# app has ever composed: guest names, addresses, phone numbers, dietary notes,
+# voucher codes and password-reset links, in plain text, 895 files of it.
+#
+# This repository is the thing the restaurant is buying. Committing real guest
+# data to it puts personal data somewhere it cannot be erased on request — the
+# opposite of what the erasure screen exists to do, and permanent, because git
+# keeps what you delete.
+/data/backups/
+/data/outbox/
+
+# Zenryz commercial papers — day rates, margin, what to say on the call.
+# The client owns this repository. This one is not theirs to read.
+/docs/zenryz-*
 shot.mjs
 # captured media is imported locally, not committed
 /public/media/**
@@ -53,3 +72,4 @@ shot*.mjs
 .tmp-money-test/
 .tmp-auth-test/
 .tmp-qr-test/
+.tmp-marketing-test/

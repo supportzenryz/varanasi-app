@@ -1,6 +1,31 @@
 import path from "node:path";
 import type { NextConfig } from "next";
 import { redirects as oldUrlRedirects, feedRedirects } from "./src/lib/redirects";
+import bookingConfig from "./data/booking.json" with { type: "json" };
+
+/**
+ * The one external origin the page is allowed to load a script from.
+ *
+ * Derived from the configured analytics script rather than hardcoded, so
+ * pointing `data/booking.json` at a self-hosted Plausible — or turning
+ * analytics off entirely — needs no change here and cannot leave the policy
+ * quietly wider than the site actually uses.
+ *
+ * This matters because CSP fails silently. The previous GA4 setup rendered a
+ * cookie banner, stored the visitor's consent, and then asked the browser for
+ * a script from googletagmanager.com, which was not on this list: the browser
+ * refused, said nothing to the page, and the site would have reported zero
+ * visitors with everything apparently working.
+ */
+function analyticsOrigin(): string | null {
+  const a = bookingConfig.analytics as { provider?: string; scriptUrl?: string };
+  if (!a?.provider || a.provider === "none" || !a.scriptUrl) return null;
+  try {
+    return new URL(a.scriptUrl).origin;
+  } catch {
+    return null;
+  }
+}
 
 const nextConfig: NextConfig = {
   // Every URL the old site had that the new one doesn't. Rankings move with a
@@ -59,17 +84,21 @@ const nextConfig: NextConfig = {
    * reads anywhere, which is the half that protects the guests.
    */
   async headers() {
+    const measure = analyticsOrigin();
     const csp = [
       "default-src 'self'",
       // Stripe's hosted payment page is an external navigation, not a frame,
-      // so nothing third-party needs to run here.
-      "script-src 'self' 'unsafe-inline'",
+      // so nothing third-party needs to run here. The only third-party script
+      // permitted is the analytics one named in data/booking.json, if any.
+      `script-src 'self' 'unsafe-inline'${measure ? ` ${measure}` : ""}`,
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https://res.cloudinary.com",
       "media-src 'self' https://res.cloudinary.com",
       "font-src 'self' data:",
-      // Where the browser may send data. The important line.
-      "connect-src 'self' https://api.stripe.com",
+      // Where the browser may send data. The important line — and the reason
+      // the analytics host has to appear twice: it needs to load, and then it
+      // needs to post the page view back.
+      `connect-src 'self' https://api.stripe.com${measure ? ` ${measure}` : ""}`,
       "form-action 'self'",
       "frame-ancestors 'none'",
       "base-uri 'self'",

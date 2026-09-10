@@ -70,7 +70,44 @@ export function noteSuccess(email: string, ip: string): void {
   clearLimit(ipKey(ip));
 }
 
-/** Exported for the tests, which must not inherit state between cases. */
+/**
+ * Whether one account is locked out, ignoring the address counter.
+ *
+ * `lockedFor` above answers "may this attempt proceed", which needs both
+ * counters and therefore needs to know where the attempt came from. The staff
+ * screen is asking something different — "is Priya locked out" — and it has no
+ * idea which router Priya is sitting behind. So it asks about the email alone.
+ */
+export function emailLockedFor(email: string): number {
+  const left = isLimited(emailKey(email)).retryAfter;
+  return left > 0 ? Math.ceil(left / 60) : 0;
+}
+
+/**
+ * An owner letting a colleague back in before the fifteen minutes are up.
+ *
+ * Without this the only honest thing to tell someone who mistyped their
+ * password five times is "wait" — and on a Friday evening, with the person who
+ * takes the bookings locked out of the bookings screen, "wait" is how a
+ * sensible safety measure gets torn out of a system entirely. The counter is
+ * cleared; the password is untouched, so this cannot be used to get into an
+ * account, only to stop punishing one.
+ */
+export function clearEmailLock(email: string): void {
+  clearLimit(emailKey(email));
+}
+
+/**
+ * Clear every counter.
+ *
+ * The comment here used to say "exported for the tests", which was not true —
+ * `tests/auth.mts` calls `resetAllLimits()` from lib/rate-limit directly. A
+ * comment naming a caller that does not exist is worse than no comment, so
+ * either the claim or the function had to go; the function is kept because a
+ * one-line "unlock everything" is genuinely useful from a REPL when a
+ * deployment has locked out a room full of staff, and it is the only thing
+ * that does that. Nothing in the app calls it.
+ */
 export function resetLoginGuard(): void {
   resetAllLimits();
 }

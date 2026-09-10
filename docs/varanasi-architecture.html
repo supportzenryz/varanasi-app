@@ -1,0 +1,940 @@
+<title>How Varanasi Is Built</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,400&family=Manrope:wght@400;500;700&family=Tenor+Sans&display=swap">
+<style>
+  /* Varanasi's own tokens — the same palette and the same three faces as the
+     website, the printed menus and the safeguards document, so this reads as
+     part of one restaurant rather than as a consultant's template. */
+  :root {
+    --gold: #B69112;
+    --gold-bright: #E9BA20;
+    --gold-ink: #7A5C04;
+    --ink: #0F0F0F;
+    --ink-soft: #4A4C42;
+    --page: #F5F9E9;
+    --surface: #FFFFFF;
+    --pale-2: #ECF4D5;
+    --line: #D7DFBF;
+    --leaf: #2F6B34;
+    --brick: #882D25;
+
+    --text: var(--ink);
+    --muted: var(--ink-soft);
+    --ground: var(--page);
+    --card: var(--surface);
+    --rule: var(--line);
+    --accent: var(--gold-ink);
+    --accent-line: rgba(182, 145, 18, 0.35);
+    --good: var(--leaf);
+    --watch: var(--brick);
+    --quiet: rgba(15, 15, 15, 0.045);
+
+    --display: "Fraunces", Georgia, "Times New Roman", serif;
+    --body: "Manrope", ui-sans-serif, system-ui, -apple-system, sans-serif;
+    --label: "Tenor Sans", Optima, Georgia, serif;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --text: #F5F9E9;
+      --muted: rgba(245, 249, 233, 0.62);
+      --ground: var(--ink);
+      --card: #1A1A18;
+      --rule: rgba(233, 186, 32, 0.20);
+      --accent: var(--gold-bright);
+      --accent-line: rgba(233, 186, 32, 0.30);
+      --good: #6FBF74;
+      --watch: #E08472;
+      --quiet: rgba(245, 249, 233, 0.05);
+    }
+  }
+  :root[data-theme="dark"] {
+    --text: #F5F9E9;
+    --muted: rgba(245, 249, 233, 0.62);
+    --ground: var(--ink);
+    --card: #1A1A18;
+    --rule: rgba(233, 186, 32, 0.20);
+    --accent: var(--gold-bright);
+    --accent-line: rgba(233, 186, 32, 0.30);
+    --good: #6FBF74;
+    --watch: #E08472;
+    --quiet: rgba(245, 249, 233, 0.05);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--ground);
+    color: var(--text);
+    font-family: var(--body);
+    font-size: 16px;
+    line-height: 1.62;
+    margin: 0;
+    padding-inline: 20px;
+    padding-block: 0;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .sheet { max-width: 60rem; margin-inline: auto; padding-block: 4rem 6rem; }
+
+  /* ---------- masthead ---------- */
+
+  .masthead { border-bottom: 1px solid var(--rule); padding-bottom: 2.25rem; }
+  .eyebrow {
+    font-family: var(--label);
+    font-size: 0.72rem;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 1.1rem;
+  }
+  h1 {
+    font-family: var(--display);
+    font-weight: 400;
+    font-size: clamp(2.3rem, 6vw, 3.6rem);
+    line-height: 1.06;
+    letter-spacing: -0.015em;
+    text-wrap: balance;
+    margin: 0 0 1rem;
+  }
+  .standfirst {
+    font-size: clamp(1.02rem, 2.3vw, 1.16rem);
+    color: var(--muted);
+    max-width: 40rem;
+    margin: 0 0 1.75rem;
+  }
+  .stamp {
+    display: flex; flex-wrap: wrap; gap: 0.5rem 2rem;
+    font-size: 0.8rem; color: var(--muted);
+  }
+  .stamp b { color: var(--text); font-weight: 500; }
+
+  /* ---------- sections ---------- */
+
+  section { margin-top: 3.75rem; }
+  h2 {
+    font-family: var(--display);
+    font-weight: 400;
+    font-size: clamp(1.5rem, 3.4vw, 1.95rem);
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+    margin: 0 0 0.35rem;
+    padding-bottom: 0.7rem;
+    border-bottom: 2px solid var(--accent-line);
+  }
+  .kicker {
+    font-family: var(--label);
+    font-size: 0.7rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 0.75rem;
+  }
+  h3 {
+    font-family: var(--body);
+    font-weight: 700;
+    font-size: 1.02rem;
+    letter-spacing: 0.005em;
+    margin: 2.1rem 0 0.4rem;
+  }
+  p { margin: 0 0 1.05rem; max-width: 42rem; }
+  section > p:first-of-type { margin-top: 1.4rem; }
+  strong { font-weight: 700; }
+  em { font-style: italic; }
+
+  code {
+    font-family: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, monospace;
+    font-size: 0.86em;
+    background: var(--quiet);
+    padding: 0.1em 0.34em;
+    border-radius: 2px;
+  }
+
+  /* ---------- the principles ---------- */
+
+  .rules { display: grid; gap: 0; margin-top: 1.6rem; }
+  .rule-row {
+    display: grid;
+    grid-template-columns: 2.6rem 1fr;
+    gap: 0 1.1rem;
+    padding: 1.25rem 0;
+    border-top: 1px solid var(--rule);
+  }
+  .rule-row:last-child { border-bottom: 1px solid var(--rule); }
+  .rule-n {
+    font-family: var(--display);
+    font-size: 1.5rem;
+    color: var(--accent);
+    line-height: 1;
+    padding-top: 0.1rem;
+  }
+  .rule-row h3 { margin: 0 0 0.3rem; }
+  .rule-row p { margin: 0; max-width: 38rem; color: var(--muted); }
+  .rule-row p b { color: var(--text); font-weight: 500; }
+
+  /* ---------- layer stack ---------- */
+
+  .stack { display: grid; gap: 0.5rem; margin: 1.6rem 0 1.2rem; }
+  .layer {
+    display: grid;
+    grid-template-columns: 9.5rem 1fr;
+    gap: 0.15rem 1.25rem;
+    padding: 0.95rem 1.15rem;
+    background: var(--card);
+    border-left: 3px solid var(--accent-line);
+  }
+  .layer .lname {
+    font-family: var(--label);
+    font-size: 0.76rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    padding-top: 0.15rem;
+  }
+  .layer .ldesc { font-size: 0.92rem; color: var(--muted); }
+  .layer .ldesc b { color: var(--text); font-weight: 500; }
+  @media (max-width: 640px) {
+    .layer { grid-template-columns: 1fr; }
+  }
+
+  /* ---------- journeys ---------- */
+
+  .journey { counter-reset: step; margin: 1.4rem 0 0.6rem; }
+  .step {
+    counter-increment: step;
+    position: relative;
+    padding: 0 0 1.15rem 2.5rem;
+    border-left: 1px solid var(--rule);
+    margin-left: 0.6rem;
+  }
+  .step:last-child { border-left-color: transparent; padding-bottom: 0.2rem; }
+  .step::before {
+    content: counter(step);
+    position: absolute;
+    left: -0.72rem; top: 0;
+    width: 1.45rem; height: 1.45rem;
+    display: grid; place-items: center;
+    border-radius: 50%;
+    background: var(--ground);
+    border: 1px solid var(--accent-line);
+    color: var(--accent);
+    font-size: 0.72rem;
+    font-variant-numeric: tabular-nums;
+  }
+  .step h3 { margin: 0 0 0.2rem; font-size: 0.98rem; }
+  .step p { margin: 0; color: var(--muted); font-size: 0.94rem; max-width: 38rem; }
+  .step p b { color: var(--text); font-weight: 500; }
+
+  /* ---------- tables ---------- */
+
+  .scroll { overflow-x: auto; margin: 1.5rem 0; }
+  table { border-collapse: collapse; width: 100%; min-width: 30rem; font-size: 0.9rem; }
+  caption {
+    text-align: left;
+    font-family: var(--label);
+    font-size: 0.72rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding-bottom: 0.6rem;
+  }
+  th, td { text-align: left; padding: 0.62rem 0.9rem 0.62rem 0; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  th {
+    font-family: var(--label);
+    font-weight: 400;
+    font-size: 0.74rem;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--muted);
+    border-bottom-color: var(--accent-line);
+  }
+  td.num { font-variant-numeric: tabular-nums; text-align: right; padding-right: 0; white-space: nowrap; }
+  th.num { text-align: right; padding-right: 0; }
+  tbody tr:last-child td { border-bottom: none; }
+  tfoot td { border-top: 2px solid var(--accent-line); border-bottom: none; font-weight: 700; padding-top: 0.7rem; }
+
+  .yes { color: var(--good); font-weight: 700; }
+  .no { color: var(--muted); }
+
+  /* ---------- pull ---------- */
+
+  .pull {
+    margin: 2rem 0;
+    padding: 1.35rem 1.5rem;
+    background: var(--card);
+    border-top: 2px solid var(--accent);
+  }
+  .pull p { margin: 0; max-width: 44rem; }
+  .pull p + p { margin-top: 0.8rem; }
+
+  /* ---------- checklist ---------- */
+
+  .checks { list-style: none; padding: 0; margin: 1.5rem 0 0; display: grid; gap: 0.15rem; }
+  .checks li {
+    display: grid;
+    grid-template-columns: 1.5rem 1fr;
+    gap: 0.9rem;
+    padding: 0.85rem 0;
+    border-bottom: 1px solid var(--rule);
+    align-items: start;
+  }
+  .checks .box {
+    width: 1.05rem; height: 1.05rem;
+    border: 1px solid var(--accent-line);
+    margin-top: 0.32rem;
+  }
+  .checks b { display: block; font-weight: 700; }
+  .checks span.why { display: block; color: var(--muted); font-size: 0.92rem; }
+
+  /* ---------- diagram ---------- */
+
+  figure { margin: 1.8rem 0; }
+  figure .scroll { margin: 0; }
+  svg { display: block; max-width: 100%; height: auto; }
+  figcaption { font-size: 0.84rem; color: var(--muted); margin-top: 0.8rem; max-width: 42rem; }
+
+  .colophon {
+    margin-top: 4.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--rule);
+    font-size: 0.84rem;
+    color: var(--muted);
+  }
+  .colophon p { max-width: 44rem; }
+
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  a:focus-visible, .checks li:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+</style>
+
+<div class="sheet">
+
+  <header class="masthead">
+    <p class="eyebrow">Varanasi &middot; Birmingham &amp; Leicester</p>
+    <h1>How Varanasi Is Built</h1>
+    <p class="standfirst">
+      The reasoning behind the restaurant's website and back office — what protects the
+      money, what protects the guest, what happens when something goes wrong, and how
+      each of those claims was checked rather than asserted.
+    </p>
+    <div class="stamp">
+      <span><b>9 September 2026</b></span>
+      <span>Prepared by <b>Zenryz</b></span>
+      <span><b>916</b> automated checks passing</span>
+    </div>
+  </header>
+
+  <section>
+    <p class="kicker">The position in one paragraph</p>
+    <h2>Two restaurants, one system, no monthly ransom</h2>
+    <p>
+      Varanasi runs its own reservations, its own gift vouchers, its own menus and its
+      own guest records, on software the restaurant owns outright. There is no booking
+      platform taking a slice per cover, no separate voucher provider taking a slice per
+      card, and no supplier holding the guest list. The trade-off is that the parts a
+      platform would normally supply — taking money safely, keeping staff accounts
+      honest, answering a data request, surviving a mistake — have to be built properly
+      here instead. This document is the account of how they were, written so that a
+      restaurateur can follow it and a technical reviewer can check it.
+    </p>
+  </section>
+
+  <section>
+    <p class="kicker">Part one</p>
+    <h2>The seven rules this build follows</h2>
+    <p>
+      Every decision below came out of one of these. They are worth stating plainly,
+      because they are what makes the difference between software that works on the day
+      it is demonstrated and software that is still trustworthy in three years.
+    </p>
+
+    <div class="rules">
+      <div class="rule-row">
+        <div class="rule-n">I</div>
+        <div>
+          <h3>The database is the last word, never the form</h3>
+          <p>
+            Anything arriving from a browser is treated as a claim, not a fact — including
+            the price, including which restaurant a voucher is valid at, including who the
+            person says they are. <b>A manager cannot mint £500 of the other branch's
+            liability by editing a dropdown</b>, because the branch is decided on the
+            server from their account, not read out of the form.
+          </p>
+        </div>
+      </div>
+
+      <div class="rule-row">
+        <div class="rule-n">II</div>
+        <div>
+          <h3>Anything touching money is written conditionally</h3>
+          <p>
+            A redemption does not write "the new balance is £30". It writes "set the balance
+            to £30 <em>only if it is still £50</em>", then reads the row back to confirm.
+            <b>Two tills redeeming the same voucher in the same second cannot both
+            succeed</b> — the second one is told the voucher changed and to try again.
+          </p>
+        </div>
+      </div>
+
+      <div class="rule-row">
+        <div class="rule-n">III</div>
+        <div>
+          <h3>Refuse rather than guess</h3>
+          <p>
+            When the system cannot be certain, it stops and says so. Payments configured
+            wrongly in production refuse to fall back to the simulator. A session secret
+            that has not been set refuses to let the server start at all.
+            <b>A silent wrong answer is worse than a loud refusal</b>, because only one of
+            them gets noticed.
+          </p>
+        </div>
+      </div>
+
+      <div class="rule-row">
+        <div class="rule-n">IV</div>
+        <div>
+          <h3>Every action leaves a name and a time</h3>
+          <p>
+            Price changed, voucher cancelled, account promoted, guest record erased — each
+            writes a line naming the person, the thing and the moment. <b>The owner is told
+            straight away about anything that moves money or changes who can do what</b>,
+            and gets everything else in one daily summary.
+          </p>
+        </div>
+      </div>
+
+      <div class="rule-row">
+        <div class="rule-n">V</div>
+        <div>
+          <h3>Nobody has more power than their job needs</h3>
+          <p>
+            Staff redeem vouchers and see bookings. Managers edit them. Only the owner can
+            cancel a voucher, change a price, add a colleague, read the activity log or
+            erase a guest's record. <b>Everyone below owner is pinned to their own
+            restaurant</b> and cannot see or change the other one.
+          </p>
+        </div>
+      </div>
+
+      <div class="rule-row">
+        <div class="rule-n">VI</div>
+        <div>
+          <h3>The recovery path is designed before the failure</h3>
+          <p>
+            Forgotten password, locked-out owner, corrupted database, a payment taken for a
+            voucher the guest abandoned halfway — each has a route back that was written
+            deliberately and tested. <b>"That has never happened" is not a plan.</b>
+          </p>
+        </div>
+      </div>
+
+      <div class="rule-row">
+        <div class="rule-n">VII</div>
+        <div>
+          <h3>A claim that isn't tested isn't a claim</h3>
+          <p>
+            Everything asserted in this document is exercised by an automated check that
+            fails the build if it stops being true. <b>The gift voucher's QR code is
+            photographed and read back by a real barcode decoder</b>, because a QR code that
+            is subtly wrong looks perfect and scans as nothing.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <p class="kicker">Part two</p>
+    <h2>The shape of the system</h2>
+    <p>
+      Five layers, each of which can only be reached through the one above it. The point
+      of the arrangement is that a rule written once — "only an owner may cancel a
+      voucher" — cannot be bypassed by finding a different screen.
+    </p>
+
+    <div class="stack">
+      <div class="layer">
+        <span class="lname">The public site</span>
+        <span class="ldesc">
+          22 page templates, rendered per branch: menus, drinks, private dining rooms,
+          gallery, catering, contact, terms, privacy — plus booking, gift-voucher purchase
+          and the printable voucher itself. <b>Every page is branch-scoped</b>, so
+          Leicester's address, hours and rooms can never appear under Birmingham.
+        </span>
+      </div>
+      <div class="layer">
+        <span class="lname">The back office</span>
+        <span class="ldesc">
+          13 sections — menus, private dining, reservations, blocked dates, gift vouchers,
+          enquiries, gallery, staff, settings, activity log, erasure requests, backups.
+          <b>Never indexed by search engines and never cached</b>, enforced at the server,
+          not by convention.
+        </span>
+      </div>
+      <div class="layer">
+        <span class="lname">The rules</span>
+        <span class="ldesc">
+          29 self-contained modules holding every decision the business makes: what a valid
+          booking is, what a password may be, when a voucher expires, who may do what.
+          <b>The screens ask these; they do not re-implement them</b>, which is why the
+          till and the admin cannot disagree about a balance.
+        </span>
+      </div>
+      <div class="layer">
+        <span class="lname">The record</span>
+        <span class="ldesc">
+          17 tables — branches, menus, rooms, bookings, blocked dates, vouchers and their
+          redemptions, enquiries, staff, settings, the activity log. Changes to its shape
+          are applied as 7 numbered migrations, so <b>the live database and a fresh one are
+          provably identical</b>.
+        </span>
+      </div>
+      <div class="layer">
+        <span class="lname">The outside world</span>
+        <span class="ldesc">
+          Stripe for card payments, Resend for email, WhatsApp for staff alerts.
+          <b>Each is optional and each fails visibly</b>: if email is misconfigured the
+          server says so on startup, in English, rather than quietly dropping
+          confirmations.
+        </span>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <p class="kicker">Part three</p>
+    <h2>The money</h2>
+    <p>
+      Three things here take or hold real money: a deposit on a reservation, the purchase
+      of a gift voucher, and the redemption of one at the till. Each is written on the
+      assumption that the network will drop, the guest will press the button twice, and
+      two members of staff will do the same thing at the same moment.
+    </p>
+
+    <h3>Buying a gift voucher</h3>
+    <div class="journey">
+      <div class="step">
+        <h3>The guest fills in the form</h3>
+        <p>
+          Amount, who it is for, an optional message, an optional delivery date. The amount
+          is checked <b>before</b> it is rounded to pence — asking whether a rounded number
+          is a whole number tells you nothing.
+        </p>
+      </div>
+      <div class="step">
+        <h3>A voucher is created as <em>pending</em></h3>
+        <p>
+          It exists, it has a code, and it is worth nothing. <b>No voucher ever carries a
+          balance before the money has arrived.</b>
+        </p>
+      </div>
+      <div class="step">
+        <h3>Stripe takes the payment</h3>
+        <p>
+          On Stripe's own hosted page. <b>No card number ever reaches this system</b>, which
+          is what keeps the restaurant out of the heaviest tier of card-industry
+          compliance.
+        </p>
+      </div>
+      <div class="step">
+        <h3>Stripe tells the server, and the server checks the signature</h3>
+        <p>
+          The message is verified as a genuine Stripe message before it is read at all — an
+          HMAC over the exact raw text, compared in constant time, rejected if it is more
+          than five minutes old. <b>Anyone can send us a message claiming a voucher was paid
+          for; only Stripe can sign one.</b>
+        </p>
+      </div>
+      <div class="step">
+        <h3>The voucher activates and is emailed</h3>
+        <p>
+          It gets its balance, its expiry, and a printable page carrying a QR code. If the
+          same notification arrives twice — which Stripe deliberately does — <b>the second
+          one changes nothing</b>.
+        </p>
+      </div>
+    </div>
+
+    <figure>
+      <div class="scroll">
+        <svg viewBox="0 0 780 250" role="img" width="780" height="250"
+             aria-label="The five states a gift voucher can be in, and the events that move it between them: pending becomes active when payment succeeds, or cancelled if the guest abandons the purchase; active becomes redeemed when the balance reaches zero, expired after twelve months, or cancelled by the owner; a partial redemption leaves it active.">
+          <defs>
+            <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--accent)"></path>
+            </marker>
+          </defs>
+
+          <!-- pending -->
+          <rect x="12" y="96" width="132" height="52" rx="2" fill="var(--card)" stroke="var(--accent-line)" stroke-width="1"></rect>
+          <text x="78" y="118" text-anchor="middle" font-family="Manrope, sans-serif" font-size="14" font-weight="700" fill="var(--text)">Pending</text>
+          <text x="78" y="136" text-anchor="middle" font-family="Manrope, sans-serif" font-size="11" fill="var(--muted)">worth £0</text>
+
+          <!-- active -->
+          <rect x="292" y="96" width="132" height="52" rx="2" fill="var(--card)" stroke="var(--good)" stroke-width="2"></rect>
+          <text x="358" y="118" text-anchor="middle" font-family="Manrope, sans-serif" font-size="14" font-weight="700" fill="var(--text)">Active</text>
+          <text x="358" y="136" text-anchor="middle" font-family="Manrope, sans-serif" font-size="11" fill="var(--muted)">carries a balance</text>
+
+          <!-- redeemed -->
+          <rect x="600" y="18" width="164" height="46" rx="2" fill="var(--card)" stroke="var(--accent-line)" stroke-width="1"></rect>
+          <text x="682" y="47" text-anchor="middle" font-family="Manrope, sans-serif" font-size="13" font-weight="700" fill="var(--text)">Redeemed</text>
+
+          <!-- expired -->
+          <rect x="600" y="99" width="164" height="46" rx="2" fill="var(--card)" stroke="var(--accent-line)" stroke-width="1"></rect>
+          <text x="682" y="128" text-anchor="middle" font-family="Manrope, sans-serif" font-size="13" font-weight="700" fill="var(--text)">Expired</text>
+
+          <!-- cancelled -->
+          <rect x="600" y="180" width="164" height="46" rx="2" fill="var(--card)" stroke="var(--watch)" stroke-width="1"></rect>
+          <text x="682" y="209" text-anchor="middle" font-family="Manrope, sans-serif" font-size="13" font-weight="700" fill="var(--text)">Cancelled</text>
+
+          <!-- pending -> active -->
+          <path d="M 148 122 L 286 122" stroke="var(--accent)" stroke-width="1.5" fill="none" marker-end="url(#ar)"></path>
+          <text x="217" y="112" text-anchor="middle" font-family="Manrope, sans-serif" font-size="11" fill="var(--muted)">Stripe confirms</text>
+          <text x="217" y="140" text-anchor="middle" font-family="Manrope, sans-serif" font-size="11" fill="var(--muted)">the payment</text>
+
+          <!-- pending -> cancelled (abandoned) -->
+          <path d="M 78 152 L 78 203 L 594 203" stroke="var(--accent)" stroke-width="1.5" fill="none" marker-end="url(#ar)" stroke-dasharray="4 3"></path>
+          <text x="300" y="195" text-anchor="middle" font-family="Manrope, sans-serif" font-size="11" fill="var(--muted)">purchase abandoned — and reversible if the money later arrives</text>
+
+          <!-- active -> redeemed -->
+          <path d="M 424 112 L 512 112 L 512 41 L 594 41" stroke="var(--accent)" stroke-width="1.5" fill="none" marker-end="url(#ar)"></path>
+          <text x="512" y="78" text-anchor="middle" font-family="Manrope, sans-serif" font-size="11" fill="var(--muted)">balance reaches £0</text>
+
+          <!-- active -> expired -->
+          <path d="M 424 122 L 594 122" stroke="var(--accent)" stroke-width="1.5" fill="none" marker-end="url(#ar)"></path>
+          <text x="509" y="136" text-anchor="middle" font-family="Manrope, sans-serif" font-size="11" fill="var(--muted)">12 months pass</text>
+
+          <!-- active -> cancelled -->
+          <path d="M 424 132 L 512 132 L 512 203 L 594 203" stroke="var(--watch)" stroke-width="1.5" fill="none" marker-end="url(#ar)"></path>
+          <text x="556" y="170" text-anchor="middle" font-family="Manrope, sans-serif" font-size="11" fill="var(--muted)">owner cancels</text>
+
+          <!-- self loop: partial redemption -->
+          <path d="M 322 96 C 322 52, 394 52, 394 96" stroke="var(--good)" stroke-width="1.5" fill="none" marker-end="url(#ar)"></path>
+          <text x="358" y="48" text-anchor="middle" font-family="Manrope, sans-serif" font-size="11" fill="var(--muted)">part-spent at the till</text>
+        </svg>
+      </div>
+      <figcaption>
+        The five states a voucher can hold. The dashed line is the one most systems get
+        wrong: a guest who abandons the payment page leaves a cancelled voucher, and if
+        their money arrives afterwards anyway, that voucher is brought back to life rather
+        than leaving the restaurant paid for something it never issued.
+      </figcaption>
+    </figure>
+
+    <h3>Redeeming one at the restaurant</h3>
+    <p>
+      Staff either type the code printed on the voucher — <code>VG-</code> and twelve
+      characters — or scan its QR —
+      the QR simply opens the redemption screen with the code already filled in, so a
+      phone camera and a keyboard reach the same place. The screen shows the balance, the
+      restaurant it is valid at and the expiry before anything is taken.
+    </p>
+    <p>
+      The amount is then removed <em>conditionally</em>, against the balance the member of
+      staff was actually looking at. A voucher that changed in between — because the other
+      till was on it, or because the page had been open for an hour — is refused with an
+      explanation rather than being overwritten. Every redemption writes its own line:
+      amount, branch, member of staff, time.
+    </p>
+
+    <div class="pull">
+      <p>
+        <strong>The QR code was written from the specification rather than borrowed.</strong>
+        That is normally a bad idea, and here it removes a third-party dependency from a
+        piece of paper the restaurant hands to a paying guest. The risk is that an encoder
+        with a single bit out of place produces something that looks exactly like a QR code
+        and scans as nothing at all.
+      </p>
+      <p>
+        So it is not judged by eye. Every code the system can produce is rendered to an
+        image and read back by an independent barcode decoder — the same class of software
+        as a phone camera — and the text has to come back identical. That test found two
+        real faults during the build: a transposed corner in the format bits, and a
+        mis-scored mask pattern. Both would have shipped invisibly.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <p class="kicker">Part four</p>
+    <h2>Who can do what</h2>
+    <p>
+      Three roles. Eighteen distinct permissions, each checked on the server every time,
+      including on the actions behind buttons a person cannot see.
+    </p>
+
+    <div class="scroll">
+      <table>
+        <caption>The permissions that matter most</caption>
+        <thead>
+          <tr>
+            <th scope="col">Can…</th>
+            <th scope="col">Staff</th>
+            <th scope="col">Manager</th>
+            <th scope="col">Owner</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>See today's bookings and enquiries</td><td class="yes">Yes</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
+          <tr><td>Redeem a gift voucher at the till</td><td class="yes">Yes</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
+          <tr><td>Change a booking, edit menus and rooms</td><td class="no">No</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
+          <tr><td>Issue a voucher by hand, refund a deposit</td><td class="no">No</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
+          <tr><td>Cancel a voucher</td><td class="no">No</td><td class="no">No</td><td class="yes">Yes</td></tr>
+          <tr><td>Add or remove a colleague</td><td class="no">No</td><td class="no">No</td><td class="yes">Yes</td></tr>
+          <tr><td>Change prices, deposits and settings</td><td class="no">No</td><td class="no">No</td><td class="yes">Yes</td></tr>
+          <tr><td>Read the activity log</td><td class="no">No</td><td class="no">No</td><td class="yes">Yes</td></tr>
+          <tr><td>Erase a guest's personal data</td><td class="no">No</td><td class="no">No</td><td class="yes">Yes</td></tr>
+          <tr><td>See the other restaurant at all</td><td class="no">No</td><td class="no">No</td><td class="yes">Yes</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <p class="kicker">Part five</p>
+    <h2>Passwords, and getting back in</h2>
+
+    <h3>How a password is kept</h3>
+    <p>
+      Passwords are not stored. What is stored is a bcrypt hash at cost 12 — a deliberately
+      slow one-way transformation, tuned so that checking one password takes a fraction of
+      a second and checking a stolen list of them would take a very long time. If the
+      database file were taken tomorrow, <strong>the passwords in it could not be read out
+      of it</strong>.
+    </p>
+    <p>
+      A new password must be at least twelve characters and is refused if it is the
+      starting password, the previous one, an obvious choice, a run across the keyboard,
+      built from too few distinct characters, or made out of the person's own name or
+      email address. The same rules apply everywhere a password is set — the sign-in
+      screen, the reset link and the command-line tool all ask one shared piece of code,
+      so they cannot drift apart.
+    </p>
+
+    <h3>Staying signed in</h3>
+    <p>
+      A signed-in session is a signed token in a cookie the browser will not hand to
+      JavaScript, will not send to another site, and — in production — will only send over
+      HTTPS. It lasts seven days. It also carries a fingerprint of the account's password
+      hash, which has a useful consequence: <strong>changing a password immediately
+      invalidates every session that account has open anywhere</strong>. That is the
+      correct behaviour when a laptop is lost or a member of staff leaves.
+    </p>
+
+    <h3>Three ways back in, in order</h3>
+    <div class="journey">
+      <div class="step">
+        <h3>The person forgot their password</h3>
+        <p>
+          They ask for a link by email. The link lasts <b>30 minutes, works once</b>, and
+          asking for a new one cancels the earlier ones. Only a hash of the link's token is
+          stored, so the same protection that covers passwords covers reset links. The
+          screen says the same thing whether or not the address exists — otherwise it
+          becomes a way to discover who works there.
+        </p>
+      </div>
+      <div class="step">
+        <h3>An account is locked out by wrong guesses</h3>
+        <p>
+          Five failures against one email address locks it for fifteen minutes; fifty from
+          one internet connection locks that connection. <b>An owner can clear a lock
+          immediately</b> from the staff screen, so a real person who mistyped is never
+          waiting on a timer.
+        </p>
+      </div>
+      <div class="step">
+        <h3>Every owner is locked out at once</h3>
+        <p>
+          The recovery of last resort, and the one that is usually missing. A command run on
+          the server — <code>npm run staff:password</code> — sets a named account's password
+          directly. It obeys exactly the same strength rules as the website and it writes a
+          line into the activity log, so <b>using it is never invisible</b>.
+        </p>
+      </div>
+    </div>
+
+    <p>
+      Two-step verification by phone was considered and deliberately deferred. It is worth
+      adding once the restaurant is trading on this system, and it is a small piece of work
+      on top of what is here — but it introduces a new way to be locked out, and adding it
+      before the recovery paths above were solid would have made the system less safe
+      rather than more.
+    </p>
+  </section>
+
+  <section>
+    <p class="kicker">Part six</p>
+    <h2>The guest's data</h2>
+
+    <h3>Answering an erasure request</h3>
+    <p>
+      A guest is entitled to ask for their details to be removed, and the restaurant has a
+      month to do it. There is a screen for this, and two decisions inside it are worth
+      stating because they are the ones that are usually got wrong.
+    </p>
+    <p>
+      <strong>The record is anonymised, not deleted.</strong> A booking is a trading record
+      — covers on a night, a deposit taken — and destroying it falsifies accounts that HMRC
+      requires kept for six years. The law anticipates exactly this: the right to erasure
+      does not override a legal obligation to retain. So the person comes out of the row
+      and the transaction stays in it.
+    </p>
+    <p>
+      <strong>A gift voucher with a balance cannot be erased.</strong> It is money the
+      restaurant owes to whoever holds the code. Removing the name does not cancel the
+      debt; it makes the debt unattributable, which is worse for both sides. The screen
+      says so, names the voucher, and does the rest.
+    </p>
+
+    <h3>Backups</h3>
+    <p>
+      A copy is taken every 24 hours and the last 30 are kept. Each copy is
+      <strong>opened and read back after it is written</strong>, and the count of bookings
+      inside it is reported, because a backup nobody has ever restored is a promise, not a
+      protection. The owner can see the list, take one on demand, and download one.
+    </p>
+
+    <h3>The activity log</h3>
+    <p>
+      Every administrative action is recorded against a person and a time. Rather than
+      emailing the owner four hundred times on a busy Saturday — which produces an inbox
+      nobody reads — the log splits by consequence: anything that moves money, changes who
+      can do what, or takes data out of the building is reported <strong>immediately</strong>;
+      everything else arrives in <strong>one daily summary</strong> with nothing omitted.
+    </p>
+
+    <h3>What the browser is allowed to do</h3>
+    <p>
+      The site sends a content security policy that names the only places code and images
+      may come from, refuses to be embedded in another site's frame, refuses to let a
+      browser guess a file's type, and switches off access to camera, microphone, location
+      and the browser payment API — none of which this site has any business using. The
+      back office additionally tells search engines to stay out and forbids any page of it
+      from being cached.
+    </p>
+  </section>
+
+  <section>
+    <p class="kicker">Part seven</p>
+    <h2>What proves it</h2>
+    <p>
+      Eight suites, 916 checks, all currently passing. They are not a formality — the
+      counts below include faults these suites caught during the build that a demonstration
+      would not have: two in the QR encoder, a redemption that could be double-spent, a
+      manager able to issue vouchers against the other branch, and a mobile page 18 pixels
+      wider than the phone it was on.
+    </p>
+
+    <div class="scroll">
+      <table>
+        <caption>Automated checks, 9 September 2026</caption>
+        <thead>
+          <tr>
+            <th scope="col">Suite</th>
+            <th scope="col">What it proves</th>
+            <th scope="col" class="num">Checks</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Journeys</td><td>Every page and every admin screen, driven in a real browser</td><td class="num">248</td></tr>
+          <tr><td>Validation</td><td>Every form field against valid, invalid and hostile input</td><td class="num">355</td></tr>
+          <tr><td>Mobile</td><td>Every page at 320, 360, 390 and 430 pixels wide</td><td class="num">131</td></tr>
+          <tr><td>Accounts</td><td>Passwords, sessions, lockouts, reset links, permissions</td><td class="num">54</td></tr>
+          <tr><td>QR codes</td><td>Every code rendered and read back by an independent decoder</td><td class="num">48</td></tr>
+          <tr><td>Money</td><td>Rounding, balances, double-spending, refunds</td><td class="num">34</td></tr>
+          <tr><td>Two full journeys</td><td>Buying and redeeming a voucher; forgetting and resetting a password</td><td class="num">24</td></tr>
+          <tr><td>Payments</td><td>Signature verification, replay, duplicate notifications</td><td class="num">22</td></tr>
+        </tbody>
+        <tfoot>
+          <tr><td colspan="2">Total</td><td class="num">916</td></tr>
+        </tfoot>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <p class="kicker">Part eight</p>
+    <h2>Before it goes live</h2>
+    <p>
+      Six items. None is development work; all are configuration that can only be done
+      once, with the real accounts, and each is deliberately something the system will
+      complain about until it is done.
+    </p>
+
+    <ul class="checks">
+      <li>
+        <span class="box" aria-hidden="true"></span>
+        <span>
+          <b>Set the session secret on the live server</b>
+          <span class="why">The production server refuses to start without it, by design.</span>
+        </span>
+      </li>
+      <li>
+        <span class="box" aria-hidden="true"></span>
+        <span>
+          <b>Verify the restaurant's own sending domain</b>
+          <span class="why">Until then the server warns on every start that no confirmation email is being delivered.</span>
+        </span>
+      </li>
+      <li>
+        <span class="box" aria-hidden="true"></span>
+        <span>
+          <b>Switch Stripe from test keys to live keys</b>
+          <span class="why">And confirm the Stripe account is in the restaurant's name, not a previous supplier's.</span>
+        </span>
+      </li>
+      <li>
+        <span class="box" aria-hidden="true"></span>
+        <span>
+          <b>Point Stripe's notifications at the live address and roll the signing secret</b>
+          <span class="why">The signature check is worthless if the secret behind it is one anybody has seen.</span>
+        </span>
+      </li>
+      <li>
+        <span class="box" aria-hidden="true"></span>
+        <span>
+          <b>Set the live site address</b>
+          <span class="why">It is what goes into voucher links, booking links and reset emails.</span>
+        </span>
+      </li>
+      <li>
+        <span class="box" aria-hidden="true"></span>
+        <span>
+          <b>Change every starting password</b>
+          <span class="why">Staff are already forced to on first sign-in; this is confirming it happened.</span>
+        </span>
+      </li>
+    </ul>
+  </section>
+
+  <section>
+    <p class="kicker">Part nine</p>
+    <h2>What is deliberately not built</h2>
+    <p>
+      Stating this is part of the architecture, not an apology for it. Each was considered
+      and left out on purpose, and each is straightforward to add later because the
+      groundwork is here.
+    </p>
+    <p>
+      <strong>Two-step verification for staff sign-in</strong> — deferred until trading, for
+      the reason given in Part five. <strong>A native phone app</strong> — the back office
+      already works properly on a phone, which is what the "app" question usually means;
+      a genuine app store product is a different and much larger undertaking.
+      <strong>A till or EPOS integration</strong> — redemptions are recorded here and
+      reconciled by hand, which is correct until there is a volume that justifies wiring
+      the two together. <strong>Loyalty and marketing automation</strong> — consent is
+      captured and stored correctly, so the data will be there when the restaurant wants
+      to use it.
+    </p>
+  </section>
+
+  <div class="colophon">
+    <p>
+      Prepared by Zenryz for Varanasi, 9 September 2026. Figures in this document are read
+      from the codebase and the test results on that date rather than estimated: 18,847
+      lines of application code, 3,691 lines of tests, 17 tables, 7 migrations, 916 passing
+      checks. A companion document, <em>Varanasi Safeguards</em>, covers the same ground for
+      a non-technical reader in half the length.
+    </p>
+  </div>
+
+</div>

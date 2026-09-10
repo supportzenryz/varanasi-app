@@ -1,5 +1,6 @@
 import { submitEnquiryAction } from "@/app/(site)/[branch]/enquiry-actions";
 import { SubmitButton } from "@/components/SubmitButton";
+import { choice, choiceText, field, label } from "@/lib/forms";
 
 export type EnquiryField =
   | "phone" | "company" | "location" | "partySize" | "date" | "time" | "occasion" | "room" | "dietary";
@@ -50,9 +51,6 @@ export function EnquiryForm({
   values?: Record<string, string>;
 }) {
   const has = (f: EnquiryField) => fields.includes(f);
-  const field =
-    "w-full border border-[--line] px-3.5 py-3 text-[0.95rem] outline-none focus:border-gold rounded-none";
-  const label = "block accent text-[0.6rem] text-gold mb-2";
   /* Marked rather than left to guesswork. The asterisk is aria-hidden and
      paired with the real `required` attribute, so a screen reader hears the
      field's own requiredness rather than a stray star. */
@@ -147,16 +145,16 @@ export function EnquiryForm({
       </div>
 
       <div className="grid gap-3">
-        <label className="flex gap-3 text-sm items-start">
-          <input type="checkbox" name="terms" required className="mt-0.5 h-5 w-5 shrink-0 accent-[#c6a35a]" />
-          <span>
+        <label className={choice}>
+          <input type="checkbox" name="terms" required />
+          <span className={choiceText}>
             I&rsquo;m happy for Varanasi to hold these details in order to reply to me, as set out in the{" "}
             <a href={privacyHref} className="underline hover:text-gold">privacy policy</a>.
           </span>
         </label>
-        <label className="flex gap-3 text-sm items-start">
-          <input type="checkbox" name="marketing" className="mt-0.5 h-5 w-5 shrink-0 accent-[#c6a35a]" />
-          <span>I&rsquo;d also like to hear about events, new menus and offers.</span>
+        <label className={choice}>
+          <input type="checkbox" name="marketing" />
+          <span className={choiceText}>I&rsquo;d also like to hear about events, new menus and offers.</span>
         </label>
       </div>
 

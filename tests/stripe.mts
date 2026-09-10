@@ -25,7 +25,8 @@ process.env.STRIPE_WEBHOOK_SECRET = "whsec_dummy_local";
 const src = fs.readFileSync(new URL("../src/lib/stripe.ts", import.meta.url), "utf8");
 const tmp = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "stripe-test-")), "stripe.ts");
 fs.writeFileSync(tmp, src.replace(/^import "server-only";\s*$/m, ""));
-const { verifyWebhook, createDepositCheckout, createVoucherCheckout, refundDeposit, refundedSoFar } =
+const { verifyWebhook, createDepositCheckout, createVoucherCheckout, refundDeposit, refundedSoFar,
+  sessionPaysFor } =
   await import(pathToFileURL(tmp).href);
 
 let pass = 0, fail = 0;
@@ -148,6 +149,56 @@ t("a partial refund of the remainder is a different key, not a replay of the fir
 const already = await refundedSoFar("pi_1");
 t("what has already gone back counts succeeded and pending, and ignores failed",
   already === 1250, `£${(already / 100).toFixed(2)} (expected £12.50)`);
+
+console.log("\n── A paid session only pays for its own order ──");
+{
+  /* The hole this closes was a live payment bypass: both Stripe return pages
+     read "which order" and "which session" out of the query string and never
+     compared them, so one real payment could issue an unlimited number of
+     vouchers and confirm an unlimited number of tables. */
+  const paid = {
+    id: "cs_test_1", url: null, payment_status: "paid" as const, status: "complete" as const,
+    payment_intent: "pi_1", amount_total: 5000,
+    client_reference_id: "VG-AAAA-BBBB-CCCC",
+    metadata: { voucherId: "7", code: "VG-AAAA-BBBB-CCCC", kind: "voucher" },
+  };
+  const forThis = { kind: "voucher" as const, id: 7, reference: "VG-AAAA-BBBB-CCCC", amountPence: 5000 };
+
+  t("the session that paid for this voucher is accepted", sessionPaysFor(paid, forThis).ok === true);
+
+  const other = sessionPaysFor(paid, { ...forThis, id: 8, reference: "VG-ZZZZ-YYYY-XXXX" });
+  t("the same paid session cannot issue a DIFFERENT voucher", other.ok === false,
+    other.ok === false ? other.reason : "");
+
+  const dearer = sessionPaysFor(paid, { ...forThis, amountPence: 50000 });
+  t("a £50 payment cannot issue a £500 voucher", dearer.ok === false,
+    dearer.ok === false ? dearer.reason : "");
+
+  t("a session referencing another code is refused",
+    sessionPaysFor({ ...paid, client_reference_id: "VG-QQQQ-QQQQ-QQQQ" }, forThis).ok === false);
+
+  t("a session carrying no voucher id at all is refused",
+    sessionPaysFor({ ...paid, metadata: {} }, forThis).ok === false);
+
+  t("a booking session cannot be read as a voucher session",
+    sessionPaysFor({ ...paid, metadata: { bookingId: "7", reference: "VB-ABC123" } }, forThis).ok === false);
+
+  const booking = {
+    ...paid, client_reference_id: "VB-ABC123",
+    metadata: { bookingId: "12", reference: "VB-ABC123" },
+  };
+  t("a booking session pays for its own booking",
+    sessionPaysFor(booking, { kind: "booking", id: 12, reference: "VB-ABC123", amountPence: 5000 }).ok === true);
+  t("and not for another one",
+    sessionPaysFor(booking, { kind: "booking", id: 13, reference: "VB-ABC123", amountPence: 5000 }).ok === false);
+
+  /* Stripe not returning `client_reference_id` must not refuse real money —
+     the id check is the decisive one. */
+  const noRef: Record<string, unknown> = { ...paid };
+  delete noRef.client_reference_id;
+  t("a missing client_reference_id does not refuse an otherwise-matching session",
+    sessionPaysFor(noRef as typeof paid, forThis).ok === true);
+}
 
 console.log(`\n${"─".repeat(60)}\n${pass}/${pass + fail} checks passed\n`);
 process.exit(fail ? 1 : 0);

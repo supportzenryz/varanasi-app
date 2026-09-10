@@ -4,11 +4,11 @@ import { AdminNotice } from "@/components/AdminNotice";
 import { ConfirmButton } from "@/components/ConfirmButton";
 import { findPersonalData } from "@/lib/erasure";
 import { eraseAction } from "./actions";
+import { field } from "@/lib/forms";
 
 export const metadata = { title: "Erasure requests" };
 export const dynamic = "force-dynamic";
 
-const field = "w-full border border-[--line] bg-white px-3 py-2 text-sm outline-none focus:border-gold";
 
 function when(at: number): string {
   return new Date(at * 1000).toLocaleDateString("en-GB", { timeZone: "Europe/London", dateStyle: "medium" });
@@ -41,7 +41,7 @@ export default async function ErasurePage({ searchParams }: {
             Email, phone or name
           </label>
           <input id="q" name="q" defaultValue={query} required minLength={3}
-            placeholder="guest@example.com" className={`${field} w-80`} />
+            placeholder="guest@example.com" className={`${field} sm:w-80`} />
         </div>
         <button className="bg-ink text-pale px-5 py-2 text-sm font-semibold">Find everything</button>
       </form>
@@ -168,7 +168,7 @@ export default async function ErasurePage({ searchParams }: {
                   <label className="block text-xs font-semibold text-ink-3 mb-1" htmlFor="confirm">
                     Type <code className="tnum">{query}</code> to confirm
                   </label>
-                  <input id="confirm" name="confirm" required className={`${field} w-80`} autoComplete="off" />
+                  <input id="confirm" name="confirm" required className={`${field} sm:w-80`} autoComplete="off" />
                 </div>
                 <ConfirmButton
                   ask={`Erase this person from ${total} record${total === 1 ? "" : "s"}? This cannot be undone.`}

@@ -282,6 +282,30 @@ console.log("\n── Asking too often ──");
   guard.noteSuccess(email, "5.5.5.5");
   t("a correct password clears it", guard.lockedFor(email, "5.5.5.5") === 0);
 }
+{
+  /* The owner letting a colleague back in.
+   *
+   * The behaviour the staff screen depends on: an owner can see that one
+   * account is locked, clear it for that account alone, and do so without
+   * touching the password — otherwise the only way back in on a Friday
+   * evening is to reset the password of the person who takes the bookings. */
+  limiter.resetAllLimits();
+  const locked = "priya@example.test";
+  const other = "raj@example.test";
+  for (let i = 0; i < guard.LOGIN_LIMITS.MAX_PER_EMAIL; i++) guard.noteFailure(locked, "7.7.7.7");
+  for (let i = 0; i < guard.LOGIN_LIMITS.MAX_PER_EMAIL; i++) guard.noteFailure(other, "7.7.7.7");
+
+  t("the staff screen can see who is locked out without knowing their address",
+    guard.emailLockedFor(locked) > 0, `${guard.emailLockedFor(locked)} minutes`);
+  t("and reports nothing for an account that is fine",
+    guard.emailLockedFor("nobody@example.test") === 0);
+
+  guard.clearEmailLock(locked);
+  t("an owner can clear one account's lock", guard.emailLockedFor(locked) === 0);
+  t("without freeing everyone else who was locked", guard.emailLockedFor(other) > 0);
+  t("and the account can sign in again immediately",
+    guard.lockedFor(locked, "7.7.7.7") === 0);
+}
 
 console.log("\n" + "─".repeat(60));
 console.log(`${pass}/${pass + fail} checks passed`);

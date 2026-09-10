@@ -10,11 +10,10 @@ import { expireStaleHolds } from "@/lib/booking";
 import { AdminNotice } from "@/components/AdminNotice";
 import { ConfirmButton } from "@/components/ConfirmButton";
 import { addBooking, updateBookingStatus, refundBookingAction } from "./actions";
+import { field, label } from "@/lib/forms";
 
 export const metadata = { title: "Reservations" };
 
-const field = "w-full border border-[--line] bg-white px-3 py-2 text-sm outline-none focus:border-gold";
-const label = "block text-xs font-semibold text-ink-3 mb-1";
 
 const STATUS_LABEL: Record<string, string> = {
   held: "Held", confirmed: "Confirmed", seated: "Seated",
@@ -195,7 +194,7 @@ export default async function BookingsAdmin({
                           <input type="hidden" name="id" value={r.id} />
                           <input name="amount" inputMode="decimal" placeholder="all of it"
                             aria-label={`Amount to refund for ${r.reference}`}
-                            className="w-24 border border-[--line] bg-white px-2 py-1 text-[0.7rem]" />
+                            className={`${field} w-24 !px-2 !py-1 !text-[0.7rem]`} />
                           <ConfirmButton
                             ask={`Refund this deposit to ${r.guestName}? The money leaves the account and they are emailed. This cannot be undone from here.`}
                             className="text-[0.7rem] border border-brick/40 text-brick px-2 py-1 hover:bg-clay/10">

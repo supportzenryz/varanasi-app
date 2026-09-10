@@ -6,11 +6,10 @@ import { branches, blockedDates, privateRooms } from "@/db/schema";
 import { requireAbility } from "@/lib/auth";
 import { addBlockedDate, deleteBlockedDate } from "./actions";
 import { AdminNotice } from "@/components/AdminNotice";
+import { field, label } from "@/lib/forms";
 
 export const metadata = { title: "Blocked dates" };
 
-const field = "w-full border border-[--line] bg-white px-3 py-2 text-sm outline-none focus:border-gold";
-const label = "block text-xs font-semibold text-ink-3 mb-1";
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10);

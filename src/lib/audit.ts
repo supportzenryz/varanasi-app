@@ -164,6 +164,10 @@ export function recordAnon(entry: AuditEntry & { who?: string }): void {
   try {
     db.insert(auditLog).values({
       userId: null,
+      /* `who` used to be passed in, put in the alert email, and then thrown
+         away — the row itself recorded only that "somebody" did it. It is
+         stored now, which is the whole point of the column. */
+      actor: entry.who ?? null,
       action: entry.action,
       entity: entry.entity,
       entityId: entry.entityId ?? null,
@@ -192,6 +196,48 @@ export function recordAnon(entry: AuditEntry & { who?: string }): void {
       "Nobody was signed in when this happened.",
     ].filter(Boolean).join("\n"),
   }).catch((err) => console.error("[audit] alert failed:", err instanceof Error ? err.message : err));
+}
+
+/**
+ * Something a guest did on the website.
+ *
+ * THE GAP THIS CLOSES. Every administrative action has been recorded since
+ * the build's first week — a price changed, a voucher cancelled, an account
+ * promoted. Nothing a *guest* did was recorded anywhere. So "why was table 12
+ * cancelled on Saturday" had an answer only when a member of staff had done
+ * it; when the guest cancelled it themselves through the link in their
+ * confirmation, the booking simply changed state and the log was silent. The
+ * same was true of every voucher bought, every deposit taken, every enquiry
+ * sent and every consent given or withdrawn.
+ *
+ * Deliberately NOT page views. Recording which pages a visitor looked at, tied
+ * to them, would make this table personal data under UK GDPR — it would need
+ * its own consent, its own retention period, and it would have to be erasable
+ * on request along with everything else. Analytics answers "which pages are
+ * working" without identifying anybody, and that is where that question
+ * belongs. This table answers "what happened to this booking", which needs a
+ * name on it and has a lawful basis for having one.
+ *
+ * `actor` is the guest's own name or reference rather than an account, and
+ * these never interrupt the owner: a Saturday of ordinary bookings is not
+ * forty emails. They appear in the daily summary alongside everything else.
+ */
+export function recordGuest(entry: AuditEntry & { by?: string | null }): void {
+  try {
+    db.insert(auditLog).values({
+      userId: null,
+      actor: entry.by ?? "Guest",
+      action: entry.action,
+      entity: entry.entity,
+      entityId: entry.entityId ?? null,
+      detail: entry.detail ?? null,
+    }).run();
+  } catch (err) {
+    /* Never throws, for the same reason `record` doesn't: a guest must not be
+       unable to book a table because the log is unwritable. Loud in the
+       container log, silent to the guest. */
+    console.error("[audit] could not write guest entry:", err instanceof Error ? err.message : err);
+  }
 }
 
 /* ---------------------------------------------------------------- digest -- */

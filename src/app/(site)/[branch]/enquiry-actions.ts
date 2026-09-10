@@ -2,6 +2,7 @@
 import { redirect } from "next/navigation";
 import { submitEnquiry, type EnquiryType } from "@/lib/enquiry";
 import { rememberSubmission } from "@/lib/form-recall";
+import { guardPublicForm } from "@/lib/public-limit";
 
 /**
  * One action behind every enquiry form on the site. Which page it came from is
@@ -27,6 +28,14 @@ export async function submitEnquiryAction(formData: FormData) {
   const type = String(formData.get("type") ?? "contact") as EnquiryType;
   const branchSlug = String(formData.get("branch") ?? "") || null;
   const page = safeReturn(String(formData.get("returnTo") ?? ""), branchSlug);
+
+  /* Before anything is written or emailed. This form sends two messages per
+     submission, so an unlimited one is somebody else's outbound email budget. */
+  const guard = await guardPublicForm("enquiry", { email: String(formData.get("email") ?? "") });
+  if (!guard.allowed) {
+    await rememberSubmission(guard.message, formData, page);
+    redirect(`${page}?error=1`);
+  }
 
   const partyRaw = String(formData.get("partySize") ?? "");
   const roomRaw = String(formData.get("roomId") ?? "");

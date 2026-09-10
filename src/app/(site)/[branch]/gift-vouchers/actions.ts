@@ -6,10 +6,8 @@ import { voucherRules } from "@/lib/booking-config";
 import { createVoucherCheckout, stripeSimulated, paymentsUnavailable } from "@/lib/stripe";
 import { guardPublicForm } from "@/lib/public-limit";
 import { parsePounds, formatPence } from "@/lib/money";
+import { siteUrl } from "@/lib/site";
 
-function siteUrl(): string {
-  return (process.env.SITE_URL ?? "http://localhost:3000").replace(/\/$/, "");
-}
 
 /**
  * Creates the voucher as `pending`, then sends the buyer to pay. Exactly the
@@ -95,9 +93,17 @@ export async function buyVoucher(formData: FormData) {
   const cancelUrl = `${siteUrl()}/${branchSlug}/gift-vouchers/unconfirmed?code=${encodeURIComponent(voucher.code)}`;
 
   if (stripeSimulated()) {
+    /* The simulator is same-origin, so it comes back by path rather than by
+       absolute URL. Real Stripe needs the absolute `successUrl` above — it is
+       redirecting from its own domain — but the simulator is a page on this
+       server, and sending it a fully-qualified address meant the local
+       payment journey depended on SITE_URL being set correctly. It usually
+       wasn't in development, so a production build run locally sent the guest
+       to the live domain to collect a voucher that had been created here. */
+    const path = (u: string) => u.slice(siteUrl().length) || "/";
     redirect(`/checkout-simulator?ref=${encodeURIComponent(voucher.code)}&amount=${voucher.valuePence}` +
-      `&success=${encodeURIComponent(successUrl.replace("{CHECKOUT_SESSION_ID}", `sim_${voucher.code}`))}` +
-      `&cancel=${encodeURIComponent(cancelUrl)}`);
+      `&success=${encodeURIComponent(path(successUrl).replace("{CHECKOUT_SESSION_ID}", `sim_${voucher.code}`))}` +
+      `&cancel=${encodeURIComponent(path(cancelUrl))}`);
   }
 
   let url: string | null = null;

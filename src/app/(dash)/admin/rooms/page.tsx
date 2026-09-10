@@ -9,11 +9,10 @@ import { formatPence } from "@/lib/money";
 import { saveRoom, addRoom, toggleRoom, deleteRoom, moveRoom, addRoomImage, removeRoomImage } from "./actions";
 import { AdminNotice } from "@/components/AdminNotice";
 import { ConfirmButton } from "@/components/ConfirmButton";
+import { field, label } from "@/lib/forms";
 
 export const metadata = { title: "Private dining" };
 
-const field = "w-full border border-[--line] bg-white px-3 py-2 text-sm outline-none focus:border-gold";
-const label = "block text-xs font-semibold text-ink-3 mb-1";
 const poundValue = (p: number | null) => (p == null ? "" : (p / 100).toFixed(2).replace(/\.00$/, ""));
 
 function idealForText(json: string | null): string {

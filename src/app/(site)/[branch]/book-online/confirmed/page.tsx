@@ -8,7 +8,7 @@ import {
   bookingByReference, confirmPaidBooking, dateLabel, markPaymentFailed, notifyPaymentFailed,
   notifyVerificationFailed, tokenMatches,
 } from "@/lib/booking";
-import { retrieveSession, stripeSimulated } from "@/lib/stripe";
+import { retrieveSession, sessionPaysFor, stripeSimulated } from "@/lib/stripe";
 import { databaseDiagnostics } from "@/db";
 import { PageHero } from "@/components/PageHero";
 
@@ -92,13 +92,40 @@ export default async function Confirmed({
     } else {
       try {
         const session = await retrieveSession(sessionId);
-        if (session.payment_status === "paid" || session.payment_status === "no_payment_required") {
-          await confirmPaidBooking({
+        const owns = sessionPaysFor(session, {
+          kind: "booking",
+          id: booking.id,
+          reference: booking.reference,
+          amountPence: booking.depositPence ?? 0,
+        });
+
+        if (!owns.ok) {
+          /* A paid session belonging to a different booking. The table is not
+             confirmed and no deposit is marked captured. There is no innocent
+             route here — every link this site generates carries the session
+             that paid for the reference beside it — so it is logged as a
+             refusal rather than as a payment problem. */
+          console.error(
+            `[booking] REFUSED to confirm ${booking.reference} against session ${sessionId} — ${owns.reason}`,
+          );
+          detail = `Session/booking mismatch: ${owns.reason}.`;
+          problem = "We couldn't match that payment to this booking, so the table hasn't been "
+            + "confirmed. If you have been charged, ring us and we'll sort it out straight away.";
+        } else if (session.payment_status === "paid" || session.payment_status === "no_payment_required") {
+          const done = await confirmPaidBooking({
             bookingId: booking.id,
             paymentIntent: session.payment_intent,
             sessionId: session.id,
           });
-          paid = true;
+          /* The result is read rather than assumed. It comes back false when
+             the booking was cancelled between paying and arriving here — the
+             deposit is recorded so it can be refunded, but the table is not
+             put back on sale, and the guest must not be told it is confirmed. */
+          paid = done.confirmed;
+          if (!paid) {
+            problem = "This booking was cancelled, so the table hasn't been reinstated — but your "
+              + "payment did go through. We'll refund it; ring us if you'd rather rebook.";
+          }
         } else if (session.status === "expired") {
           detail = `Stripe says the checkout session expired (status=${session.status}).`;
           markPaymentFailed(booking.id);

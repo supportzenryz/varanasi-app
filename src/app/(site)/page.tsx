@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { allBranches } from "@/lib/branches";
 import { brand } from "@/lib/brand";
 import { OrnamentDivider } from "@/components/Ornament";
+import { organisationJsonLd } from "@/lib/seo";
 
 export const metadata: Metadata = {
   // absolute, or the root layout's "%s | Varanasi" template appends a
@@ -46,6 +47,16 @@ export default function ChooseBranch() {
   const branches = allBranches();
 
   return (
+    <>
+      {/* The two restaurants as one business, for the front door.
+          Each branch page carries its own Restaurant markup; this is what
+          tells Google they belong to the same organisation rather than being
+          two unrelated places that happen to share a name — which is the
+          confusion the client asked us to fix in the first place. */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: organisationJsonLd(branches) }}
+      />
     <main className="relative isolate flex min-h-svh items-center justify-center overflow-hidden bg-ink">
       <Image
         src="/brand/home-hero.png"
@@ -105,5 +116,6 @@ export default function ChooseBranch() {
         </ul>
       </div>
     </main>
+    </>
   );
 }

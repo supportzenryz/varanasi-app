@@ -9,6 +9,8 @@ import { formatPence } from "@/lib/money";
 import { checkName, checkEmail } from "@/lib/validate";
 import { sendMail } from "@/lib/email";
 import { sendWhatsApp } from "@/lib/whatsapp";
+import { recordGuest } from "@/lib/audit";
+import { siteUrl } from "@/lib/site";
 
 export type Voucher = typeof vouchers.$inferSelect;
 
@@ -212,6 +214,15 @@ export async function activatePaidVoucher(opts: {
 
   const voucher = voucherById(opts.voucherId)!;
 
+  recordGuest({
+    action: "voucher.purchased",
+    entity: "voucher",
+    entityId: voucher.code,
+    by: voucher.purchaserName,
+    detail: `${voucher.valuePence / 100} paid, for ${voucher.recipientName}` +
+      (voucher.deliverOn ? `, held until ${voucher.deliverOn}` : ", sent now"),
+  });
+
   // Always receipt the buyer. Only send the voucher itself now if it isn't
   // being held for a future date.
   await notifyPurchaser(voucher);
@@ -225,6 +236,16 @@ export function markPurchaseFailed(voucherId: number): void {
   const v = voucherById(voucherId);
   if (!v || v.status !== "pending") return;
   db.update(vouchers).set({ status: "cancelled" }).where(eq(vouchers.id, voucherId)).run();
+  /* Worth a line of its own. An abandoned voucher purchase that is later paid
+     for is recovered by `activatePaidVoucher`, and knowing this happened is
+     what makes that recovery legible six weeks later. */
+  recordGuest({
+    action: "voucher.abandoned",
+    entity: "voucher",
+    entityId: v.code,
+    by: v.purchaserName,
+    detail: `${v.valuePence / 100} purchase not completed`,
+  });
 }
 
 /* ---------------- delivery ---------------- */
@@ -255,7 +276,7 @@ export function voucherLink(v: Voucher, site: string): string {
 export async function deliverVoucher(v: Voucher): Promise<void> {
   if (v.deliveredAt) return;
   const rules = voucherRules();
-  const site = (process.env.SITE_URL ?? "https://varanasi.uk").replace(/\/$/, "");
+  const site = siteUrl();
 
   await sendMail({
     to: v.recipientEmail ? [v.recipientEmail] : [],
@@ -304,7 +325,7 @@ Varanasi Restaurant`,
 async function notifyPurchaser(v: Voucher): Promise<void> {
   const rules = voucherRules();
   if (!v.purchaserEmail) return;
-  const site = (process.env.SITE_URL ?? "https://varanasi.uk").replace(/\/$/, "");
+  const site = siteUrl();
   const when = v.deliverOn
     ? `We'll send it to ${v.recipientName} on ${new Date(`${v.deliverOn}T12:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" })}.`
     : `We've sent it straight to ${v.recipientName} at ${v.recipientEmail}.`;
@@ -404,6 +425,10 @@ export function redeem(opts: {
   code: string;
   amountPence: number;
   branchId: number | null;
+  /** True only for an owner, who may redeem at either restaurant. Stated by
+   *  the caller rather than inferred from a null `branchId`, which an account
+   *  with no restaurant attached also has. */
+  anyBranch?: boolean;
   userId: number;
   note?: string | null;
   /**
@@ -434,10 +459,30 @@ export function redeem(opts: {
   if (v.status === "expired") return { ok: false, error: `That voucher expired on ${expiryLabel(v)}.` };
   if (v.status === "redeemed" || v.balancePence <= 0) return { ok: false, error: "That voucher has already been fully used." };
 
-  // A branch-specific voucher can't be spent at the other restaurant.
-  if (v.branchId && opts.branchId && v.branchId !== opts.branchId) {
-    const b = branchOf(v);
-    return { ok: false, error: `That voucher is only valid at Varanasi ${b?.city ?? "the other branch"}.` };
+  /* A branch-specific voucher can't be spent at the other restaurant.
+   *
+   * `opts.branchId` is null in exactly two situations and they need opposite
+   * answers: an owner, who may redeem anywhere, and a non-owner whose account
+   * has no restaurant attached, who may redeem nowhere. The old test was
+   * `v.branchId && opts.branchId && …`, which short-circuits on a null
+   * `opts.branchId` and so gave both of them the owner's answer — a staff
+   * account with no branch could spend a Leicester-only voucher at a
+   * Birmingham till, drawing down Leicester's liability against Birmingham's
+   * takings with a null branch on the ledger row to reconcile it against.
+   *
+   * The caller now says which it means rather than leaving it to be inferred
+   * from a null. */
+  if (v.branchId && !opts.anyBranch) {
+    if (opts.branchId == null) {
+      return {
+        ok: false,
+        error: "This account isn't attached to a restaurant, so it can't redeem a voucher. Ask the owner.",
+      };
+    }
+    if (v.branchId !== opts.branchId) {
+      const b = branchOf(v);
+      return { ok: false, error: `That voucher is only valid at Varanasi ${b?.city ?? "the other branch"}.` };
+    }
   }
 
   if (!Number.isInteger(opts.expectedBalancePence)) {

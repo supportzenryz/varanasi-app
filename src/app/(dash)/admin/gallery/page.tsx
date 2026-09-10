@@ -7,14 +7,13 @@ import { branches, galleryImages, branchStats } from "@/db/schema";
 import { requireAbility } from "@/lib/auth";
 import { AdminNotice } from "@/components/AdminNotice";
 import { ConfirmButton } from "@/components/ConfirmButton";
+import { field, label } from "@/lib/forms";
 import {
   addImage, updateImage, deleteImage, moveImage, saveStat, addStat, deleteStat,
 } from "./actions";
 
 export const metadata = { title: "Gallery & venue tiles" };
 
-const field = "w-full border border-[--line] bg-white px-3 py-2 text-sm outline-none focus:border-gold";
-const label = "block text-xs font-semibold text-ink-3 mb-1";
 
 export default async function GalleryAdmin({
   searchParams,

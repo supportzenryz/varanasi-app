@@ -50,6 +50,20 @@
       "when": 1788960100000,
       "tag": "0006_rate_limits",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1788969800000,
+      "tag": "0007_guest_actions_and_marketing",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1789000000000,
+      "tag": "0008_indexes",
+      "breakpoints": true
     }
   ]
 }

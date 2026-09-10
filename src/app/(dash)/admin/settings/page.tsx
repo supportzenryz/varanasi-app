@@ -7,11 +7,10 @@ import { stripeConfigured, stripeSimulated, paymentsUnavailable } from "@/lib/st
 import { mailMode, mailConfigWarning, sendingDomainWarning, lastMailResult } from "@/lib/email";
 import { saveBookingRules, sendTestEmail } from "./actions";
 import { AdminNotice } from "@/components/AdminNotice";
+import { field, label } from "@/lib/forms";
 
 export const metadata = { title: "Settings" };
 
-const field = "w-full border border-[--line] bg-white px-3 py-2 text-sm outline-none focus:border-gold";
-const label = "block text-xs font-semibold text-ink-3 mb-1";
 const pounds = (p: number) => (p / 100).toFixed(2).replace(/\.00$/, "");
 
 export default async function SettingsAdmin({

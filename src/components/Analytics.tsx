@@ -1,103 +1,60 @@
-"use client";
-
-import { useState, useSyncExternalStore } from "react";
 import Script from "next/script";
-
-const KEY = "varanasi_cookie_consent";
+import type { AnalyticsRules } from "@/lib/booking-config";
 
 /**
- * GA4 behind a consent gate.
+ * Cookieless analytics, and no cookie banner.
  *
- * The old site had no analytics at all — nothing to migrate, and no baseline —
- * so this is where one starts. Two rules it follows:
+ * WHAT WAS HERE BEFORE, and why it went. This was GA4 behind a consent gate:
+ * a client component that read localStorage, showed an accept/decline bar
+ * along the bottom of every page, and loaded Google's tag only after somebody
+ * pressed Accept. It was carefully written and it measured nothing, for two
+ * separate reasons:
  *
- *  1. Nothing loads until a visitor accepts. Under UK GDPR/PECR, analytics
- *     cookies need consent first, so the tag isn't even fetched before then.
- *  2. No measurement ID, no banner. The site shouldn't nag people about
- *     cookies it isn't setting.
+ *  1. No measurement ID was ever set, so the gate never opened.
+ *  2. Even with one, the site's Content-Security-Policy allows scripts from
+ *     'self' only. googletagmanager.com was never on that list, so the browser
+ *     would have refused to load the tag — silently, as CSP does. The banner
+ *     would have appeared, the guest would have pressed Accept, and the number
+ *     of visitors recorded would have been zero.
  *
- * The choice is remembered in localStorage, which is a per-device preference,
- * not personal data leaving the browser.
+ * The replacement counts visitors without identifying them: no cookies, no
+ * localStorage, no cross-site identifier, nothing stored on the device at all.
+ * That matters for more than principle. Analytics cookies need consent under
+ * PECR, and consent means a banner; a banner is the first thing a guest sees
+ * on a page selling fine dining, and between 40% and 45% of people decline it,
+ * so the numbers underneath are missing nearly half the audience and nobody
+ * can say which half. Measuring without cookies needs no banner and counts
+ * everyone.
+ *
+ * Two providers are supported because they are interchangeable and the client
+ * may already have one: Plausible identifies a site by its domain, Umami by an
+ * id. Set neither and nothing is rendered — no script, no request, no banner.
+ * The CSP in next.config.ts is widened to exactly the host configured here and
+ * no other.
  */
-export function Analytics({ measurementId, consentRequired }: {
-  measurementId: string;
-  consentRequired: boolean;
-}) {
-  /**
-   * The stored answer, read after mount.
-   *
-   * It cannot be read during render: localStorage does not exist on the server,
-   * so a state initialiser that touched it would make the first server render
-   * and the first browser render disagree and produce a hydration error. React
-   * has one sanctioned way to read a browser-only store — useSyncExternalStore,
-   * with a server snapshot — and this is it. The subscribe callback also means
-   * a second tab that accepts or declines updates this one.
-   */
-  const stored = useSyncExternalStore(
-    (onChange) => {
-      window.addEventListener("storage", onChange);
-      return () => window.removeEventListener("storage", onChange);
-    },
-    () => {
-      try {
-        return localStorage.getItem(KEY);
-      } catch {
-        // private browsing, or storage blocked entirely. We cannot remember an
-        // answer, so we must not keep asking for one: treat it as a decline.
-        return "no";
-      }
-    },
-    () => null,                       // server: nothing decided yet
-  );
+export function Analytics({ rules }: { rules: AnalyticsRules }) {
+  if (rules.provider === "none" || !rules.scriptUrl) return null;
 
-  // A local override so pressing Accept takes effect immediately, rather than
-  // waiting for a storage event this tab will never receive from itself.
-  const [picked, setPicked] = useState<"yes" | "no" | null>(null);
+  if (rules.provider === "umami") {
+    if (!rules.websiteId) return null;
+    return (
+      <Script
+        src={rules.scriptUrl}
+        data-website-id={rules.websiteId}
+        strategy="afterInteractive"
+        defer
+      />
+    );
+  }
 
-  const choice: "unknown" | "yes" | "no" = !consentRequired
-    ? "yes"
-    : (picked ?? (stored === "yes" ? "yes" : stored === "no" ? "no" : "unknown"));
-
-  const decide = (value: "yes" | "no") => {
-    try { localStorage.setItem(KEY, value); } catch { /* nothing we can do */ }
-    setPicked(value);
-  };
-
-  if (!measurementId) return null;
-
+  // Plausible.
+  if (!rules.domain) return null;
   return (
-    <>
-      {choice === "yes" && (
-        <>
-          <Script src={`https://www.googletagmanager.com/gtag/js?id=${measurementId}`} strategy="afterInteractive" />
-          <Script id="ga4-init" strategy="afterInteractive">
-            {`window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}
-gtag('js',new Date());gtag('config','${measurementId}',{anonymize_ip:true});`}
-          </Script>
-        </>
-      )}
-
-      {choice === "unknown" && (
-        <div role="dialog" aria-label="Cookies"
-          className="fixed bottom-0 inset-x-0 z-[60] border-t border-[--line] bg-ink/97 backdrop-blur-sm">
-          <div className="mx-auto max-w-[84rem] px-5 lg:px-10 py-5 flex flex-wrap items-center gap-x-8 gap-y-4">
-            <p className="text-sm text-pale/75 flex-1 min-w-[18rem]">
-              We&rsquo;d like to use analytics cookies to see which pages are useful and which aren&rsquo;t.
-              Nothing is loaded unless you say yes, and we don&rsquo;t use them for advertising.
-            </p>
-            <div className="flex gap-2.5">
-              <button onClick={() => decide("yes")} className="btn btn-gold !py-2.5 !px-5">Accept</button>
-              <button onClick={() => decide("no")} className="btn btn-outline !py-2.5 !px-5">Decline</button>
-            </div>
-          </div>
-        </div>
-      )}
-    </>
+    <Script
+      src={rules.scriptUrl}
+      data-domain={rules.domain}
+      strategy="afterInteractive"
+      defer
+    />
   );
-}
-
-/** Fires a GA4 event, but only if the tag actually loaded. */
-export function track(event: string, params?: Record<string, unknown>) {
-  const w = window as unknown as { gtag?: (...args: unknown[]) => void };
-  if (typeof w.gtag === "function") w.gtag("event", event, params ?? {});
 }

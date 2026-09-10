@@ -5,6 +5,7 @@ import { branchBySlug, telHref } from "@/lib/branches";
 import { formatPence } from "@/lib/money";
 import { voucherByCode, expiryLabel, expireOldVouchers } from "@/lib/voucher";
 import { qrSvg } from "@/lib/qr";
+import { siteUrl } from "@/lib/site";
 
 export const metadata: Metadata = { title: "Your gift voucher", robots: { index: false } };
 export const dynamic = "force-dynamic";
@@ -46,7 +47,7 @@ export default async function VoucherPage({
      query string. A member of staff scanning this is already signed in, so it
      opens ready to take an amount off; anybody else who scans it gets a
      sign-in page, which is the correct answer to a stranger with a camera. */
-  const site = (process.env.SITE_URL ?? "http://localhost:3000").replace(/\/$/, "");
+  const site = siteUrl();
   const redeemUrl = `${site}/admin/vouchers?code=${encodeURIComponent(v.code)}`;
   const qr = qrSvg(redeemUrl, { size: 168, label: `Gift voucher ${v.code}` });
 
@@ -54,7 +55,16 @@ export default async function VoucherPage({
   const dead = v.status === "cancelled" || v.status === "expired" || v.balancePence <= 0;
 
   return (
-    <main className="bg-pale text-ink min-h-dvh py-10 px-5 print:py-0">
+    /* `pt-24` clears the header. Every other page in this section opens with a
+       full-bleed dark banner that the header is meant to sit over — that is why
+       it is `overlay` — and this one opens with a card instead, so without the
+       padding the bar sat across the top of the voucher. `print:pt-0` puts it
+       back for the printed sheet, where there is no header at all. */
+    /* A `div`, not a `main`. The branch layout already wraps every page in
+       `<main>`, so this was producing two of them in one document — which is
+       invalid HTML and, more practically, leaves a screen reader's "jump to
+       main content" with two places to go. */
+    <div className="bg-pale text-ink min-h-dvh pt-24 pb-10 sm:pt-28 px-5 print:pt-0 print:pb-0">
       {/* One card, sized so it prints on a single sheet without a dialogue
           full of choices. `print:` rules drop the page furniture. */}
       <div className="mx-auto max-w-[40rem]">
@@ -132,6 +142,6 @@ export default async function VoucherPage({
           Print this page, or keep it on your phone — either works.
         </p>
       </div>
-    </main>
+    </div>
   );
 }

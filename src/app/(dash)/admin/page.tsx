@@ -5,6 +5,7 @@ import { enquiries, menuItems, menuCategories, privateRooms, vouchers, blockedDa
 import { requirePasswordChanged, visibleBranchIds, hasNoBranch } from "@/lib/auth";
 import { formatPence } from "@/lib/money";
 import { AdminNotice } from "@/components/AdminNotice";
+import { liveStatuses } from "@/lib/booking";
 
 export const metadata = { title: "Overview" };
 
@@ -64,7 +65,7 @@ export default async function AdminHome({
     .where(and(
       eq(bookings.date, today),
       inArray(bookings.branchId, branchIds),
-      inArray(bookings.status, ["held", "confirmed", "seated"]),
+      liveStatuses(),
     )).get()?.n ?? 0;
 
   const stats = [

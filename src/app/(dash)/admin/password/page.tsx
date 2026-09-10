@@ -1,10 +1,10 @@
 "use client";
 import { useActionState } from "react";
 import { changePasswordAction } from "../actions";
+import { field } from "@/lib/forms";
 
 export default function PasswordPage() {
   const [state, action, pending] = useActionState(changePasswordAction, undefined);
-  const field = "w-full border border-[--line] bg-white px-3.5 py-2.5 text-sm outline-none focus:border-gold";
 
   return (
     <div className="max-w-sm">

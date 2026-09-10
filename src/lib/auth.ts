@@ -1,4 +1,5 @@
 import "server-only";
+import { BCRYPT_COST } from "@/lib/password-rules.mjs";
 import crypto from "node:crypto";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
@@ -75,6 +76,12 @@ export const CAN = {
   // Money going back out of the business. Managers run their own service and
   // need to settle a cancellation on the spot; staff do not.
   refundDeposit: ["owner", "manager"],
+  /* Marketing splits in two on purpose. A manager writes and edits the weekly
+     email — it is about their restaurant's menu and their private rooms — but
+     only an owner presses send, because a send cannot be recalled and reaches
+     every address the business holds. */
+  editMarketing: ["owner", "manager"],
+  sendMarketing: ["owner"],
   manageStaff: ["owner"],
   editSettings: ["owner"],
   viewAllBranches: ["owner"],
@@ -247,9 +254,38 @@ export async function destroySession(): Promise<void> {
   jar.delete(COOKIE);
 }
 
+/**
+ * A bcrypt hash of nothing in particular, at the same cost as a real one.
+ *
+ * Computed once when the module loads, so the cost is paid at boot rather than
+ * on the first failed sign-in — where paying it would itself be a measurable
+ * difference. The value is irrelevant; only the time it takes to check against
+ * it matters.
+ */
+const DECOY_HASH = bcrypt.hashSync("no account with this address", BCRYPT_COST);
+
 export async function verifyLogin(email: string, password: string): Promise<Session | null> {
   const row = db.select().from(users).where(eq(users.email, email.trim().toLowerCase())).get();
-  if (!row || !row.isActive) return null;
+
+  /* An unknown address has to cost the same as a known one.
+   *
+   * This returned before reaching bcrypt when the row was missing or inactive,
+   * so an address with no account answered in about the time of one indexed
+   * read and an address with an account took ~100ms. The sign-in screen is
+   * careful to give the same words either way; the clock gave a different
+   * answer. With the per-address limit irrelevant (one attempt is enough to
+   * classify an address) and the per-IP limit at 50 per quarter of an hour,
+   * that is a couple of hundred addresses an hour — enough to enumerate who
+   * works at the restaurant, which is the input to both password-guessing and
+   * targeted phishing.
+   *
+   * So a missing or deactivated account still does the bcrypt comparison,
+   * against a hash that cannot match. The work is identical; only the answer
+   * differs. */
+  if (!row || !row.isActive) {
+    bcrypt.compareSync(password, DECOY_HASH);
+    return null;
+  }
   if (!bcrypt.compareSync(password, row.passwordHash)) return null;
   db.update(users).set({ lastLoginAt: Math.floor(Date.now() / 1000) }).where(eq(users.id, row.id)).run();
   return {

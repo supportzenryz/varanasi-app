@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { field, label } from "@/lib/forms";
 
 /**
  * The frame around every screen you see before you are signed in: sign in,
@@ -50,9 +51,18 @@ export function AuthShell({
   );
 }
 
-/** The input styling the three screens share. */
-export const authField =
-  "w-full rounded-none border border-[--line] bg-white px-3.5 py-2.5 text-sm outline-none focus:border-gold";
-export const authLabel = "block text-sm font-medium mb-1.5";
+/* The sign-in screens use the same controls as everything else.
+ *
+ * These were a fifteenth copy of the string the forms refactor existed to
+ * delete — and the one place it did not reach, because `src/lib/forms.ts`
+ * documents "fourteen" and nobody goes looking for a fifteenth. AuthShell
+ * renders inside `<main className="dash …">`, so `.field` and `.field-label`
+ * already resolve here; the screens now also get the gold focus ring, the
+ * `:user-invalid` state and the autofill fix they were missing.
+ *
+ * Kept as re-exports rather than edited at all five call sites: the names read
+ * well on those pages, and the point is that there is one definition. */
+export const authField = field;
+export const authLabel = label;
 export const authButton =
   "mt-7 w-full bg-ink text-pale py-3 text-sm font-semibold tracking-wide hover:bg-ink-2 disabled:opacity-60";

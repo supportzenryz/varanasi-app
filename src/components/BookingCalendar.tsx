@@ -27,6 +27,20 @@ import type { CalendarDay } from "@/lib/availability";
 
 const DOW = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
+/** The month arrows, drawn to match the chevron on every dropdown on the site.
+ *  They were the typographic characters ‹ and › — which render in whatever
+ *  fallback font has them, at whatever weight that font happens to be, and on
+ *  this page came out as two faint hairline marks nobody read as buttons. */
+function Chevron({ direction }: { direction: "left" | "right" }) {
+  return (
+    <svg viewBox="0 0 8 12" width="8" height="12" fill="none" aria-hidden="true"
+      className={direction === "left" ? "rotate-180" : undefined}>
+      <path d="M1.6 1 6.4 6l-4.8 5" stroke="currentColor" strokeWidth="1.3"
+        strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 const MONTH = (iso: string) =>
   new Date(`${iso}T12:00:00Z`).toLocaleDateString("en-GB", {
     month: "long", year: "numeric", timeZone: "UTC",
@@ -71,17 +85,23 @@ export function BookingCalendar({
 
   return (
     <div className="border border-[--line] bg-ink-2">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-[--line]">
+      <div className="flex items-center justify-between px-3 py-3.5 border-b border-[--line]">
         <button
           type="button"
           onClick={() => setPage((p) => Math.max(0, p - 1))}
           disabled={page === 0}
           aria-label="Previous month"
-          className="px-2 py-1 text-pale/60 hover:text-gold disabled:opacity-25 disabled:hover:text-pale/60"
+          className="grid h-9 w-9 place-items-center text-pale/55 transition-colors hover:text-gold
+                     disabled:opacity-20 disabled:hover:text-pale/55"
         >
-          ‹
+          <Chevron direction="left" />
         </button>
-        <span className="text-sm font-semibold" aria-live="polite">
+        {/* The month in the display face, not the body one.
+            It was 14px semibold Manrope — the type of a form label — sitting
+            at the head of a panel whose entire job is to feel like part of a
+            restaurant. Fraunces at a slightly larger size costs nothing and is
+            the difference between a widget and a considered detail. */}
+        <span className="display text-[1.05rem] tracking-wide" aria-live="polite">
           {key ? MONTH(`${key}-01`) : ""}
         </span>
         <button
@@ -89,15 +109,19 @@ export function BookingCalendar({
           onClick={() => setPage((p) => Math.min(byMonth.length - 1, p + 1))}
           disabled={page >= byMonth.length - 1}
           aria-label="Next month"
-          className="px-2 py-1 text-pale/60 hover:text-gold disabled:opacity-25 disabled:hover:text-pale/60"
+          className="grid h-9 w-9 place-items-center text-pale/55 transition-colors hover:text-gold
+                     disabled:opacity-20 disabled:hover:text-pale/55"
         >
-          ›
+          <Chevron direction="right" />
         </button>
       </div>
 
-      <div className="grid grid-cols-7 gap-px px-3 pt-3 text-center">
+      <div className="grid grid-cols-7 gap-1 px-3 pt-3.5 text-center">
         {DOW.map((d) => (
-          <span key={d} className="accent text-[0.55rem] text-pale/40 pb-1">{d.slice(0, 1)}</span>
+          <abbr key={d} title={d}
+            className="accent text-[0.6rem] text-gold/45 pb-1.5 no-underline">
+            {d.slice(0, 1)}
+          </abbr>
         ))}
       </div>
 
@@ -117,9 +141,9 @@ export function BookingCalendar({
                 key={d.date}
                 title={d.reason}
                 aria-label={`${d.date} — ${d.reason ?? "unavailable"}`}
-                className={`relative grid h-10 place-items-center text-sm cursor-not-allowed
+                className={`relative grid h-11 place-items-center text-sm tnum cursor-not-allowed
                   ${d.state === "blocked" || d.state === "closed"
-                    ? "text-brick/60 line-through"
+                    ? "text-brick/60 line-through decoration-brick/40"
                     : "text-pale/20"}`}
               >
                 {n}
@@ -136,10 +160,16 @@ export function BookingCalendar({
               href={hrefPrefix + d.date}
               aria-current={isSelected ? "date" : undefined}
               title={d.free <= 2 ? `Only ${d.free} sitting${d.free === 1 ? "" : "s"} left` : undefined}
-              className={`relative grid h-10 place-items-center text-sm transition-colors
+              /* A hairline that fills, rather than a colour that swaps.
+                 An open day carries a transparent border in its resting
+                 state, so hovering adds a gold edge without the number
+                 shifting by the pixel a border would otherwise introduce —
+                 and the chosen day is the only solid block of gold on the
+                 panel, which is what makes it read instantly. */
+              className={`relative grid h-11 place-items-center text-sm tnum border transition-colors duration-200
                 ${isSelected
-                  ? "bg-gold font-semibold text-ink"
-                  : "text-pale hover:bg-gold/15 hover:text-gold"}`}
+                  ? "border-gold bg-gold font-semibold text-ink"
+                  : "border-transparent text-pale hover:border-gold/45 hover:bg-gold/10 hover:text-gold"}`}
             >
               {n}
               {/* A day down to its last sittings is worth saying before they

@@ -32,7 +32,6 @@
   --text: var(--color-pale);
   --muted: rgba(245, 249, 233, 0.58);
   --line: rgba(233, 186, 32, 0.22);
-  --line-soft: rgba(245, 249, 233, 0.10);
 }
 
 /* Admin runs on the light palette; scoping it here keeps every shared
@@ -43,7 +42,6 @@
   --text: var(--color-ink);
   --muted: var(--color-ink-3);
   --line: #D7DFBF;
-  --line-soft: #E4EACF;
 }
 
 @layer base {
@@ -66,22 +64,37 @@ body {
   font-synthesis-weight: none;
   -webkit-font-smoothing: antialiased;
 }
-.dash body, .dash { color-scheme: light; }
+/* `.dash` is on a <main> and a <div>, both inside <body>, so a `.dash body`
+   selector could never match anything. */
+.dash { color-scheme: light; }
 
-/* Form controls on the dark site: the browser default is a white box, which
-   punches a hole in the page. */
-.on-dark input, .on-dark select, .on-dark textarea {
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--color-pale);
-  border-color: var(--line);
-}
-.on-dark input::placeholder, .on-dark textarea::placeholder { color: rgba(245, 249, 233, 0.35); }
-.on-dark input:focus, .on-dark select:focus, .on-dark textarea:focus { border-color: var(--color-gold); }
-.on-dark option { background: var(--color-ink-2); color: var(--color-pale); }
-/* the native date/time pickers ship a black glyph — invert it on dark */
-.on-dark input[type="date"]::-webkit-calendar-picker-indicator,
-.on-dark input[type="time"]::-webkit-calendar-picker-indicator { filter: invert(1) opacity(.55); }
-.on-dark input[type="checkbox"] { accent-color: var(--color-gold); }
+/* The form-control rules that used to live here are gone. Every one of them —
+   the ground, the placeholder, the focus border, the option colours, the
+   inverted date glyph, the checkbox accent — is now a property of `.field` and
+   `.choice` in the components layer below, which is both more specific in
+   practice (the component layer beats the base layer whatever the selector
+   weight) and applies in the admin as well.
+
+   Checked before deleting: every visible control on the dark site carries
+   `field`, and every checkbox sits inside a `.choice` label whose
+   `appearance: none` made `accent-color` inert anyway. The only raw controls
+   left under `.on-dark` are `type="hidden"` and four `sr-only` radios. */
+
+/* Links take the colour of the text around them unless something says
+   otherwise.
+
+   Every link in the app is deliberately coloured today, so this changes
+   nothing on any current page. It is here because the default it replaces is
+   the browser's own blue and purple, which on a black-and-gold page is the
+   loudest thing on screen — and the failure mode is silent: a link added
+   later without a colour class simply looks wrong, on a site whose whole
+   proposition is that it doesn't.
+
+   `:where()` gives it zero specificity, so it beats the browser's stylesheet
+   and loses to every class in the app. A bare `a:visited` would be more
+   specific than a utility class and would flatten genuinely-gold links to
+   their surroundings once someone had clicked them. */
+:where(a), :where(a:visited) { color: inherit; }
 
 /* The printed menus set headings in Fraunces with generous tracking; match it. */
 h1, h2, h3, .display {
@@ -120,21 +133,6 @@ h1 { line-height: 1.04; }
 }
 .dash .leader > .fill { border-bottom-color: color-mix(in srgb, var(--color-ink) 26%, transparent); }
 
-/* A thin gold rule with a diamond at its centre — the menu's section divider */
-.rule {
-  display: flex;
-  align-items: center;
-  gap: .75rem;
-  color: var(--color-gold-deep);
-}
-.rule::before, .rule::after {
-  content: "";
-  height: 1px;
-  flex: 1 1 auto;
-  background: linear-gradient(to right, transparent, currentColor 35%, currentColor 65%, transparent);
-  opacity: .5;
-}
-.rule.on-dark { color: var(--color-gold); }
 
 /* Buttons: the live site's square gold fill and its outlined counterpart */
 .btn {
@@ -245,6 +243,16 @@ h1 { line-height: 1.04; }
   background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.015));
   padding: 1.35rem 1.5rem;
   transition: border-color .3s, background-color .3s;
+  /* A grid item defaults to `min-width: auto`, which means it cannot be
+     narrower than its own content — so on a 320px phone a section whose
+     heading ran long ("Appetisers, Chat & Tawa" beside "11 dishes", which
+     cannot wrap) pushed the whole page 8px wider than the screen and every
+     page on the site scrolled sideways.
+     The fault was invisible on any wider phone and depended on the category
+     names in the database, so it appeared and disappeared as the menu was
+     edited. `min-width: 0` lets the box be as narrow as the column, and the
+     heading below wraps instead. */
+  min-width: 0;
 }
 .menu-section:hover { border-color: rgba(198,163,90,.42); }
 .menu-section[open] { border-color: rgba(198,163,90,.5); }
@@ -253,10 +261,14 @@ h1 { line-height: 1.04; }
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 1.5rem;
+  /* Roomy on a laptop, tight on a phone — the gap was a fixed 1.5rem, which is
+     25px of the 278 available at 320px spent on empty space between a heading
+     that needed to wrap and a count that could not. */
+  gap: .75rem;
   cursor: pointer;
   list-style: none;          /* Firefox */
 }
+@media (min-width: 640px) { .menu-summary { gap: 1.5rem; } }
 .menu-summary::-webkit-details-marker { display: none; }  /* Safari/Chrome */
 
 .menu-count {
@@ -286,6 +298,213 @@ h1 { line-height: 1.04; }
 
 .hover-zoom img { transition: transform .7s cubic-bezier(.2,.7,.3,1); }
 .hover-zoom:hover img { transform: scale(1.05); }
+
+/* ---- Form controls -------------------------------------------------------
+   One definition, used by every form on the site and in the admin.
+
+   There were four. `const field = "w-full border border-[--line] px-3.5 py-3
+   …"` was written out again in the enquiry form, the booking pages, the
+   voucher purchase and half the admin screens, and they had already drifted:
+   one carried `bg-ink-2` and the others didn't, so the same field was a
+   different colour depending on which page you were standing on. A restaurant
+   that describes itself as fine dining cannot have two shades of text box.
+
+   Everything below is expressed in the palette tokens rather than in fixed
+   colours, so the identical markup renders dark-and-gold on the public site
+   and light in the admin without a second set of classes.
+
+   The detail that does the most work here is `appearance: none` on <select>.
+   A native dropdown is drawn by the operating system: on Windows it is a grey
+   box with a blue chevron in a system font, and it is the single loudest thing
+   on an otherwise carefully typeset page. Replacing the chevron with the same
+   hairline gold used everywhere else is most of the difference between a site
+   that looks commissioned and one that looks assembled. */
+.field {
+  width: 100%;
+  font: inherit;
+  font-size: .95rem;
+  line-height: 1.5;
+  color: var(--text);
+  background: var(--field-bg, rgba(255, 255, 255, 0.035));
+  border: 1px solid var(--line);
+  border-radius: 0;
+  padding: .85rem 1rem;
+  outline: none;
+  transition: border-color .28s ease, box-shadow .28s ease, background-color .28s ease;
+}
+.dash .field { --field-bg: #FFFFFF; }
+
+.field::placeholder { color: var(--muted); opacity: .7; }
+
+/* A ring rather than a jump. The old rule only swapped the border colour,
+   which on a hairline border is almost invisible — people tabbing through a
+   booking form could not tell where they were. This keeps the hairline and
+   adds a soft gold halo outside it, so focus reads at a glance without the
+   layout moving by a pixel. */
+.field:focus {
+  border-color: var(--color-gold);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-gold) 18%, transparent);
+  background: var(--field-bg-focus, rgba(255, 255, 255, 0.06));
+}
+.dash .field:focus { --field-bg-focus: #FFFFFF; }
+
+/* `:user-invalid`, deliberately, not `:invalid`.
+   `:invalid` matches an empty required field from the moment the page loads,
+   so a booking form opens with every box already outlined in red before the
+   guest has typed a character — which reads as an error they have somehow
+   already made. `:user-invalid` waits until they have actually interacted
+   with the field and left it wrong. */
+.field:user-invalid {
+  border-color: var(--color-clay);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-clay) 16%, transparent);
+}
+
+.field:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+  background: transparent;
+}
+
+/* Chrome paints autofilled inputs with a hardcoded pale yellow background and
+   near-black text, which on a dark page produces an unreadable band exactly
+   where the guest's name and email go. There is no property that turns it off;
+   an inset shadow the size of the box is the one thing that covers it. */
+.field:-webkit-autofill,
+.field:-webkit-autofill:hover,
+.field:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--text);
+  -webkit-box-shadow: 0 0 0 60rem var(--autofill, #16160F) inset;
+  caret-color: var(--text);
+}
+.dash .field:-webkit-autofill,
+.dash .field:-webkit-autofill:hover,
+.dash .field:-webkit-autofill:focus { --autofill: #FFFFFF; }
+
+/* Dropdowns. The chevron is drawn here rather than by the operating system;
+   padding on the right leaves room for it, and `text-overflow` keeps a long
+   option from running underneath it. */
+select.field {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 2.75rem;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.6 6 6.4 11 1.6' fill='none' stroke='%23E9BA20' stroke-width='1.3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 1rem center;
+  background-size: .7rem auto;
+}
+.dash select.field {
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.6 6 6.4 11 1.6' fill='none' stroke='%23B69112' stroke-width='1.3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+/* The open list is still drawn by the browser and cannot be styled, but its
+   colours can be set — without this it opens as a white sheet on a dark site. */
+select.field option { background: var(--surface); color: var(--text); }
+
+textarea.field { min-height: 7.5rem; resize: vertical; }
+
+/* The spinner arrows on a number input are two tiny grey triangles in a system
+   font. On an amount field next to a pound sign they are simply untidy, and
+   nobody has ever nudged a gift voucher to £51 one arrow at a time. */
+input[type="number"].field { appearance: textfield; -moz-appearance: textfield; }
+input[type="number"].field::-webkit-outer-spin-button,
+input[type="number"].field::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
+/* The native calendar and clock glyphs are black, which disappears on the dark
+   site. Whitened and dimmed to sit at the same weight as the chevron, and the
+   whole indicator is given a pointer so it reads as pressable. */
+input[type="date"].field::-webkit-calendar-picker-indicator,
+input[type="time"].field::-webkit-calendar-picker-indicator {
+  filter: invert(1) sepia(1) saturate(4) hue-rotate(5deg) opacity(.55);
+  cursor: pointer;
+}
+.dash input[type="date"].field::-webkit-calendar-picker-indicator,
+.dash input[type="time"].field::-webkit-calendar-picker-indicator { filter: sepia(1) saturate(3) opacity(.6); }
+
+/* The label above a field: the same gold caps as the site's section labels. */
+.field-label {
+  display: block;
+  font-family: var(--font-accent);
+  font-size: max(.62rem, 10px);
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: var(--color-gold);
+  margin-bottom: .5rem;
+}
+.dash .field-label { color: var(--color-gold-ink); }
+
+.field-hint { display: block; font-size: .78rem; color: var(--muted); margin-top: .45rem; }
+.field-error { display: block; font-size: .78rem; color: var(--color-clay); margin-top: .45rem; }
+
+/* A consent tick or a radio. Native controls are drawn by the operating
+   system at a size it chooses — usually 13px, which is both too small to hit
+   accurately on a phone and visibly foreign on this page. These are square,
+   hairline and gold, sized to the 24px minimum a thumb needs. */
+.choice {
+  display: flex;
+  align-items: flex-start;
+  gap: .75rem;
+  cursor: pointer;
+  padding: .35rem 0;
+}
+.choice input[type="checkbox"],
+.choice input[type="radio"] {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: 0 0 auto;
+  width: 1.25rem;
+  height: 1.25rem;
+  margin: .12rem 0 0;
+  border: 1px solid var(--line);
+  background: var(--field-bg, rgba(255, 255, 255, 0.035));
+  cursor: pointer;
+  transition: border-color .2s, background-color .2s, box-shadow .2s;
+}
+.choice input[type="radio"] { border-radius: 50%; }
+.choice:hover input:not(:disabled) { border-color: color-mix(in srgb, var(--color-gold) 60%, transparent); }
+.choice input:checked {
+  border-color: var(--color-gold);
+  background-color: var(--color-gold);
+}
+.choice input[type="checkbox"]:checked {
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14'%3E%3Cpath d='M2.5 7.4 5.7 10.5 11.5 3.9' fill='none' stroke='%230F0F0F' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: .85rem;
+}
+.choice input[type="radio"]:checked {
+  /* A gold dot inside a gold ring, made with a shadow so there is no extra
+     element to place. */
+  background-color: transparent;
+  box-shadow: inset 0 0 0 .28rem var(--color-gold);
+}
+.choice input:focus-visible {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-gold) 22%, transparent);
+  outline: none;
+}
+.choice .choice-text { font-size: .88rem; line-height: 1.5; color: var(--text); }
+.choice .choice-text b { font-weight: 600; }
+.choice .choice-text small { display: block; color: var(--muted); font-size: .78rem; margin-top: .15rem; }
+
+/* The admin runs the same controls tighter. It is a working tool with a dozen
+   fields on a screen at once, where the guest-facing form is four fields with
+   room around them — and its labels are plain semibold rather than gold caps,
+   because a settings screen with forty gold caps on it reads as a menu.
+   Scoped to `.dash` rather than given a second class, so no admin form can be
+   typeset like a guest-facing one by forgetting a modifier. */
+.dash .field { font-size: .86rem; padding: .6rem .8rem; }
+.dash select.field { padding-right: 2.25rem; background-position: right .75rem center; }
+.dash textarea.field { min-height: 5.5rem; }
+.dash .field-label {
+  font-family: var(--font-body);
+  font-size: .72rem;
+  font-weight: 600;
+  letter-spacing: .02em;
+  text-transform: none;
+  color: var(--muted);
+  margin-bottom: .3rem;
+}
+.dash .choice input[type="checkbox"], .dash .choice input[type="radio"] { width: 1.1rem; height: 1.1rem; }
 }
 
 :focus-visible { outline: 2px solid var(--color-gold); outline-offset: 2px; }

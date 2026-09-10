@@ -39,7 +39,7 @@ npm run dev
 - **Stripe**: Real-time payment processing
 - **Email**: Resend or webhook-based email
 - **WhatsApp**: Optional booking notifications
-- **Analytics**: GA4 with consent gate
+- **Analytics**: cookieless (Plausible or Umami), no consent banner
 - **Audit trail**: Complete action history
 
 ## Tech Stack

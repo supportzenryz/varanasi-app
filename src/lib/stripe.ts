@@ -144,8 +144,75 @@ export type CheckoutSession = {
   status: "open" | "complete" | "expired";
   payment_intent: string | null;
   amount_total: number | null;
+  /** Set to the booking reference or voucher code when the session is made. */
+  client_reference_id?: string | null;
   metadata?: Record<string, string>;
 };
+
+/** What a session is supposed to be paying for. */
+export type SessionOwner =
+  | { kind: "voucher"; id: number; reference: string; amountPence: number }
+  | { kind: "booking"; id: number; reference: string; amountPence: number };
+
+/**
+ * Does this paid session actually pay for THIS order?
+ *
+ * THE HOLE THIS CLOSES, because it is worth being explicit about. Both Stripe
+ * return pages read two things out of the query string — which order to fulfil,
+ * and which session to check — and then fulfilled the first if the second said
+ * "paid". They were never compared. The page's own comment argued that the
+ * session id is proof of payment because Stripe handed it to the guest's
+ * browser; that is true, and it is proof of *a* payment, not of *this* one.
+ *
+ * So: buy one £25 voucher, keep the `session_id` out of the address bar, then
+ * start a £500 purchase, press back on Stripe's page to collect the new code
+ * from the cancel URL, and open
+ *
+ *   /birmingham/gift-vouchers/confirmed?code=<new>&session_id=<the £25 one>
+ *
+ * The £500 voucher is issued, emailed and spendable at the till. Repeat for
+ * free vouchers indefinitely. The booking equivalent confirms a table and marks
+ * a deposit captured that was never paid — and then overwrites the row's
+ * payment intent, so a later refund of the fraudulent booking is taken out of
+ * the honest guest's payment.
+ *
+ * Everything needed to stop it was already being sent to Stripe at creation and
+ * simply never read back: `metadata.voucherId`/`metadata.bookingId` and
+ * `client_reference_id`. Three things have to agree — the row id, the
+ * reference, and the amount — because each catches a different mistake:
+ *
+ *   id         a session for a different order
+ *   reference  a stale session for a row id since reused
+ *   amount     a cheap session fulfilling an expensive order
+ *
+ * The amount check also catches an unrelated defect: a Checkout Session opened
+ * for one deposit but attached to a booking whose party size has since changed.
+ */
+export function sessionPaysFor(
+  session: CheckoutSession,
+  expect: SessionOwner,
+): { ok: true } | { ok: false; reason: string } {
+  const meta = session.metadata ?? {};
+  const namedId = expect.kind === "voucher" ? meta.voucherId : meta.bookingId;
+
+  if (!namedId) {
+    return { ok: false, reason: `the session carries no ${expect.kind} id` };
+  }
+  if (namedId !== String(expect.id)) {
+    return { ok: false, reason: `the session was paid for ${expect.kind} ${namedId}, not ${expect.id}` };
+  }
+  /* `client_reference_id` is only checked when Stripe returned one. It is
+     always set on sessions this app creates, but refusing a payment because a
+     field was absent would turn a Stripe API change into refused money, and
+     the id check above is already decisive. */
+  if (session.client_reference_id && session.client_reference_id !== expect.reference) {
+    return { ok: false, reason: `the session references ${session.client_reference_id}, not ${expect.reference}` };
+  }
+  if (session.amount_total != null && session.amount_total !== expect.amountPence) {
+    return { ok: false, reason: `the session paid ${session.amount_total}p, but this is ${expect.amountPence}p` };
+  }
+  return { ok: true };
+}
 
 /**
  * A hosted payment page for one booking deposit.

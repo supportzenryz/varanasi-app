@@ -255,6 +255,10 @@ export const vouchers = sqliteTable("vouchers", {
 }, (t) => ({
   codeIdx: uniqueIndex("vouchers_code_idx").on(t.code),
   statusIdx: index("vouchers_status_idx").on(t.status),
+  /* Same reasoning as bookings: the Stripe return path, and the admin list
+     that orders by newest. */
+  sessionIdx: index("vouchers_session_idx").on(t.stripeSessionId),
+  createdIdx: index("vouchers_created_idx").on(t.createdAt),
 }));
 
 export const voucherRedemptions = sqliteTable("voucher_redemptions", {
@@ -337,6 +341,14 @@ export const bookings = sqliteTable("bookings", {
 }, (t) => ({
   refIdx: uniqueIndex("bookings_reference_idx").on(t.reference),
   dateIdx: index("bookings_branch_date_idx").on(t.branchId, t.date),
+  /* `expireStaleHolds()` runs on every view of /book-online and every load of
+     the admin bookings screen, and without this it is a full scan of the
+     table — the one query on the money path that gets slower every month the
+     restaurant trades. */
+  holdIdx: index("bookings_status_hold_idx").on(t.status, t.holdExpiresAt),
+  /* Looked up once per webhook and once per return from Stripe: the moments a
+     guest is watching a spinner having just paid. */
+  sessionIdx: index("bookings_session_idx").on(t.stripeSessionId),
 }));
 
 /* ---------- settings & audit ---------- */
@@ -349,9 +361,69 @@ export const settings = sqliteTable("settings", {
 export const auditLog = sqliteTable("audit_log", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   userId: integer("user_id").references(() => users.id),
+  /* Who did it when it was not a member of staff: a guest's name, "scheduler",
+     "Stripe". Null for staff, whose name comes from user_id. */
+  actor: text("actor"),
   action: text("action").notNull(),
   entity: text("entity").notNull(),
   entityId: text("entity_id"),
   detail: text("detail"),
   createdAt: integer("created_at").notNull().default(now),
 }, (t) => ({ createdIdx: index("audit_log_created_idx").on(t.createdAt) }));
+
+/* ---------- marketing ----------
+ * Consent is a fact with a history, not a boolean on a booking.
+ *
+ * A `marketing_consent` column on `bookings` says the box was ticked. It
+ * cannot say when, on which form, or against what wording — and it cannot
+ * hold an unsubscribe, because the booking it hangs off may since have been
+ * anonymised for an erasure request while the person's wish not to be emailed
+ * still has to be honoured. Under PECR the restaurant has to be able to show
+ * that a given address agreed; this table is that evidence.
+ *
+ * Nothing is ever deleted here. Unsubscribing stamps `unsubscribedAt`, so a
+ * later booking from the same address cannot quietly put someone back on a
+ * list they asked to leave.
+ */
+export const marketingContacts = sqliteTable("marketing_contacts", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  email: text("email").notNull(),
+  name: text("name"),
+  branchId: integer("branch_id").references(() => branches.id),
+  source: text("source", { enum: ["booking", "enquiry", "voucher", "manual"] }).notNull(),
+  /** The exact sentence they agreed to, kept verbatim. */
+  consentText: text("consent_text"),
+  consentedAt: integer("consented_at").notNull(),
+  consentIp: text("consent_ip"),
+  unsubscribedAt: integer("unsubscribed_at"),
+  /** In the footer of every email. Long enough that it cannot be guessed. */
+  unsubscribeToken: text("unsubscribe_token").notNull(),
+  lastSentAt: integer("last_sent_at"),
+  createdAt: integer("created_at").notNull().default(now),
+}, (t) => ({
+  emailIdx: uniqueIndex("marketing_contacts_email_idx").on(t.email),
+  tokenIdx: uniqueIndex("marketing_contacts_token_idx").on(t.unsubscribeToken),
+}));
+
+/** One weekly email, from the draft the scheduler prepares to the send an
+ *  owner authorises. Nothing leaves without a person pressing a button. */
+export const campaigns = sqliteTable("campaigns", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  subject: text("subject").notNull(),
+  preheader: text("preheader"),
+  body: text("body").notNull(),
+  status: text("status", { enum: ["draft", "sending", "sent", "cancelled"] })
+    .notNull().default("draft"),
+  /** Null means both restaurants. */
+  branchId: integer("branch_id").references(() => branches.id),
+  /** The Monday this was prepared for, YYYY-MM-DD. Unique, so the scheduler
+   *  cannot prepare the same week twice however often it runs. */
+  weekOf: text("week_of"),
+  preparedBy: text("prepared_by"),
+  sentByUserId: integer("sent_by_user_id").references(() => users.id),
+  sentAt: integer("sent_at"),
+  recipientCount: integer("recipient_count").notNull().default(0),
+  failedCount: integer("failed_count").notNull().default(0),
+  createdAt: integer("created_at").notNull().default(now),
+  updatedAt: integer("updated_at").notNull().default(now),
+}, (t) => ({ weekIdx: uniqueIndex("campaigns_week_idx").on(t.weekOf) }));

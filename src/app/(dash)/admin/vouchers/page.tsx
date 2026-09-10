@@ -21,11 +21,10 @@ import { voucherByCode, redemptionsFor, expiryLabel, expireOldVouchers } from "@
 import { redeemVoucher, issueVoucher, cancelVoucher, releaseScheduled } from "./actions";
 import { ConfirmButton } from "@/components/ConfirmButton";
 import { AdminNotice } from "@/components/AdminNotice";
+import { field, label } from "@/lib/forms";
 
 export const metadata = { title: "Gift vouchers" };
 
-const field = "w-full border border-[--line] bg-white px-3 py-2 text-sm outline-none focus:border-gold";
-const label = "block text-xs font-semibold text-ink-3 mb-1";
 
 const STATUS_COLOUR: Record<string, string> = {
   active: "bg-leaf/15 text-leaf",

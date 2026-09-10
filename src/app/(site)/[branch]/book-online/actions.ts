@@ -5,10 +5,11 @@ import { rememberSubmission } from "@/lib/form-recall";
 import { bookingRules, prettyTime } from "@/lib/booking-config";
 import { createDepositCheckout, stripeSimulated, paymentsUnavailable } from "@/lib/stripe";
 import { guardPublicForm } from "@/lib/public-limit";
+import { siteUrl } from "@/lib/site";
 
-function siteUrl(): string {
-  return (process.env.SITE_URL ?? "http://localhost:3000").replace(/\/$/, "");
-}
+/** An absolute URL on this site, as the path the browser can follow itself. */
+const toPath = (u: string) => u.slice(siteUrl().length) || "/";
+
 
 /**
  * Holds the table, then sends the guest to pay.
@@ -117,8 +118,9 @@ export async function startBooking(formData: FormData) {
   // whole journey — including the failure path — can be demonstrated today.
   if (stripeSimulated()) {
     redirect(`/checkout-simulator?ref=${booking.reference}&amount=${depositPence}` +
-      `&success=${encodeURIComponent(successUrl.replace("{CHECKOUT_SESSION_ID}", `sim_${booking.reference}`))}` +
-      `&cancel=${encodeURIComponent(cancelUrl)}`);
+      // Same-origin, so by path — see the note in the gift-voucher action.
+      `&success=${encodeURIComponent(toPath(successUrl).replace("{CHECKOUT_SESSION_ID}", `sim_${booking.reference}`))}` +
+      `&cancel=${encodeURIComponent(toPath(cancelUrl))}`);
   }
 
   let url: string | null = null;

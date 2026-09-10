@@ -10,6 +10,7 @@ import { requireAbility, type Session, type Role } from "@/lib/auth";
 import { ok, problem } from "@/lib/admin-feedback";
 import { checkEmail, checkName } from "@/lib/validate";
 import { STARTING_STAFF_PASSWORD } from "@/lib/staff";
+import { clearEmailLock, emailLockedFor } from "@/lib/login-guard";
 
 const BACK = "/admin/staff";
 
@@ -136,6 +137,34 @@ export async function toggleStaff(formData: FormData) {
   ok(BACK, row!.isActive
     ? `${row!.name} deactivated — they are signed out everywhere immediately.`
     : `${row!.name} can sign in again.`);
+}
+
+/**
+ * Lets someone try again immediately after five wrong passwords locked them out.
+ *
+ * Deliberately not the same button as "Reset password". Five wrong guesses is
+ * usually caps lock, and answering it by wiping the person's password — signing
+ * them out of every device and forcing them to pick a new one at the pass — is
+ * a heavier response than the situation deserves. This clears the counter and
+ * touches nothing else.
+ */
+export async function unlockStaff(formData: FormData) {
+  const session = await requireAbility("manageStaff");
+  const id = Number(formData.get("id"));
+  const row = db.select().from(users).where(eq(users.id, id)).get();
+  if (!row) problem(BACK, "That account no longer exists.");
+
+  /* Say so rather than reporting a success that did nothing. The lock expires
+     on its own after fifteen minutes, so by the time an owner has walked to
+     the office the button may already have nothing to do. */
+  if (emailLockedFor(row!.email) === 0) {
+    ok(BACK, `${row!.name} isn't locked out — they can sign in now.`);
+  }
+
+  clearEmailLock(row!.email);
+  log(session, "user.unlock", String(id), row!.email);
+  revalidatePath(BACK);
+  ok(BACK, `${row!.name} can try again straight away. Their password hasn't changed.`);
 }
 
 /** Puts an account back on the starting password with the change forced again. */

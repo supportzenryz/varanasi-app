@@ -7,10 +7,10 @@ import { TYPE_LABEL, type EnquiryType } from "@/lib/enquiry";
 import { AdminNotice } from "@/components/AdminNotice";
 import { setEnquiryStatus, saveEnquiryNote } from "./actions";
 import { buildEnquiryWhere, selectEnquiries, filtersToQuery, RANGES, type EnquiryQuery } from "./filters";
+import { field } from "@/lib/forms";
 
 export const metadata = { title: "Enquiries" };
 
-const field = "w-full border border-[--line] bg-white px-3 py-2 text-sm outline-none focus:border-gold";
 
 const STATUS_COLOUR: Record<string, string> = {
   new: "bg-gold/20 text-gold-ink",
@@ -186,7 +186,16 @@ export default async function EnquiriesAdmin({
                 <span className={`inline-block px-2 py-1 text-xs font-semibold shrink-0 ${STATUS_COLOUR[e.status]}`}>
                   {e.status}
                 </span>
-                <span className="flex-1 min-w-48 min-w-0">
+                {/* One min-width, not two. This read `min-w-48 min-w-0`, which
+                    is a cascade collision: both classes set the same property,
+                    so which one applies depends on the order Tailwind happens
+                    to emit them in, and the 12rem one was winning. That plus
+                    the status pill, the gap and the padding is 338px of
+                    content in a 320px screen — the whole reason the enquiry
+                    list scrolled sideways on a phone. `min-w-0` is the one
+                    that matters: it lets a flex item shrink below its content,
+                    which long guest names need. */}
+                <span className="flex-1 basis-48 min-w-0">
                   <span className="block font-medium [overflow-wrap:anywhere]">
                     {e.name}
                     <span className="text-ink-3 font-normal"> · {TYPE_LABEL[e.type as EnquiryType]}</span>
@@ -253,7 +262,11 @@ export default async function EnquiriesAdmin({
                     <form action={saveEnquiryNote} className="mt-4 flex flex-wrap items-end gap-3">
                       <input type="hidden" name="id" value={e.id} />
                       <input type="hidden" name="filters" value={filters} />
-                      <div className="flex-1 min-w-[16rem]">
+                      {/* `basis`, not `min-w`: on a wide screen the note box
+                          still wants to be 16rem before it wraps, but on a
+                          320px phone a hard minimum is 16rem inside a 280px
+                          space. */}
+                      <div className="flex-1 basis-64 min-w-0">
                         <label className="block text-xs font-semibold text-ink-3 mb-1" htmlFor={`note${e.id}`}>
                           Internal note (never shown to the customer)
                         </label>

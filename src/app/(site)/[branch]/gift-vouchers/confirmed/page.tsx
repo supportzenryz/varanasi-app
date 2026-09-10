@@ -7,7 +7,7 @@ import { formatPence } from "@/lib/money";
 import {
   voucherByCode, activatePaidVoucher, markPurchaseFailed, expiryLabel,
 } from "@/lib/voucher";
-import { retrieveSession, stripeSimulated } from "@/lib/stripe";
+import { retrieveSession, sessionPaysFor, stripeSimulated } from "@/lib/stripe";
 import { PageHero } from "@/components/PageHero";
 
 export const metadata: Metadata = { title: "Gift voucher purchased", robots: { index: false } };
@@ -38,7 +38,24 @@ export default async function VoucherConfirmed({
     } else {
       try {
         const session = await retrieveSession(sessionId);
-        if (session.payment_status === "paid" || session.payment_status === "no_payment_required") {
+        const owns = sessionPaysFor(session, {
+          kind: "voucher",
+          id: found.id,
+          reference: found.code,
+          amountPence: found.valuePence,
+        });
+
+        if (!owns.ok) {
+          /* A paid session that belongs to a different voucher. Nothing is
+             issued, and this is logged loudly because there is no innocent way
+             to arrive here: every link this site produces carries the session
+             that paid for the code beside it. */
+          console.error(
+            `[voucher] REFUSED to issue ${found.code} against session ${sessionId} — ${owns.reason}`,
+          );
+          problem = "We couldn't match that payment to this voucher, so nothing has been issued. "
+            + "If you have been charged, forward your Stripe receipt and we'll sort it out.";
+        } else if (session.payment_status === "paid" || session.payment_status === "no_payment_required") {
           await activatePaidVoucher({
             voucherId: found.id,
             paymentIntent: session.payment_intent,

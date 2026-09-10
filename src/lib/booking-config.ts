@@ -28,7 +28,18 @@ export type BookingRules = {
   vouchers: VoucherRules;
   followUp: FollowUpRules;
   whatsapp: { enabled: boolean; notifyTo: string; templates: Record<string, string> };
-  analytics: { ga4MeasurementId: string; consentRequired: boolean };
+  analytics: AnalyticsRules;
+};
+
+/** Cookieless analytics. See src/components/Analytics.tsx for why not GA4. */
+export type AnalyticsRules = {
+  provider: "plausible" | "umami" | "none";
+  /** The provider's script. Its origin is what the CSP is widened to. */
+  scriptUrl: string;
+  /** Plausible identifies a site by the domain it is served from. */
+  domain: string;
+  /** Umami identifies it by an id instead. */
+  websiteId: string;
 };
 
 export type VoucherRules = {

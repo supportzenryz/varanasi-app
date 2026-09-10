@@ -82,7 +82,14 @@ export async function POST(req: Request) {
       if (status === "paid" || status === "no_payment_required") {
         const paymentIntent = typeof object.payment_intent === "string" ? object.payment_intent : null;
         const result = await confirmPaidBooking({ bookingId: booking.id, paymentIntent, sessionId });
-        console.log(`[stripe:webhook] ${booking.reference} confirmed${result.alreadyDone ? " (already done)" : ""}`);
+        console.log(
+          result.confirmed
+            ? `[stripe:webhook] ${booking.reference} confirmed${result.alreadyDone ? " (already done)" : ""}`
+            /* Not an error, and not a confirmation either: a cancelled or
+               already-refunded booking whose payment turned up afterwards. */
+            : `[stripe:webhook] ${booking.reference} paid but NOT confirmed `
+              + `(status=${result.booking?.status}, deposit=${result.booking?.depositStatus})`,
+        );
       } else {
         console.log(`[stripe:webhook] ${booking.reference} completed but payment_status=${String(status)} — waiting`);
       }

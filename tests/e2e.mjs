@@ -1,4 +1,4 @@
-import { chromium } from 'playwright';
+import { launchBrowser } from './browser.mjs';
 import { DatabaseSync } from 'node:sqlite';
 import bcrypt from 'bcryptjs';
 import fs from 'node:fs';
@@ -127,9 +127,7 @@ if (!process.env.STRIPE_SECRET_KEY) {
   }
 }
 
-const browser = await chromium.launch(
-  process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {},
-);
+const browser = await launchBrowser();
 const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
 const page = await ctx.newPage();
 const errors = [];
@@ -1690,14 +1688,30 @@ for (const [label, w, h] of [['mobile 375', 375, 812], ['tablet 768', 768, 1024]
 }
 
 {
-  /* Sign out has to be reachable on the device it is used from. The admin rail
-     scrolls sideways on a phone, and the whole rail used to scroll — putting
-     "Sign out" 1,466px to the right of a 375px screen. It was in the markup and
-     nobody could reach it, on a device shared at the pass. */
+  /* Sign out has to be reachable on the device it is used from — a phone or a
+     shared iPad at the pass.
+     
+     The history of this check is the history of the admin's mobile layout. The
+     rail once scrolled sideways as a whole, which put "Sign out" 1,466px to
+     the right of a 375px screen: in the markup, unreachable. Then only the
+     links scrolled, which fixed Sign out and left thirteen sections sharing
+     ninety pixels. Now the phone layout is a bar and a drawer, so the button
+     lives in the drawer — which is why this check opens it first, and why it
+     also checks the button that opens it. `npm run test:mobile` covers the
+     rest of that layout at four widths. */
   const phone = await ctx.newPage();
   await phone.setViewportSize({ width: 375, height: 812 });
   await phone.goto(`${BASE}/admin`, { waitUntil: 'networkidle' });
-  const box = await phone.locator('button', { hasText: /^Sign out$/ }).first().boundingBox();
+
+  const opener = phone.locator('button[aria-controls="admin-menu"]');
+  const openerBox = await opener.first().boundingBox();
+  t('The admin has a menu button on a phone',
+    !!openerBox && openerBox.x >= 0 && openerBox.x + openerBox.width <= 375 + 1,
+    openerBox ? `x=${Math.round(openerBox.x)} w=${Math.round(openerBox.width)}` : 'not found');
+
+  await opener.first().click();
+  await phone.waitForTimeout(250);
+  const box = await phone.locator('#admin-menu button', { hasText: /^Sign out$/ }).first().boundingBox();
   t('Sign out is on screen on a phone',
     !!box && box.x >= 0 && box.x + box.width <= 375 + 1,
     box ? `x=${Math.round(box.x)} w=${Math.round(box.width)}` : 'not found');

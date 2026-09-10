@@ -9,6 +9,7 @@ import { PageHero } from "@/components/PageHero";
 import { recallSubmission } from "@/lib/form-recall";
 import { buyVoucher } from "./actions";
 import { SubmitButton } from "@/components/SubmitButton";
+import { choice, choiceText, field, label } from "@/lib/forms";
 
 export async function generateMetadata({ params }: { params: Promise<{ branch: string }> }): Promise<Metadata> {
   const { branch: slug } = await params;
@@ -21,9 +22,6 @@ export async function generateMetadata({ params }: { params: Promise<{ branch: s
   };
 }
 
-const field =
-  "w-full border border-[--line] px-3.5 py-3 text-[0.95rem] outline-none focus:border-gold rounded-none";
-const label = "block accent text-[0.6rem] text-gold mb-2";
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10);
@@ -199,9 +197,9 @@ export default async function GiftVouchers({
               </ul>
             </div>
 
-            <label className="flex gap-3 text-sm items-start">
-              <input type="checkbox" name="terms" required className="mt-1" />
-              <span>
+            <label className={choice}>
+              <input type="checkbox" name="terms" required />
+              <span className={choiceText}>
                 I agree to the{" "}
                 <Link href={`/${branch.slug}/terms`} className="underline hover:text-gold">
                   Terms &amp; Conditions

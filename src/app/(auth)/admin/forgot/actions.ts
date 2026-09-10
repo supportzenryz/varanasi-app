@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { requestPasswordReset } from "@/lib/password-reset";
 import { checkEmail } from "@/lib/validate";
 import { hit } from "@/lib/rate-limit";
+import { siteUrl } from "@/lib/site";
 
 /** Behind a proxy the socket address is the proxy's, so the client is the
  *  first hop. Only used for the audit trail and the per-address counter. */
@@ -13,9 +14,6 @@ async function clientIp(): Promise<string> {
   return h.get("x-real-ip") ?? "unknown";
 }
 
-function siteUrl(): string {
-  return (process.env.SITE_URL ?? "http://localhost:3000").replace(/\/$/, "");
-}
 
 /**
  * One answer, always the same.

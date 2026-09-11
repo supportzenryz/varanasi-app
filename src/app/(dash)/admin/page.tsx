@@ -11,12 +11,12 @@ export const metadata = { title: "Overview" };
 
 export default async function AdminHome({
   searchParams,
-}: { searchParams: Promise<{ denied?: string; saved?: string; problem?: string }> }) {
+}: { searchParams: Promise<{ denied?: string; n?: string; problem?: string }> }) {
   /* `saved` and `problem` are the admin's shared vocabulary for "here is what
      just happened" (see lib/admin-feedback), and this page — the one every
      action can sensibly send someone back to — was the only screen that did
      not read them. A redirect here dropped its message on the floor. */
-  const { denied, saved, problem } = await searchParams;
+  const { denied, n } = await searchParams;
   const session = await requirePasswordChanged();
   const branchIds = visibleBranchIds(session);
   const scoped = session.role !== "owner";
@@ -100,7 +100,7 @@ export default async function AdminHome({
           it, so the screen a member of staff got after clicking "Staff" was the
           overview, unchanged, with no explanation — indistinguishable from the
           link being broken. */}
-      <AdminNotice saved={saved} problem={problem} />
+      <AdminNotice n={n} />
 
       {denied && (
         <section role="alert" className="mt-8 border-l-2 border-brick bg-brick/8 px-5 py-4">

@@ -427,3 +427,14 @@ export const campaigns = sqliteTable("campaigns", {
   createdAt: integer("created_at").notNull().default(now),
   updatedAt: integer("updated_at").notNull().default(now),
 }, (t) => ({ weekIdx: uniqueIndex("campaigns_week_idx").on(t.weekOf) }));
+
+/** A one-shot admin banner. See src/lib/flash.ts for why it is not in the URL. */
+export const notices = sqliteTable("notices", {
+  id: text("id").primaryKey(),
+  kind: text("kind", { enum: ["ok", "problem"] }).notNull(),
+  message: text("message").notNull(),
+  /** What the screen was looking at — the voucher code, for instance — so it
+   *  can be put back on screen without travelling through the URL. */
+  context: text("context"),
+  createdAt: integer("created_at").notNull().default(now),
+});

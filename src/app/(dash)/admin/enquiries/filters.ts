@@ -20,8 +20,7 @@ export type EnquiryQuery = {
   range?: string;
   /** free text, matched against name, email and phone */
   q?: string;
-  saved?: string;
-  problem?: string;
+  n?: string;
 };
 
 export const RANGES = [

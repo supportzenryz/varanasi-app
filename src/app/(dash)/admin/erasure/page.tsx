@@ -15,10 +15,10 @@ function when(at: number): string {
 }
 
 export default async function ErasurePage({ searchParams }: {
-  searchParams: Promise<{ q?: string; saved?: string; problem?: string }>;
+  searchParams: Promise<{ q?: string; n?: string; problem?: string }>;
 }) {
   await requireAbility("erasePersonalData");
-  const { q, saved, problem } = await searchParams;
+  const { q, n } = await searchParams;
   const query = (q ?? "").trim();
   const found = query.length >= 3 ? findPersonalData(query) : null;
   const total = found ? found.enquiries.length + found.bookings.length + found.vouchers.length : 0;
@@ -26,7 +26,7 @@ export default async function ErasurePage({ searchParams }: {
 
   return (
     <>
-      <AdminNotice saved={saved} problem={problem} />
+      <AdminNotice n={n} />
       <span className="accent text-xs text-gold-ink">Erasure requests</span>
       <h1 className="text-3xl sm:text-4xl mt-3">Someone has asked to be forgotten</h1>
       <p className="text-ink-3 mt-2 max-w-[64ch]">

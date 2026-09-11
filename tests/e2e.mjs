@@ -380,7 +380,18 @@ console.log('\n── 2b. The date picker knows what the restaurant is doing ─
      misremembered the date. */
   t('A date blocked in the admin is not a link',
     await page.locator(`a[href$="date=${blocked}"]`).count() === 0);
-  const blockedCell = page.locator(`[aria-label^="${blocked}"]`);
+  /* The calendar opens on the month of the first bookable day, so a date
+     twenty days out is on the next page whenever that crosses a month
+     boundary — which is why this passed every day of the run until the 11th
+     and then failed on the 1st of October. Page forward if it is not here
+     yet, rather than asserting on a day the guest would also have to page to
+     find. */
+  let blockedCell = page.locator(`[aria-label^="${blocked}"]`);
+  if (await blockedCell.count() === 0) {
+    await page.locator('button[aria-label="Next month"]').click();
+    await page.waitForTimeout(200);
+    blockedCell = page.locator(`[aria-label^="${blocked}"]`);
+  }
   t('  · but it is still shown on the calendar', await blockedCell.count() === 1);
   t('  · and says why, in the manager\'s own words',
     /E2E Wedding/.test(await blockedCell.getAttribute('aria-label') ?? ''),

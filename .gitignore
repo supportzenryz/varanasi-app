@@ -73,3 +73,6 @@ shot*.mjs
 .tmp-auth-test/
 .tmp-qr-test/
 .tmp-marketing-test/
+
+# FUSE artefacts from mounting the folder
+data/.fuse_hidden*

@@ -18,10 +18,11 @@ function mineIncludes(session: { role: string; branchId: number | null }, branch
 import { formatPence } from "@/lib/money";
 import { voucherRules } from "@/lib/booking-config";
 import { voucherByCode, redemptionsFor, expiryLabel, expireOldVouchers } from "@/lib/voucher";
-import { redeemVoucher, issueVoucher, cancelVoucher, releaseScheduled } from "./actions";
+import { redeemVoucher, issueVoucher, cancelVoucher, releaseScheduled, findVoucher } from "./actions";
 import { ConfirmButton } from "@/components/ConfirmButton";
 import { AdminNotice } from "@/components/AdminNotice";
 import { field, label } from "@/lib/forms";
+import { readNotice } from "@/lib/flash";
 
 export const metadata = { title: "Gift vouchers" };
 
@@ -36,13 +37,14 @@ const STATUS_COLOUR: Record<string, string> = {
 
 export default async function VouchersAdmin({
   searchParams,
-}: { searchParams: Promise<{ code?: string; saved?: string; problem?: string }> }) {
+}: { searchParams: Promise<{ n?: string; page?: string }> }) {
   const session = await requireAbility("redeemVoucher");
-  /* `saved` and `problem`, the same two words as every other admin screen.
-     This page used to invent `done` and `error`, which meant its actions could
-     not use the shared feedback helpers and its banners were a second,
-     slightly different copy of the same component. */
-  const { code, saved, problem } = await searchParams;
+  const { n, page: pageParam } = await searchParams;
+  /* The code being looked at travels in the notice row, not the URL — a
+     voucher code is money and a URL is written into browser history on a
+     shared terminal. See lib/flash.ts. */
+  const code = readNotice(n)?.context ?? undefined;
+  const page = Math.max(1, Number(pageParam ?? 1) || 1);
 
   // Anything past its date stops being redeemable the moment this screen opens.
   expireOldVouchers();
@@ -88,8 +90,15 @@ export default async function VouchersAdmin({
     .where(and(sql`status = 'active' and delivered_at is null and deliver_on is not null`, ofMine))
     .get()?.n ?? 0;
 
+  /* Ten a page. The list used to be a flat most-recent-25 with no way past
+     it, so a restaurant three months in could not reach the voucher it sold
+     last week from this screen at all. */
+  const PER_PAGE = 10;
+  const totalVouchers = db.select({ n: sql<number>`count(*)` }).from(vouchers).where(ofMine).get()?.n ?? 0;
+  const pages = Math.max(1, Math.ceil(totalVouchers / PER_PAGE));
   const recent = db.select().from(vouchers).where(ofMine)
-    .orderBy(desc(vouchers.createdAt)).limit(25).all();
+    .orderBy(desc(vouchers.createdAt))
+    .limit(PER_PAGE).offset((Math.min(page, pages) - 1) * PER_PAGE).all();
 
   const canIssue = can(session, "issueVoucher");
   const canCancel = can(session, "cancelVoucher");
@@ -102,7 +111,7 @@ export default async function VouchersAdmin({
         Look a voucher up by its code to check the balance or take money off it at the till.
       </p>
 
-      <div className="mt-6"><AdminNotice saved={saved} problem={problem} /></div>
+      <div className="mt-6"><AdminNotice n={n} /></div>
 
       <div className="mt-8 grid gap-px bg-[--line] sm:grid-cols-3 border border-[--line]">
         <div className="bg-pale p-5">
@@ -130,19 +139,19 @@ export default async function VouchersAdmin({
       <section className="mt-10 border border-[--line] bg-white/50">
         <div className="px-5 sm:px-7 py-6">
           <h2 className="text-xl">Look up a voucher</h2>
-          <form className="mt-4 flex flex-wrap items-end gap-3">
+          {/* A server action, not a GET form: a GET form would put the code
+              straight into the address bar. */}
+          <form action={findVoucher} className="mt-4 flex flex-wrap items-end gap-3">
             <div className="flex-1 min-w-[16rem]">
               <label className={label} htmlFor="code">Voucher code</label>
               <input id="code" name="code" defaultValue={code ?? ""} placeholder="VG-XXXX-XXXX-XXXX"
-                className={`${field} tnum uppercase`} />
+                className={`${field} tnum uppercase`} autoComplete="off" />
             </div>
             <button className="bg-ink text-pale px-5 py-2.5 text-sm font-semibold">Find it</button>
           </form>
         </div>
 
-        {code && !looked && (
-          <p className="px-5 sm:px-7 pb-6 text-sm text-brick">No voucher found with that code.</p>
-        )}
+
 
         {looked && (
           <div className="border-t border-[--line] px-5 sm:px-7 py-6 bg-white">
@@ -289,7 +298,13 @@ export default async function VouchersAdmin({
 
       {/* recent */}
       <section className="mt-10">
-        <h2 className="text-xl">Recent vouchers</h2>
+        <div className="flex flex-wrap items-baseline justify-between gap-3">
+          <h2 className="text-xl">Recent vouchers</h2>
+          <p className="text-sm text-ink-3 tnum">
+            {totalVouchers.toLocaleString("en-GB")} in total
+            {pages > 1 && <> &middot; page {Math.min(page, pages)} of {pages}</>}
+          </p>
+        </div>
         <div className="mt-4 border border-[--line] bg-white/50 overflow-x-auto">
           <table className="w-full text-sm min-w-[44rem]">
             <thead>
@@ -305,10 +320,14 @@ export default async function VouchersAdmin({
             <tbody>
               {recent.map((v) => (
                 <tr key={v.id} className="border-b border-[--line] last:border-0">
+                  {/* A form, not a link. A link would put the code back in the
+                      address bar, which is the whole thing this screen stopped
+                      doing. */}
                   <td className="px-4 py-3 tnum whitespace-nowrap">
-                    <a href={`/admin/vouchers?code=${encodeURIComponent(v.code)}`} className="underline hover:text-gold-ink">
-                      {v.code}
-                    </a>
+                    <form action={findVoucher}>
+                      <input type="hidden" name="code" value={v.code} />
+                      <button className="underline hover:text-gold-ink tnum">{v.code}</button>
+                    </form>
                   </td>
                   <td className="px-4 py-3 tnum">{formatPence(v.valuePence)}</td>
                   <td className="px-4 py-3 tnum">{formatPence(v.balancePence)}</td>
@@ -331,6 +350,23 @@ export default async function VouchersAdmin({
             </tbody>
           </table>
         </div>
+
+        {pages > 1 && (
+          <nav aria-label="Voucher pages" className="mt-4 flex flex-wrap items-center gap-2 text-sm">
+            {Math.min(page, pages) > 1 && (
+              <a href={`/admin/vouchers?page=${Math.min(page, pages) - 1}`}
+                className="border border-[--line] px-3 py-1.5 hover:bg-pale">Newer</a>
+            )}
+            {Math.min(page, pages) < pages && (
+              <a href={`/admin/vouchers?page=${Math.min(page, pages) + 1}`}
+                className="border border-[--line] px-3 py-1.5 hover:bg-pale">Older</a>
+            )}
+            <span className="text-ink-3 tnum">
+              Showing {(Math.min(page, pages) - 1) * PER_PAGE + 1}&ndash;
+              {Math.min(Math.min(page, pages) * PER_PAGE, totalVouchers)} of {totalVouchers}
+            </span>
+          </nav>
+        )}
       </section>
     </>
   );

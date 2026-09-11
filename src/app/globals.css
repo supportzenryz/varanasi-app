@@ -325,7 +325,18 @@ h1 { line-height: 1.04; }
   font-size: .95rem;
   line-height: 1.5;
   color: var(--text);
-  background: var(--field-bg, rgba(255, 255, 255, 0.035));
+  /* `background-color`, never the `background` shorthand.
+   *
+   * The shorthand resets every background longhand it does not mention —
+   * image, repeat, size, position. `select.field` below draws its chevron with
+   * those longhands, so a shorthand anywhere in a rule that can beat it wipes
+   * them out. That is exactly what `.field:focus` did: the moment a dropdown
+   * was opened (opening focuses it) the chevron lost `no-repeat` and its
+   * explicit size, and in the admin — where `.dash select.field` is specific
+   * enough to keep the image alive — it tiled into a row of zigzags across the
+   * whole control. Invisible until you click, which is why it survived three
+   * rounds of screenshots. */
+  background-color: var(--field-bg, rgba(255, 255, 255, 0.035));
   border: 1px solid var(--line);
   border-radius: 0;
   padding: .85rem 1rem;
@@ -344,7 +355,7 @@ h1 { line-height: 1.04; }
 .field:focus {
   border-color: var(--color-gold);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-gold) 18%, transparent);
-  background: var(--field-bg-focus, rgba(255, 255, 255, 0.06));
+  background-color: var(--field-bg-focus, rgba(255, 255, 255, 0.06));
 }
 .dash .field:focus { --field-bg-focus: #FFFFFF; }
 
@@ -362,7 +373,7 @@ h1 { line-height: 1.04; }
 .field:disabled {
   opacity: .45;
   cursor: not-allowed;
-  background: transparent;
+  background-color: transparent;
 }
 
 /* Chrome paints autofilled inputs with a hardcoded pale yellow background and
@@ -466,7 +477,8 @@ input[type="time"].field::-webkit-calendar-picker-indicator {
   height: 1.25rem;
   margin: .12rem 0 0;
   border: 1px solid var(--line);
-  background: var(--field-bg, rgba(255, 255, 255, 0.035));
+  /* Same reason as `.field` — the tick is drawn with `background-image`. */
+  background-color: var(--field-bg, rgba(255, 255, 255, 0.035));
   cursor: pointer;
   transition: border-color .2s, background-color .2s, box-shadow .2s;
 }

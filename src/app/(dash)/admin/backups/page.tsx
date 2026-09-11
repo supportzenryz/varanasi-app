@@ -13,7 +13,7 @@ const when = (d: Date) =>
 export default async function BackupsAdmin({
   searchParams,
 }: {
-  searchParams: Promise<{ saved?: string; problem?: string }>;
+  searchParams: Promise<{ n?: string; problem?: string }>;
 }) {
   await requireAbility("manageBackups");
   const sp = await searchParams;
@@ -29,7 +29,7 @@ export default async function BackupsAdmin({
         their balances, enquiries and menus — taken automatically once a day.
       </p>
 
-      <div className="mt-6"><AdminNotice saved={sp.saved} problem={sp.problem} /></div>
+      <div className="mt-6"><AdminNotice n={sp.n} /></div>
 
       {/* The state that actually matters, said plainly rather than left for
           someone to work out from a list of filenames. */}

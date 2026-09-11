@@ -9,17 +9,19 @@ import { parsePounds, formatPence } from "@/lib/money";
 import { ok, problem } from "@/lib/admin-feedback";
 import {
   redeem, voucherByCode, voucherById, startPurchase, activatePaidVoucher, deliverDueVouchers,
+  normaliseCode,
 } from "@/lib/voucher";
 
-/* One vocabulary. This screen spoke its own — `?done=` and `?error=` — while
-   every other admin screen used `?saved=` and `?problem=` through
-   lib/admin-feedback, so the shared banner component could not render it and
-   the messages here were duplicated inline with slightly different colours.
-   `withCode` keeps the looked-up voucher on screen after the action, which is
-   the one thing this page needs that the shared helpers do not do for free. */
-function withCode(code: string): string {
-  return code ? `/admin/vouchers?code=${encodeURIComponent(code)}` : "/admin/vouchers";
-}
+/* One vocabulary, and no voucher code in the address bar.
+ *
+ * This screen used to spell the code into the URL so the looked-up voucher
+ * stayed on screen after an action: `/admin/vouchers?code=VG-VG2Q-HNUR-KXVC`.
+ * That is a working feature and an unnecessary exposure — a voucher code is
+ * bearer money, and a URL lands in the browser history of a shared terminal
+ * and in every access log between here and the guest. The code now rides in
+ * the notice row instead (lib/flash.ts), which the page reads back and puts
+ * on screen exactly as before. The URL carries six random bytes. */
+const BACK_TO_LIST = "/admin/vouchers";
 
 function log(session: Session, action: string, entityId: string, detail?: string) {
   record(session, { action, entity: "voucher", entityId, detail });
@@ -31,10 +33,13 @@ export async function redeemVoucher(formData: FormData) {
   const code = String(formData.get("code") ?? "");
   const amount = parsePounds(String(formData.get("amount") ?? ""));
 
-  const BACK = withCode(code);
+  const BACK = BACK_TO_LIST;
+  /* The code the till typed in, carried through the redirect so the voucher
+     is still on screen afterwards. */
+  const KEEP = code;
 
-  if (amount == null) problem(BACK, "Enter the amount as a number, like 25 or 25.50.");
-  if (amount === 0) problem(BACK, "Enter an amount greater than zero.");
+  if (amount == null) problem(BACK, "Enter the amount as a number, like 25 or 25.50.", KEEP);
+  if (amount === 0) problem(BACK, "Enter an amount greater than zero.", KEEP);
 
   const result = redeem({
     code,
@@ -52,14 +57,14 @@ export async function redeemVoucher(formData: FormData) {
     expectedBalancePence: Number(formData.get("expectedBalance")),
   });
 
-  if (!result.ok) problem(BACK, result.error);
+  if (!result.ok) problem(BACK, result.error, KEEP);
 
   log(session, "voucher.redeem", result.voucher.code,
     `${formatPence(amount!)} taken, ${formatPence(result.remaining)} left`);
   revalidatePath("/admin/vouchers");
   ok(BACK, `${formatPence(amount!)} redeemed. ${result.remaining > 0
     ? `${formatPence(result.remaining)} still on the voucher.`
-    : "The voucher is now fully used."}`);
+    : "The voucher is now fully used."}`, KEEP);
 }
 
 /** Issue a voucher by hand — a gesture, a complaint, a corporate order. */
@@ -129,13 +134,13 @@ export async function issueVoucher(formData: FormData) {
    * the difference matters to the person standing at the pass. */
   const sent = activated.delivery?.ok !== false;
   if (sent) {
-    ok(withCode(issued.code),
-      `Voucher ${issued.code} issued for ${formatPence(issued.valuePence)} and emailed to ${issued.recipientEmail}.`);
+    ok(BACK_TO_LIST, `Voucher ${issued.code} issued for ${formatPence(issued.valuePence)} and emailed to ${issued.recipientEmail}.`,
+      issued.code);
   }
-  ok(withCode(issued.code),
-    `Voucher ${issued.code} issued for ${formatPence(issued.valuePence)} — but the email to `
+  ok(BACK_TO_LIST, `Voucher ${issued.code} issued for ${formatPence(issued.valuePence)} — but the email to `
     + `${issued.recipientEmail} did NOT send (${activated.delivery?.reason ?? "the provider refused it"}). `
-    + "The voucher is valid; read the code out or check Settings → Email. It will retry every hour.");
+    + "The voucher is valid; read the code out or check Settings → Email. It will retry every hour.",
+    issued.code);
 }
 
 /** Cancel a voucher — owners only, and it can't be undone. */
@@ -152,11 +157,10 @@ export async function cancelVoucher(formData: FormData) {
      The row's own status is the guard: cancelling twice is not a thing that
      can happen. */
   if (v!.status === "cancelled") {
-    ok(withCode(v!.code), `Voucher ${v!.code} was already cancelled — nothing further has changed.`);
+    ok(BACK_TO_LIST, `Voucher ${v!.code} was already cancelled — nothing further has changed.`, v!.code);
   }
   if (v!.status === "redeemed" || v!.balancePence === 0) {
-    problem(withCode(v!.code),
-      "That voucher has already been used in full — there is nothing left to cancel.");
+    problem(BACK_TO_LIST, "That voucher has already been used in full — there is nothing left to cancel.");
   }
 
   const was = v!.balancePence;
@@ -169,8 +173,7 @@ export async function cancelVoucher(formData: FormData) {
 
   const after = voucherById(v!.id);
   if (after?.status !== "cancelled") {
-    problem(withCode(v!.code),
-      "That voucher changed while you were looking at it — check the balance and try again.");
+    problem(BACK_TO_LIST, "That voucher changed while you were looking at it — check the balance and try again.");
   }
 
   log(session, "voucher.cancel", v!.code, `was ${formatPence(was)}`);
@@ -179,7 +182,7 @@ export async function cancelVoucher(formData: FormData) {
      this one success path, so the owner cancelled a voucher and the voucher
      vanished from the screen — leaving them to type the code again to check
      that what they had just done had worked. */
-  ok(withCode(v!.code), `Voucher ${v!.code} cancelled.`);
+  ok(BACK_TO_LIST, `Voucher ${v!.code} cancelled.`, v!.code);
 }
 
 /** Send any vouchers whose scheduled delivery date has arrived. */
@@ -190,4 +193,24 @@ export async function releaseScheduled() {
   revalidatePath("/admin/vouchers");
   ok("/admin/vouchers",
     n ? `${n} scheduled voucher${n === 1 ? "" : "s"} sent.` : "Nothing was due to be sent.");
+}
+
+/**
+ * Look a voucher up at the till.
+ *
+ * A server action rather than the GET form it used to be, for one reason: a
+ * GET form puts what you typed into the address bar, and what you type here is
+ * a voucher code. The code goes into the notice row instead and comes back on
+ * screen from there.
+ */
+export async function findVoucher(formData: FormData) {
+  await requireAbility("redeemVoucher");
+  const typed = String(formData.get("code") ?? "").trim();
+  if (!typed) problem(BACK_TO_LIST, "Type or scan a voucher code to look it up.");
+
+  const found = voucherByCode(typed);
+  if (!found) {
+    problem(BACK_TO_LIST, `No voucher found with the code ${normaliseCode(typed)}.`, typed);
+  }
+  ok(BACK_TO_LIST, `Showing voucher ${found!.code}.`, found!.code);
 }

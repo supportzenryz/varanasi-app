@@ -24,9 +24,9 @@ type Kind = (typeof KINDS)[number]["key"];
 
 export default async function MenuAdmin({
   searchParams,
-}: { searchParams: Promise<{ branch?: string; kind?: string; saved?: string; problem?: string }> }) {
+}: { searchParams: Promise<{ branch?: string; kind?: string; n?: string; problem?: string }> }) {
   const session = await requireAbility("editMenu");
-  const { branch: branchParam, kind: kindParam, saved, problem } = await searchParams;
+  const { branch: branchParam, kind: kindParam, n } = await searchParams;
 
   const all = db.select().from(branches).orderBy(asc(branches.sort)).all();
   const visible = session.role === "owner" ? all : all.filter((b) => b.id === session.branchId);
@@ -56,7 +56,7 @@ export default async function MenuAdmin({
 
   return (
     <>
-      <AdminNotice saved={saved} problem={problem} />
+      <AdminNotice n={n} />
       <span className="accent text-xs text-gold-ink">Menus</span>
       <h1 className="text-3xl sm:text-4xl mt-3">{active.city}&rsquo;s menus</h1>
       <p className="text-ink-3 mt-2 max-w-[62ch]">

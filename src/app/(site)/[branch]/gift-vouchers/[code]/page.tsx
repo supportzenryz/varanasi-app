@@ -48,7 +48,7 @@ export default async function VoucherPage({
      opens ready to take an amount off; anybody else who scans it gets a
      sign-in page, which is the correct answer to a stranger with a camera. */
   const site = siteUrl();
-  const redeemUrl = `${site}/admin/vouchers?code=${encodeURIComponent(v.code)}`;
+  const redeemUrl = `${site}/admin/vouchers/scan?code=${encodeURIComponent(v.code)}`;
   const qr = qrSvg(redeemUrl, { size: 168, label: `Gift voucher ${v.code}` });
 
   const spent = v.valuePence - v.balancePence;

@@ -102,16 +102,29 @@ console.log('\n── A guest buys a gift voucher, on a phone ──');
     await p2.fill('input[name="password"]', 'ChangeMe!2026');
     await p2.click('button[type="submit"]');
     await p2.waitForURL(u => !u.pathname.startsWith('/admin/login'), { timeout: 20000 }).catch(() => {});
-    await p2.goto(`${BASE}/admin/vouchers?code=${v.code}`, { waitUntil: 'networkidle' });
+    /* Scanning the QR. The code arrives in the URL of the scan route — a QR has
+       nowhere else to carry it — and that route moves it into a notice row and
+       sends the browser on to a clean /admin/vouchers?n=… so the code never
+       comes to rest in the till's browser history. */
+    await p2.goto(`${BASE}/admin/vouchers/scan?code=${v.code}`, { waitUntil: 'networkidle' });
     t('scanning it opens the till screen with the voucher looked up',
       (await p2.locator('body').innerText()).includes(v.code));
+    t('  · and the voucher code is NOT left in the address bar',
+      !p2.url().includes(v.code) && /[?&]n=/.test(p2.url()), p2.url().replace(BASE, ''));
 
+    /* The nonce we are on now. The redeem redirect issues a NEW one, and
+       waiting for "a URL with ?n=" would match the page we are already
+       standing on and read the banner before it had changed. */
+    const beforeNonce = new URL(p2.url()).searchParams.get('n');
     await p2.locator('#amount').fill('20');
     await p2.locator('form:has(input[name="amount"]) button').last().click();
     /* Wait for the action's own redirect rather than for the network to go
        quiet: a server action posts and then redirects, and `networkidle` can
        resolve in the gap between the two. */
-    await p2.waitForURL(/saved=|problem=/, { timeout: 20000 }).catch(() => {});
+    await p2.waitForURL((u) => {
+      const n = new URL(u).searchParams.get('n');
+      return Boolean(n) && n !== beforeNonce;
+    }, { timeout: 20000 }).catch(() => {});
     const said = await p2.locator('body').innerText();
     const left = q('select balance_pence from vouchers where code = ?', v.code)[0].balance_pence;
     t('taking £20 off leaves the rest', left === v.balance_pence - 2000,

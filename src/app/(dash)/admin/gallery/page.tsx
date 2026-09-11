@@ -17,9 +17,9 @@ export const metadata = { title: "Gallery & venue tiles" };
 
 export default async function GalleryAdmin({
   searchParams,
-}: { searchParams: Promise<{ branch?: string; saved?: string; problem?: string }> }) {
+}: { searchParams: Promise<{ branch?: string; n?: string; problem?: string }> }) {
   const session = await requireAbility("editRooms");
-  const { branch: branchParam, saved, problem } = await searchParams;
+  const { branch: branchParam, n } = await searchParams;
 
   const all = db.select().from(branches).orderBy(asc(branches.sort)).all();
   const visible = session.role === "owner" ? all : all.filter((b) => b.id === session.branchId);
@@ -33,7 +33,7 @@ export default async function GalleryAdmin({
 
   return (
     <>
-      <AdminNotice saved={saved} problem={problem} />
+      <AdminNotice n={n} />
       <span className="accent text-xs text-gold-ink">Gallery &amp; venue tiles</span>
       <h1 className="text-3xl sm:text-4xl mt-3">{active.city}&rsquo;s photographs</h1>
       <p className="text-ink-3 mt-2 max-w-[62ch]">

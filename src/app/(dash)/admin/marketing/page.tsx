@@ -27,7 +27,10 @@ const STATUS: Record<string, string> = {
   cancelled: "bg-ink/10 text-ink-3",
 };
 
-export default async function MarketingAdmin() {
+export default async function MarketingAdmin({
+  searchParams,
+}: { searchParams: Promise<{ n?: string }> }) {
+  const { n } = await searchParams;
   const session = await requireAbility("editMarketing");
   const mayS = can(session, "sendMarketing");
 
@@ -49,7 +52,7 @@ export default async function MarketingAdmin() {
         {mayS ? " Nothing goes out until you press send." : " An owner presses send."}
       </p>
 
-      <AdminNotice />
+      <AdminNotice n={n} />
 
       {/* ---------- the list ---------- */}
       <section className="grid gap-4 sm:grid-cols-3 mb-9">

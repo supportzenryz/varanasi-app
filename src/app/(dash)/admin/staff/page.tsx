@@ -19,9 +19,9 @@ const ROLE_NOTE: Record<string, string> = {
 };
 
 export default async function StaffAdmin({ searchParams }: {
-  searchParams: Promise<{ saved?: string; problem?: string }>;
+  searchParams: Promise<{ n?: string; problem?: string }>;
 }) {
-  const { saved, problem } = await searchParams;
+  const { n } = await searchParams;
   const session = await requireAbility("manageStaff");
   const all = db.select().from(branches).orderBy(asc(branches.sort)).all();
   const cityOf = new Map(all.map((b) => [b.id, b.city]));
@@ -36,7 +36,7 @@ export default async function StaffAdmin({ searchParams }: {
 
   return (
     <>
-      <AdminNotice saved={saved} problem={problem} />
+      <AdminNotice n={n} />
       <span className="accent text-xs text-gold-ink">Staff access</span>
       <h1 className="text-3xl sm:text-4xl mt-3">Who can get in</h1>
       <p className="text-ink-3 mt-2 max-w-[62ch]">

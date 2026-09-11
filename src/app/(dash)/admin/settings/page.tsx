@@ -16,9 +16,9 @@ const pounds = (p: number) => (p / 100).toFixed(2).replace(/\.00$/, "");
 export default async function SettingsAdmin({
   searchParams,
 }: {
-  searchParams: Promise<{ saved?: string; problem?: string }>;
+  searchParams: Promise<{ n?: string; problem?: string }>;
 }) {
-  const { saved, problem } = await searchParams;
+  const { n } = await searchParams;
   await requireAbility("editSettings");
   const rules = bookingRules();
   const all = db.select().from(branches).orderBy(asc(branches.sort)).all();
@@ -55,7 +55,7 @@ export default async function SettingsAdmin({
           the save had worked was somewhere the person never looked, and the
           screen they got back was indistinguishable from one where nothing had
           happened. */}
-      <AdminNotice saved={saved} problem={problem} />
+      <AdminNotice n={n} />
 
       {/* what's actually wired up right now */}
       <div className="mt-8 grid gap-px bg-[--line] sm:grid-cols-2 border border-[--line]">

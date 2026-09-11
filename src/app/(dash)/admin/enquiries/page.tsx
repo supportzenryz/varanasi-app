@@ -39,7 +39,7 @@ export default async function EnquiriesAdmin({
      enquiry was unreachable from this screen — no way to page back, and the
      only route to it was the CSV export. */
   const page = Math.max(1, Number(sp.page ?? 1) || 1);
-  const { saved, problem } = sp;
+  const { n } = sp;
   /* Carried into every form on this page, so an action can put the person back
      on the list they were reading rather than on an unfiltered page one. */
   const filters = filtersToQuery(params);
@@ -77,7 +77,7 @@ export default async function EnquiriesAdmin({
 
   return (
     <>
-      <AdminNotice saved={saved} problem={problem} />
+      <AdminNotice n={n} />
       <span className="accent text-gold-ink">Enquiries</span>
       <h1 className="text-3xl sm:text-4xl mt-3">Enquiries</h1>
       <p className="text-ink-3 mt-2 max-w-[62ch]">

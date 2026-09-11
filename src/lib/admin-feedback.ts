@@ -1,5 +1,6 @@
 import "server-only";
 import { redirect } from "next/navigation";
+import { stashNotice } from "@/lib/flash";
 
 /**
  * Telling the person at the keyboard what just happened.
@@ -15,15 +16,21 @@ import { redirect } from "next/navigation";
  * empty, and the booking did not exist. Nothing said why.
  *
  * So: every action ends in one of these two. `ok` for done, `problem` for
- * refused-and-here-is-why. The message travels in the URL because these are
- * server actions ending in a redirect and there is no state to hold it in;
- * it is rendered as text, never as markup, and it is written by this codebase
- * rather than echoed from user input.
+ * refused-and-here-is-why.
+ *
+ * Both stay synchronous and both still return `never`, which is what lets
+ * TypeScript treat the line after them as unreachable — the narrowing that
+ * makes `if (!name.ok) problem(BACK, name.error);` safe on the next line.
+ * The message no longer travels in the URL (see lib/flash.ts); only an opaque
+ * nonce does.
  */
-export function ok(path: string, message: string): never {
-  redirect(`${path}${path.includes("?") ? "&" : "?"}saved=${encodeURIComponent(message)}`);
+
+export function ok(path: string, message: string, context?: string): never {
+  const n = stashNotice({ kind: "ok", message, context });
+  redirect(`${path}${path.includes("?") ? "&" : "?"}n=${n}`);
 }
 
-export function problem(path: string, message: string): never {
-  redirect(`${path}${path.includes("?") ? "&" : "?"}problem=${encodeURIComponent(message)}`);
+export function problem(path: string, message: string, context?: string): never {
+  const n = stashNotice({ kind: "problem", message, context });
+  redirect(`${path}${path.includes("?") ? "&" : "?"}n=${n}`);
 }

@@ -167,7 +167,7 @@ export async function activatePaidVoucher(opts: {
   voucherId: number;
   paymentIntent?: string | null;
   sessionId?: string | null;
-}): Promise<{ activated: boolean; alreadyDone: boolean; voucher?: Voucher }> {
+}): Promise<{ activated: boolean; alreadyDone: boolean; voucher?: Voucher; delivery?: Delivery }> {
   const existing = voucherById(opts.voucherId);
   if (!existing) return { activated: false, alreadyDone: false };
 
@@ -227,9 +227,13 @@ export async function activatePaidVoucher(opts: {
   // being held for a future date.
   await notifyPurchaser(voucher);
   const today = new Date().toISOString().slice(0, 10);
-  if (!voucher.deliverOn || voucher.deliverOn <= today) await deliverVoucher(voucher);
+  const delivery = (!voucher.deliverOn || voucher.deliverOn <= today)
+    ? await deliverVoucher(voucher)
+    : { ok: true as const };
 
-  return { activated: true, alreadyDone: false, voucher };
+  /* Handed back rather than swallowed, so the member of staff who pressed
+     "Issue" is told whether the guest actually received anything. */
+  return { activated: true, alreadyDone: false, voucher, delivery };
 }
 
 export function markPurchaseFailed(voucherId: number): void {
@@ -273,13 +277,16 @@ export function voucherLink(v: Voucher, site: string): string {
   return `${site.replace(/\/$/, "")}/${slug}/gift-vouchers/${encodeURIComponent(v.code)}`;
 }
 
-export async function deliverVoucher(v: Voucher): Promise<void> {
-  if (v.deliveredAt) return;
+export type Delivery = { ok: boolean; reason?: string };
+
+export async function deliverVoucher(v: Voucher): Promise<Delivery> {
+  if (v.deliveredAt) return { ok: true };
+  if (!v.recipientEmail) return { ok: false, reason: "the voucher has no recipient address" };
   const rules = voucherRules();
   const site = siteUrl();
 
-  await sendMail({
-    to: v.recipientEmail ? [v.recipientEmail] : [],
+  const sent = await sendMail({
+    to: [v.recipientEmail],
     subject: `${v.purchaserName} has sent you a Varanasi gift voucher`,
     replyTo: rules.replyTo,
     fromName: rules.fromName,
@@ -312,14 +319,30 @@ We look forward to welcoming you.
 Varanasi Restaurant`,
   });
 
-  if (v.recipientEmail) {
-    // A voucher is a nice thing to get on WhatsApp too, where we have a number.
-    // (No number is stored for gift purchases yet — kept here for when the
-    // form starts asking, and used by the thank-you voucher, which has one.)
+  /* Stamped only if the message was actually accepted.
+   *
+   * This wrote `deliveredAt` unconditionally, one line after ignoring what
+   * `sendMail` returned. So a voucher the provider REFUSED — which is what
+   * happens on every message until the sending domain is verified — was
+   * marked delivered forever. `deliverVoucher` returns early on `deliveredAt`
+   * and `deliverDueVouchers` selects on `deliveredAt IS NULL`, so the retry
+   * that already exists could never pick it up: the guest had paid, the
+   * restaurant owed them the money, and the email was gone with nothing on
+   * any screen to say so.
+   *
+   * Leaving it null costs an hourly retry that fails until somebody fixes the
+   * provider, and then delivers by itself the moment they do. */
+  if (!sent.ok) {
+    console.error(
+      `[voucher] ${v.code}: could not send to ${v.recipientEmail} — ${sent.detail ?? "refused"}. `
+      + "It stays undelivered and will be retried hourly.",
+    );
+    return { ok: false, reason: sent.detail ?? `the mail provider refused it (${sent.via})` };
   }
 
   db.update(vouchers).set({ deliveredAt: Math.floor(Date.now() / 1000) })
     .where(eq(vouchers.id, v.id)).run();
+  return { ok: true };
 }
 
 async function notifyPurchaser(v: Voucher): Promise<void> {
@@ -396,8 +419,12 @@ export async function deliverDueVouchers(): Promise<number> {
       isNull(vouchers.deliveredAt),
       or(isNull(vouchers.deliverOn), lte(vouchers.deliverOn, today)),
     )).all();
-  for (const v of due) await deliverVoucher(v);
-  return due.length;
+  let sent = 0;
+  for (const v of due) if ((await deliverVoucher(v)).ok) sent++;
+  if (due.length && sent < due.length) {
+    console.warn(`[voucher] ${due.length - sent} of ${due.length} could not be delivered — see above.`);
+  }
+  return sent;
 }
 
 /** Marks anything past its expiry, so a stale code can't be redeemed. */

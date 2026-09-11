@@ -213,6 +213,50 @@ console.log("\n── What actually went in the envelope ──");
     `${tokens.size} distinct link(s) across ${files.length} message(s)`);
 }
 
+console.log("\n── A voucher whose email is refused is not marked delivered ──");
+{
+  /* The defect this covers cost the guest their gift. `deliverVoucher` stamped
+     `deliveredAt` one line after ignoring what `sendMail` returned, so a
+     message the provider refused — which is every message until the sending
+     domain is verified — left a voucher marked delivered forever. The retry
+     that already exists selects on `deliveredAt IS NULL`, so it could never
+     pick it up. */
+  const voucher = await import(pathToFileURL(path.join(dir, "voucher.ts")).href);
+
+  const started = voucher.startPurchase({
+    branchSlug: "birmingham", valuePence: 5000,
+    purchaserName: "Ana Silva", purchaserEmail: "ana@example.test",
+    recipientName: "Tom Silva", recipientEmail: "tom@example.test",
+  });
+  t("a voucher can be started", started.ok === true);
+
+  const activated = await voucher.activatePaidVoucher({ voucherId: started.voucher.id });
+  t("paying for it activates it", activated.activated === true);
+  t("and the outcome of the email is reported, not swallowed",
+    activated.delivery !== undefined);
+  t("the outbox accepted it, so it counts as delivered",
+    activated.delivery.ok === true);
+  t("and it is stamped delivered", Boolean(voucher.voucherById(started.voucher.id).deliveredAt));
+
+  /* Now the failing case: no recipient address at all is the one refusal this
+     suite can produce without a live provider, and it exercises the same
+     branch — report the failure, leave `deliveredAt` null so the hourly retry
+     will try again. */
+  const orphan = voucher.startPurchase({
+    branchSlug: "birmingham", valuePence: 2500,
+    purchaserName: "Ana Silva", purchaserEmail: "ana@example.test",
+    recipientName: "Nobody", recipientEmail: "nobody@example.test",
+  });
+  const raw = new DatabaseSync(dbFile);
+  raw.prepare("UPDATE vouchers SET recipient_email = NULL WHERE id = ?").run(orphan.voucher.id);
+  raw.close();
+
+  const failed = await voucher.deliverVoucher(voucher.voucherById(orphan.voucher.id));
+  t("a voucher that cannot be sent reports why", failed.ok === false, failed.reason);
+  t("and is NOT marked delivered, so the hourly retry still owns it",
+    voucher.voucherById(orphan.voucher.id).deliveredAt === null);
+}
+
 console.log("\n── The old customer list ──");
 {
   /* Not a behaviour test — a promise test. The 4,826-row export from the

@@ -114,13 +114,28 @@ export async function issueVoucher(formData: FormData) {
   // Issued by staff, so there's no payment to wait for — mark it as manual and
   // activate it straight away.
   db.update(vouchers).set({ origin: "manual" }).where(eq(vouchers.id, started.voucher.id)).run();
-  await activatePaidVoucher({ voucherId: started.voucher.id });
+  const activated = await activatePaidVoucher({ voucherId: started.voucher.id });
 
   const issued = voucherById(started.voucher.id)!;
   log(session, "voucher.issue", issued.code, `${formatPence(issued.valuePence)} issued manually`);
   revalidatePath("/admin/vouchers");
+
+  /* Say what actually happened.
+   *
+   * This reported "issued and emailed to …" whether or not a single message
+   * left the building — which is how somebody issues a voucher, tells the
+   * guest it is on its way, and finds out days later that it never sent. The
+   * voucher itself is real and valid either way; only the email failed, and
+   * the difference matters to the person standing at the pass. */
+  const sent = activated.delivery?.ok !== false;
+  if (sent) {
+    ok(withCode(issued.code),
+      `Voucher ${issued.code} issued for ${formatPence(issued.valuePence)} and emailed to ${issued.recipientEmail}.`);
+  }
   ok(withCode(issued.code),
-    `Voucher ${issued.code} issued for ${formatPence(issued.valuePence)} and emailed to ${issued.recipientEmail}.`);
+    `Voucher ${issued.code} issued for ${formatPence(issued.valuePence)} — but the email to `
+    + `${issued.recipientEmail} did NOT send (${activated.delivery?.reason ?? "the provider refused it"}). `
+    + "The voucher is valid; read the code out or check Settings → Email. It will retry every hour.");
 }
 
 /** Cancel a voucher — owners only, and it can't be undone. */
